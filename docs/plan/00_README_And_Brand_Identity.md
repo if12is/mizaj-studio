@@ -39,3 +39,4 @@
 4. `04_Phase4_Large_Scale_Interactive_UI.md`: محرر CodeMirror 6 للمقالات الضخمة (100+ صفحة بسرعة 60 FPS)، Undo/Redo، اختصارات لوحة المفاتيح، والنافذة المنبثقة لتعديل الحركات دون كسر المؤشر.
 5. `05_Phase5_Offline_Packaging_And_Release.md`: التجميع الأوفلاين عبر PyInstaller (مع توثيق `hiddenimports` والحجم الواقعي 250-350MB)، اختبارات Playwright E2E، وآلية التحديث الأوفلاين/الهجين.
 6. `06_Phase6_GitHub_Release_And_AutoUpdate.md`: بناء ملف `.exe` عبر GitHub Actions ونشره كـ GitHub Release، مع مُحدِّث تلقائي داخل البرنامج يفحص GitHub Releases.
+7. `07_Phase7_Improvements_And_Roadmap.md`: مقترحات التطوير وخارطة الطريق (الدقة، التدقيق، الصيغ، المحتوى المتخصص، الإتاحة، الهندسة، وميزات أونلاين اختيارية).

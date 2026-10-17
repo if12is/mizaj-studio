@@ -44,7 +44,8 @@ Cloud CI runners and AI Agent VMs (such as Google Jules) do not have pre-downloa
 ---
 
 ## 5. Security & Privacy Policy
-- **Zero Telemetry & Zero Network Egress:** The application makes ZERO external HTTP calls at runtime, with one explicit, user-controllable exception: the Electron auto-updater (`electron-updater`, GitHub provider) checks `if12is/mizaj-studio` Releases on startup and every 6 hours, can be disabled in Settings (`auto_update_check=false`), and only runs in packaged builds. Air-gapped machines use offline `.mizajpack` model packs instead. FastAPI binds exclusively to `127.0.0.1` on an OS-assigned ephemeral port (`--port 0`, printing `MIZAJ_PORT=<port>` to `stdout` on startup).
+- **Zero Telemetry & Zero Network Egress:** The application makes ZERO external HTTP calls at runtime, with one explicit, user-controllable exception: the Electron auto-updater (`electron-updater`, GitHub provider) checks `if12is/mizaj-studio` Releases on startup and every 6 hours, can be disabled in Settings (`auto_update_check=false`), and only runs in packaged builds. Air-gapped machines use offline `.mizajpack` model packs instead.
+- **Offline-first, optional online features:** the core (diacritization, editor, DOCX, dictionary) must always work fully offline. Online features are allowed only as opt-in additions: off by default, clearly stating what data leaves the device, and with an offline fallback (see `docs/plan/07_Phase7_Improvements_And_Roadmap.md`, Slice 7.8). FastAPI binds exclusively to `127.0.0.1` on an OS-assigned ephemeral port (`--port 0`, printing `MIZAJ_PORT=<port>` to `stdout` on startup).
 - **Windows Console Hiding:** Electron `spawn()` MUST always set `windowsHide: true` to prevent a black `cmd.exe` window on Windows.
 
 ---
