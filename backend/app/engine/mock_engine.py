@@ -57,6 +57,10 @@ class MockEngine(Engine):
             out.append(cached if cached and strip_marks(cached) == w else _mock_word(w))
         return out
 
+    def is_ambiguous(self, word: str) -> bool:
+        """Mock `minimal` rule: 'ambiguous' iff the bare word has exactly 3 letters."""
+        return len(strip_marks(word)) == 3
+
     def suggestions(self, word: str) -> list[dict[str, str]]:
         w = strip_marks(word)
         if w == "علم":

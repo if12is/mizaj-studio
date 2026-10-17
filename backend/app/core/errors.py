@@ -84,6 +84,36 @@ def task_cancelled() -> MizajError:
     )
 
 
+def docx_corrupt(detail: str = "") -> MizajError:
+    return MizajError(
+        "ERR_DOCX_CORRUPT",
+        422,
+        "ملف الوورد تالف أو غير صالح.",
+        "The .docx file is not a valid Word document.",
+        {"reason": detail},
+    )
+
+
+def docx_write_locked(path: str) -> MizajError:
+    return MizajError(
+        "ERR_DOCX_WRITE_LOCKED",
+        423,
+        "تعذر حفظ ملف الوورد لأن الملف مفتوح حالياً في برنامج آخر.",
+        "Cannot write DOCX file because it is locked by another process.",
+        {"path": path},
+    )
+
+
+def disk_full(path: str) -> MizajError:
+    return MizajError(
+        "ERR_DISK_FULL",
+        507,
+        "لا توجد مساحة كافية على القرص.",
+        "No space left on device.",
+        {"path": path},
+    )
+
+
 def _json(err: MizajError) -> JSONResponse:
     return JSONResponse(status_code=err.status, content=err.envelope())
 

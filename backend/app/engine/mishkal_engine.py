@@ -7,7 +7,7 @@ from concurrent.futures import ThreadPoolExecutor
 from functools import lru_cache
 
 from app.engine.base import Engine, Lookup
-from app.engine.normalize import strip_marks
+from app.engine.normalize import SHADDA, split_pairs, strip_marks
 
 log = logging.getLogger("mizaj.engine.mishkal")
 
@@ -80,6 +80,18 @@ class MishkalEngine(Engine):
 
     def candidates(self, word: str) -> tuple[tuple[str, str, int], ...]:
         return self._candidates(strip_marks(word))
+
+    def is_ambiguous(self, word: str) -> bool:
+        """>1 common vocalization: among candidates with freq>0 (all, if none has freq>0),
+        count distinct internal vowel patterns (last-letter case ending and shadda ignored).
+        Unknown words have no vocalization and count as unambiguous."""
+        cands = self.candidates(word)
+        common = [c for c in cands if c[2] > 0] or list(cands)
+        patterns = set()
+        for voc, _, _ in common:
+            pairs = split_pairs(voc)
+            patterns.add(tuple(m.replace(SHADDA, "") for _, m in pairs[:-1]))
+        return len(patterns) > 1
 
     def suggestions(self, word: str) -> list[dict[str, str]]:
         cands = sorted(self.candidates(word), key=lambda c: -c[2])

@@ -114,10 +114,9 @@ def reduce_level(text: str, level: str) -> str:
 
     full      : unchanged.
     irab_only : only the marks on the last letter of each word (case ending / tanween).
-    minimal   : only shadda and tanween (the marks that most often disambiguate); all short
-                vowels and sukun are dropped.
+    minimal   : handled by the pipeline (needs a per-word ambiguity oracle); unchanged here.
     """
-    if level == "full":
+    if level not in ("irab_only",):
         return text
 
     def fix(m: re.Match[str]) -> str:
@@ -125,13 +124,14 @@ def reduce_level(text: str, level: str) -> str:
         out: list[tuple[str, str]] = []
         last = len(pairs) - 1
         for i, (b, marks) in enumerate(pairs):
-            if level == "irab_only":
-                # tanween fatha is written on the letter before a final alef (سًا)
-                tail_alef = pairs[last][0] == "\u0627" and i == last - 1
-                keep = i == last or (tail_alef and "\u064b" in marks)
-                out.append((b, ("\u064b" if i != last else marks) if keep else ""))
-            else:  # minimal
-                out.append((b, "".join(c for c in marks if c == SHADDA or c in TANWEEN)))
+            # tanween fatha is written on the letter before a final alef (سًا)
+            tail_alef = pairs[last][0] == "\u0627" and i == last - 1
+            if i == last:
+                out.append((b, marks))
+            elif tail_alef and "\u064b" in marks:
+                out.append((b, "\u064b"))
+            else:
+                out.append((b, ""))
         return join_pairs(out)
 
     return WORD_RE.sub(fix, text)

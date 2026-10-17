@@ -16,3 +16,7 @@ class Engine:
 
     def suggestions(self, word: str) -> list[dict[str, str]]:
         raise NotImplementedError
+
+    def is_ambiguous(self, word: str) -> bool:
+        """True if the bare word has more than one common vocalization (used by `minimal`)."""
+        raise NotImplementedError

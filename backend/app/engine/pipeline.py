@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 import sqlite3
 from collections import Counter
+from collections.abc import Callable
 from dataclasses import dataclass
 
 from app.engine.base import Engine
@@ -41,12 +42,14 @@ class TashkeelPipeline:
         level: str = "full",
         keep_existing: bool = True,
         morph: MorphFilter | None = None,
+        ambiguity: Callable[[str], bool] | None = None,
         splitter: ArabicSentenceSplitter | None = None,
     ) -> None:
         self.engine = engine
         self.level = level
         self.keep_existing = keep_existing
         self.morph = morph
+        self.ambiguity = ambiguity
         self.splitter = splitter or ArabicSentenceSplitter()
         self.cache_tag = engine.cache_tag + ("+mf" if morph is not None else "")
 
@@ -67,13 +70,24 @@ class TashkeelPipeline:
             raw = self._run_engine(cache, stripped, spans)
             cache.put_chunk(self.cache_tag, stripped, raw)
 
-        out = reduce_level(raw, self.level)
+        out = self._apply_level(raw, spans)
         out = self._apply_dictionary(cache, out, stripped, spans)
         out = lock.apply(out)
         if strip_marks(out) != strip_marks(chunk_text):  # safety net: never alter base text
             log.error("pipeline produced altered base text; returning chunk unchanged")
             return ChunkResult(chunk_text, cached, len(spans))
         return ChunkResult(out, cached, len(spans))
+
+    def _apply_level(self, raw: str, spans) -> str:
+        if self.level != "minimal":
+            return reduce_level(raw, self.level)
+        if self.ambiguity is None:
+            raise RuntimeError("level 'minimal' needs an ambiguity oracle")
+        pairs = split_pairs(raw, canon=False)
+        for m in spans:
+            if not self.ambiguity(engine_letters(m.group(0))[0]):
+                pairs[m.start() : m.end()] = [(b, "") for b, _ in pairs[m.start() : m.end()]]
+        return join_pairs(pairs)
 
     def _run_engine(self, cache: TashkeelCache, stripped: str, spans) -> str:
         words = [m.group(0) for m in spans]
