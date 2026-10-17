@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import re
 from bisect import bisect_left
+from functools import lru_cache
 from typing import Any
 
 from app.engine.normalize import strip_marks
@@ -79,7 +80,7 @@ _MONEY_WORDS = (
     r"دينار[ًاً]?|دنانير|يورو|ج\.م|ر\.س|د\.إ|EGP|SAR|AED|USD|EUR)"
 )
 _NUM = r"\d[\d,٬٫.]*"
-_MONEY_AFTER = re.compile(rf"(?<![\w/\-])({_NUM})\s*({_MONEY_WORDS})(?![ء-ي])")
+_MONEY_AFTER = re.compile(rf"(?<![\w/\-])(?<!\d[.,٬٫])({_NUM})\s*({_MONEY_WORDS})(?![ء-ي])")
 _MONEY_BEFORE = re.compile(rf"(?<![ء-ي])({_MONEY_WORDS})\s*({_NUM})(?![\d])")
 _TIME_UNIT = re.compile(r"يوم|أيام|ايام|شهر|أشهر|اشهر|سنة|سنوات|أسبوع|اسبوع|عام")
 _DATE_NUM = re.compile(r"(?<![\d/])(\d{1,4})\s*[/\-.]\s*(\d{1,2})\s*[/\-.]\s*(\d{1,4})(?![\d/])")
@@ -117,15 +118,20 @@ def _sentences(text: str) -> list[tuple[int, int]]:
     return out
 
 
+@lru_cache(maxsize=4096)
+def _compiled_phrase(p: str) -> re.Pattern[str]:
+    return re.compile(
+        r"(?<![ء-ي])(?:و|ف)?" + r"\s+".join(map(re.escape, fold(p).split())) + r"(?![ء-ي])"
+    )
+
+
+_HAS_ARABIC = re.compile("[ء-ي]")
+
+
 def _has(folded: str, phrases: list[str]) -> list[str]:
-    hits = []
-    for p in phrases:
-        if re.search(
-            r"(?<![ء-ي])(?:و|ف)?" + r"\s+".join(map(re.escape, fold(p).split())) + r"(?![ء-ي])",
-            folded,
-        ):
-            hits.append(p)
-    return hits
+    if not _HAS_ARABIC.search(folded):  # every cue phrase is Arabic
+        return []
+    return [p for p in phrases if _compiled_phrase(p).search(folded)]
 
 
 def modality(sentence: str) -> dict[str, list[str]]:

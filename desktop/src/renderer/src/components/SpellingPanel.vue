@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import MotionGroup from '@renderer/components/ui/MotionGroup.vue'
 import { useEditorStore } from '@renderer/stores/editor'
 import { useSpellingStore } from '@renderer/stores/spelling'
 import { useQualityStore } from '@renderer/stores/quality'
@@ -53,7 +54,7 @@ const dot: Record<string, string> = {
         <h3 class="bg-slate-100 px-3 py-1 font-semibold dark:bg-slate-800">
           {{ g.label }} ({{ g.items.length }})
         </h3>
-        <ul>
+        <MotionGroup tag="ul" name="m-list" class="relative">
           <li v-for="m in g.items.slice(0, 200)" :key="m.from + ':' + m.to">
             <button
               class="flex w-full items-center gap-2 px-3 py-1 text-start hover:bg-slate-100 dark:hover:bg-slate-800"
@@ -67,7 +68,7 @@ const dot: Record<string, string> = {
               <span class="truncate text-xs text-slate-500">{{ m.message_ar }}</span>
             </button>
           </li>
-        </ul>
+        </MotionGroup>
       </section>
     </div>
   </div>

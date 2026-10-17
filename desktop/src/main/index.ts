@@ -1,8 +1,13 @@
-import { app, BrowserWindow, ipcMain, Menu } from 'electron'
+import { app, BrowserWindow, Menu, net, powerMonitor, session, shell } from 'electron'
 import { EventEmitter } from 'node:events'
 import { autoUpdater } from 'electron-updater'
 import { resolve } from 'node:path'
-import { initLogger } from './logger'
+import { initLogger, registerSecret } from './logger'
+import { handleSecure, configureIpcGuard } from './ipcGuard'
+import { hardenSession, hardenWebContents } from './hardening'
+import { generateApiToken, isAllowedExternalUrl, type AppLocation } from './security'
+import { cleanupUserData, restrictPermissions } from './userData'
+import { setFileIpcLogger } from './fileIpc'
 import { isPortable, resolveUserDataDir } from './paths'
 import { registerDiagnostics } from './diagnosticsIpc'
 import { PythonProcessManager, resolveSidecar, STATUS_EVENT } from './pythonManager'
@@ -14,6 +19,29 @@ const userDataOverride = resolveUserDataDir(process.env)
 if (userDataOverride) app.setPath('userData', userDataOverride)
 
 const log = initLogger()
+
+// One random API token per app launch; the sidecar gets it via env, the renderer via IPC only.
+const apiToken = generateApiToken()
+registerSecret(apiToken)
+// Test-only convention: lets e2e read the token via app.evaluate(() => process.env.MIZAJ_API_TOKEN).
+// Otherwise it is never placed in the main process env (only in the sidecar's child env).
+if (process.env.MIZAJ_E2E_EXPOSE_TOKEN === '1') process.env.MIZAJ_API_TOKEN = apiToken
+else delete process.env.MIZAJ_API_TOKEN
+
+const appLocation: AppLocation = {
+  rendererUrl: process.env.ELECTRON_RENDERER_URL ?? null,
+  indexHtmlPath: resolve(__dirname, '../renderer/index.html')
+}
+configureIpcGuard(appLocation, (...a) => log.warn(...a))
+setFileIpcLogger((...a) => log.warn(...a))
+hardenWebContents(appLocation, log, (url) => {
+  if (isAllowedExternalUrl(url)) void shell.openExternal(url)
+})
+restrictPermissions(app.getPath('userData'))
+{
+  const { removed } = cleanupUserData(app.getPath('userData'))
+  if (removed.length) log.info(`cleaned ${removed.length} leftover temp item(s) in userData`)
+}
 
 const backendDir = resolve(app.getAppPath(), '..', 'backend')
 const target = resolveSidecar({
@@ -28,6 +56,7 @@ const manager = new PythonProcessManager({
   backendDir: target.backendDir,
   prefixArgs: target.prefixArgs,
   extraEnv: target.extraEnv,
+  apiToken,
   dataDir: app.getPath('userData'),
   logger: log
 })
@@ -58,6 +87,18 @@ const updater = new UpdaterController({
   isPackaged: app.isPackaged,
   portable: isPortable(process.env),
   logger: log as never,
+  isOnline: () => net.isOnline(),
+  subscribeWake: (cb) => {
+    let active = true
+    const handler = (): void => {
+      if (active) cb()
+    }
+    void app.whenReady().then(() => powerMonitor.on('resume', handler)) // not usable before ready
+    return () => {
+      active = false
+      if (app.isReady()) powerMonitor.removeListener('resume', handler)
+    }
+  },
   send: (s) => {
     for (const w of BrowserWindow.getAllWindows()) {
       if (!w.isDestroyed()) w.webContents.send(UPDATER_STATUS_CHANNEL, s)
@@ -71,11 +112,11 @@ const updater = new UpdaterController({
     sidecarStopped = true // let will-quit proceed straight to quit so the installer can run
   }
 })
-ipcMain.handle('updater:get-status', () => updater.getStatus())
-ipcMain.handle('updater:check', () => updater.check(true))
-ipcMain.handle('updater:download', () => updater.download())
-ipcMain.handle('updater:install', () => updater.installNow())
-ipcMain.handle('updater:set-auto-check', (_e, enabled: unknown) =>
+handleSecure('updater:get-status', () => updater.getStatus())
+handleSecure('updater:check', () => updater.check(true))
+handleSecure('updater:download', () => updater.download())
+handleSecure('updater:install', () => updater.installNow())
+handleSecure('updater:set-auto-check', (_e, enabled: unknown) =>
   updater.setAutoCheck(enabled === true)
 )
 app.on('will-quit', (e) => {
@@ -97,11 +138,12 @@ Menu.setApplicationMenu(
     : null
 )
 
-registerDiagnostics({ manager, log, portable: isPortable(process.env) })
+registerDiagnostics({ manager, log, portable: isPortable(process.env), apiToken })
 
 void app.whenReady().then(() => {
   log.info('Mizaj Studio starting, userData=', app.getPath('userData'))
-  registerIpc(() => manager.getStatus())
+  hardenSession(session.defaultSession, appLocation, log)
+  registerIpc(() => manager.getStatus(), apiToken)
   manager.start()
   createMainWindow()
   updater.start()

@@ -245,7 +245,7 @@ class TemplateIn(BaseModel):
     name: str = Field(min_length=1, max_length=200)
     category: str = ""
     jurisdiction: str = ""
-    body: str
+    body: str = Field(max_length=MAX_TEXT)
     vars: list[VarIn] = []
     is_sample: bool = False
 
@@ -313,7 +313,7 @@ def import_templates(body: TemplateImport, db: Db) -> dict[str, Any]:
 
 
 class PreviewIn(BaseModel):
-    body: str
+    body: str = Field(max_length=MAX_TEXT)
     vars: list[VarIn] = []
     values: dict[str, Any] = {}
 

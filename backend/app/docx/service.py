@@ -16,8 +16,9 @@ from docx import Document
 from docx.oxml import parse_xml
 from lxml import etree
 
+from app.core import security
 from app.core.database import connect
-from app.core.errors import disk_full, docx_corrupt, docx_write_locked, validation_error
+from app.core.errors import MizajError, disk_full, docx_corrupt, docx_write_locked, validation_error
 from app.docx.extractor import (
     W_BR,
     W_CR,
@@ -35,6 +36,7 @@ from app.engine.factory import build_pipeline
 from app.engine.normalize import MARKS, WORD_RE, has_arabic_letters
 from app.engine.pipeline import TashkeelPipeline
 
+security.harden_docx_parser()
 log = logging.getLogger("mizaj.docx")
 TMP_PREFIX = ".~mizaj_tmp."
 PART_KEYS = ("body", "headers", "footers", "footnotes", "endnotes", "textboxes", "sdt")
@@ -52,8 +54,34 @@ def _new_stats(include_comments: bool) -> dict[str, Any]:
     }
 
 
+def _bomb(reason: str):
+    return docx_corrupt(f"archive rejected: {reason}")
+
+
+def guard_docx(src: Path) -> None:
+    """Zip-bomb limits and no DOCTYPE/ENTITY declarations in any XML part (XXE / billion
+    laughs). Word never writes a DTD into OOXML. Runs before python-docx parses anything."""
+    try:
+        with zipfile.ZipFile(src) as zf:
+            security.check_zip(
+                zf, max_members=10_000, max_total=1024**3, max_member=512 * 1024**2,
+                max_ratio=500, error=_bomb,
+            )  # fmt: skip
+            for info in zf.infolist():
+                if info.filename.lower().endswith((".xml", ".rels")) and info.file_size:
+                    with zf.open(info) as fh:
+                        if security.has_xml_declaration(fh.read(65536)):
+                            raise docx_corrupt(f"{info.filename}: DTD/entity declarations")
+    except MizajError:
+        raise
+    except Exception as exc:  # BadZipFile, zlib.error, truncated members, ...
+        raise docx_corrupt(f"{type(exc).__name__}: {exc}") from exc
+
+
 def open_source(src: Path):
     """Open `src` with python-docx; map every structural failure to ERR_DOCX_CORRUPT."""
+    if Path(src).is_file():
+        guard_docx(Path(src))
     try:
         return Document(str(src))
     except FileNotFoundError:

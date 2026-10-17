@@ -9,22 +9,37 @@ from pydantic import BaseModel
 
 from app.api.documents import count_words
 from app.api.settings import DEFAULTS
+from app.core import security
 from app.core.database import connect, now_iso, write
-from app.core.errors import not_found, validation_error
-from app.docx.service import diacritize_docx, extract_plain_text, process_text_docx
+from app.core.errors import MizajError, not_found, validation_error
 from app.engine.executor import run_blocking
 from app.engine.factory import build_pipeline
 
 router = APIRouter(prefix="/api/docx", tags=["docx"])
 
 
+MAX_DOCX_BYTES = 256 * security.MB
+
+
 def _check_path(raw: str, field: str) -> Path:
-    p = Path(raw)
-    if not p.is_absolute() or p.suffix.lower() != ".docx":
+    """Syntax-only check (absolute, .docx, no UNC/device); the file checks happen in
+    `_check_in` / `_check_out`."""
+    security._syntax_check(raw, field)
+    if Path(raw).suffix.lower() != ".docx":
         raise validation_error(
             f"{field} must be an absolute path ending with .docx", {"field": field}
         )
-    return p
+    return Path(raw)
+
+
+def _check_in(raw: str, field: str) -> Path:
+    return security.safe_path(raw, field, exts=(".docx",), max_bytes=MAX_DOCX_BYTES)
+
+
+def _check_out(raw: str, field: str, data_dir: Path, src: Path | None = None) -> Path:
+    return security.safe_path(
+        raw, field, exts=(".docx",), kind="output", data_dir=data_dir, avoid=src
+    )
 
 
 class ImportRequest(BaseModel):
@@ -45,6 +60,8 @@ class ExportRequest(BaseModel):
 def _do_import(db_path: Path, path: Path, project_id: int, title: str | None) -> dict[str, Any]:
     if not path.is_file():
         raise not_found("File", str(path))
+    from app.docx.service import extract_plain_text  # lazy: python-docx/lxml (startup time)
+
     text, stats = extract_plain_text(path)
     conn = connect(db_path)
     try:
@@ -77,7 +94,7 @@ def _do_import(db_path: Path, path: Path, project_id: int, title: str | None) ->
 
 @router.post("/import", status_code=201)
 async def import_docx(body: ImportRequest, request: Request) -> dict[str, Any]:
-    path = _check_path(body.path, "path")
+    path = _check_in(body.path, "path")
     return await run_blocking(
         _do_import, request.app.state.db_path, path, body.project_id, body.title
     )
@@ -89,10 +106,7 @@ def _resolve_source(db_path: Path, body: ExportRequest) -> dict[str, Any]:
     if (body.document_id is None) == (body.source_path is None):
         raise validation_error("provide exactly one of document_id or source_path")
     if body.source_path is not None:
-        src = _check_path(body.source_path, "source_path")
-        if not src.is_file():
-            raise not_found("File", str(src))
-        return {"src": src}
+        return {"src": _check_in(body.source_path, "source_path")}
     conn: sqlite3.Connection = connect(db_path)
     try:
         row = conn.execute(
@@ -102,8 +116,12 @@ def _resolve_source(db_path: Path, body: ExportRequest) -> dict[str, Any]:
         ).fetchone()
         if row is None:
             raise not_found("Document", body.document_id)
-        if row["source_docx_path"] and Path(row["source_docx_path"]).is_file():
-            return {"src": Path(row["source_docx_path"])}
+        if row["source_docx_path"]:
+            # the stored path may come from a restored backup: re-validate it (no UNC/devices)
+            try:
+                return {"src": _check_in(row["source_docx_path"], "source_docx_path")}
+            except MizajError:
+                pass
         st = dict(conn.execute("SELECT key, value FROM settings").fetchall())
     finally:
         conn.close()
@@ -123,9 +141,14 @@ def _resolve_source(db_path: Path, body: ExportRequest) -> dict[str, Any]:
 
 @router.post("/export")
 async def export_docx(body: ExportRequest, request: Request) -> dict[str, Any]:
-    target = _check_path(body.target_path, "target_path")
+    _check_path(body.target_path, "target_path")
     db_path = request.app.state.db_path
     src = await run_blocking(_resolve_source, db_path, body)
+    target = _check_out(
+        body.target_path, "target_path", request.app.state.data_dir, src.get("src")
+    )
+    from app.docx.service import diacritize_docx, process_text_docx  # lazy (startup time)
+
     if "src" in src:
         stats = await diacritize_docx(
             src["src"], target, body.mode, body.level, body.include_comments, db_path

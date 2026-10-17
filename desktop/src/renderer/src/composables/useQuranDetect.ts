@@ -1,4 +1,5 @@
 import type { EditorView } from '@codemirror/view'
+import { whenIdle } from '@renderer/lib/idle'
 import { useApi } from '@renderer/api'
 import { clearQuranSpans, setQuranSpans, toSpans, type QuranSpanRaw } from '@renderer/editor/quran'
 import { useEditorStore } from '@renderer/stores/editor'
@@ -12,6 +13,7 @@ export function useQuranDetect(getView: () => EditorView | null) {
   const editor = useEditorStore()
   const quality = useQualityStore()
   let timer: ReturnType<typeof setTimeout> | null = null
+  let cancelIdle: (() => void) | null = null
 
   async function detect(full = false): Promise<void> {
     const view = getView()
@@ -54,8 +56,19 @@ export function useQuranDetect(getView: () => EditorView | null) {
 
   function schedule(): void {
     if (timer) clearTimeout(timer)
-    timer = setTimeout(() => void detect(false), QURAN_DEBOUNCE_MS)
+    cancelIdle?.()
+    timer = setTimeout(() => {
+      // background work waits for an idle moment so typing/scrolling never competes with it
+      cancelIdle = whenIdle(() => void detect(false))
+    }, QURAN_DEBOUNCE_MS)
   }
 
-  return { schedule, detectNow: () => detect(true), dispose: () => timer && clearTimeout(timer) }
+  return {
+    schedule,
+    detectNow: () => detect(true),
+    dispose: () => {
+      if (timer) clearTimeout(timer)
+      cancelIdle?.()
+    }
+  }
 }

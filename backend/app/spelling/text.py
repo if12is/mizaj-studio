@@ -20,7 +20,7 @@ _LATIN_ADJ = re.compile(r"[A-Za-z0-9_۰-۹٠-٩]")
 _MASK_RE = re.compile(
     r"```.*?```|`[^`\n]*`"
     r"|(?:https?://|ftp://|www\.)[^\s<>\"«»]+"
-    r"|[\w.+-]+@[\w-]+(?:\.[\w-]+)+"
+    r"|(?<![\w.+-])[\w.+-]+@[\w-]+(?:\.[\w-]+)+"  # lookbehind: no O(n^2) rescans of one run
     r"|(?<![\w])[A-Za-z]:\\[^\s]+"
     r"|[#@][\wء-ي]+",
     re.DOTALL,
@@ -68,12 +68,15 @@ class Token:
     key: str  # marks/tatweel stripped (lookup form)
 
 
+MAX_WORD_CHARS = 100  # no real Arabic word is longer; the dictionary/suggester is superlinear
+
+
 def tokenize(text: str, masker: Masker) -> list[Token]:
     out: list[Token] = []
     n = len(text)
     for m in AR_WORD_RE.finditer(text):
         s, e = m.span()
-        if masker.overlaps(s, e):
+        if e - s > MAX_WORD_CHARS or masker.overlaps(s, e):
             continue
         # glued to Latin letters / digits => not a plain Arabic word (code, ids, model names)
         if (s > 0 and _LATIN_ADJ.match(text[s - 1])) or (e < n and _LATIN_ADJ.match(text[e])):

@@ -37,6 +37,8 @@ export interface PythonManagerOptions {
   prefixArgs?: string[]
   /** Extra environment for the child process. */
   extraEnv?: Record<string, string>
+  /** Per-launch API token, passed ONLY via the MIZAJ_API_TOKEN env var (never argv: visible in process lists). */
+  apiToken?: string
   /** Windows tree kill (taskkill). Injectable for tests. */
   killTree?: (pid: number) => void
   setTimeoutFn?: typeof setTimeout
@@ -114,8 +116,9 @@ export function resolveSidecar(i: ResolveSidecarInput): SidecarTarget {
 }
 
 export class PythonProcessManager extends EventEmitter {
-  private readonly opts: Required<Omit<PythonManagerOptions, 'killTree'>> & {
+  private readonly opts: Required<Omit<PythonManagerOptions, 'killTree' | 'apiToken'>> & {
     killTree?: (pid: number) => void
+    apiToken?: string
   }
   private child: ChildProcess | null = null
   private quitting = false
@@ -222,7 +225,9 @@ export class PythonProcessManager extends EventEmitter {
           ...process.env,
           ...this.opts.extraEnv,
           PYTHONUNBUFFERED: '1',
-          MIZAJ_PARENT_PID: String(process.pid)
+          MIZAJ_PARENT_PID: String(process.pid),
+          // Same token for every (re)start within one app launch.
+          ...(this.opts.apiToken ? { MIZAJ_API_TOKEN: this.opts.apiToken } : {})
         }
       })
     } catch (err) {

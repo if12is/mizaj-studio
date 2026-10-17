@@ -162,3 +162,85 @@ for (const mode of ['multi-line', 'single-line'] as const) {
     await page.locator('[data-testid=progress-bar]').waitFor({ state: 'detached', timeout: 10_000 })
   })
 }
+
+/** frame intervals (ms) collected on rAF while `action` runs (+ `settleMs` afterwards) */
+const frameIntervals = (action: () => Promise<void>, settleMs = 400): Promise<number[]> =>
+  (async () => {
+    await page.evaluate(() => {
+      const w = window as unknown as { __frames: number[]; __stop: boolean }
+      w.__frames = []
+      w.__stop = false
+      let last = performance.now()
+      const tick = (): void => {
+        const now = performance.now()
+        w.__frames.push(now - last)
+        last = now
+        if (!w.__stop) requestAnimationFrame(tick)
+      }
+      requestAnimationFrame(tick)
+    })
+    await action()
+    await page.waitForTimeout(settleMs)
+    return page.evaluate(() => {
+      const w = window as unknown as { __frames: number[]; __stop: boolean }
+      w.__stop = true
+      return w.__frames.slice(1)
+    })
+  })()
+const p95 = (a: number[]) =>
+  [...a].sort((x, y) => x - y)[Math.min(a.length - 1, Math.floor(a.length * 0.95))]
+
+test('modal open/close frame times with motion on (sample loaded)', async () => {
+  await page.emulateMedia({ reducedMotion: 'no-preference' })
+  await timed(sample)
+  await page.waitForTimeout(300)
+  const open = async (): Promise<void> => {
+    await page.getByTestId('open-settings').click()
+    await page.getByTestId('settings-modal').waitFor()
+  }
+  const close = async (): Promise<void> => {
+    await page.getByTestId('settings-close').click()
+    await page.getByTestId('settings-modal').waitFor({ state: 'detached' })
+  }
+  await open() // first open fetches the lazy chunk: warm it before measuring
+  await close()
+  const p95s: number[] = []
+  const worst: number[] = []
+  for (let i = 0; i < 3; i++) {
+    const f = await frameIntervals(async () => {
+      await open()
+      await close()
+    })
+    p95s.push(p95(f))
+    worst.push(Math.max(...f))
+  }
+  check('modalFrameP95Ms', 'maxMs', median(p95s))
+  check('modalFrameMaxMs', 'maxMs', median(worst))
+})
+
+test('scroll smoothness while freshly applied diacritics fade in', async () => {
+  await page.emulateMedia({ reducedMotion: 'no-preference' })
+  await timed(sample)
+  await page.waitForTimeout(300)
+  await page.getByTestId('toolbar-tashkeel').click()
+  await page.locator('[data-testid=progress-bar][data-state=done]').waitFor({ timeout: 200_000 })
+  // the fade classes are still alive for ~0.7 s after the last chunk: scroll straight away
+  const fps = await page.evaluate(async () => {
+    const v = (document.querySelector('.cm-content') as unknown as CM).cmView.view
+    const el = v.scrollDOM
+    el.scrollTop = 0
+    let frames = 0
+    const t0 = performance.now()
+    await new Promise<void>((resolve) => {
+      const tick = (): void => {
+        frames++
+        el.scrollTop += 400
+        if (performance.now() - t0 < 1500) requestAnimationFrame(tick)
+        else resolve()
+      }
+      requestAnimationFrame(tick)
+    })
+    return (frames / (performance.now() - t0)) * 1000
+  })
+  check('scrollFpsDuringFade', 'minRate', fps)
+})

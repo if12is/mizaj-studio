@@ -1,9 +1,11 @@
 <script setup lang="ts">
+import MotionTransition from '@renderer/components/ui/MotionTransition.vue'
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useApi } from '@renderer/api'
 import { ApiError } from '@renderer/api/client'
 import { notify } from '@renderer/api/toast'
 import { useProjectsStore } from '@renderer/stores/projects'
+import SuccessCheck from './ui/SuccessCheck.vue'
 
 const emit = defineEmits<{ (e: 'open', id: number, diacritize: boolean): void }>()
 const projects = useProjectsStore()
@@ -109,42 +111,49 @@ defineExpose({ onDrop })
 </script>
 
 <template>
-  <div
-    v-if="visible"
-    class="absolute inset-0 z-40 flex items-center justify-center bg-mizaj-slate/70"
-    data-testid="drop-overlay"
-  >
+  <MotionTransition name="m-fade">
     <div
-      class="min-w-[22rem] rounded-lg border-2 border-dashed border-mizaj-emerald bg-white p-6 text-center dark:bg-slate-800"
+      v-if="visible"
+      class="absolute inset-0 z-40 flex items-center justify-center bg-mizaj-slate/70"
+      data-testid="drop-overlay"
     >
-      <template v-if="!card">
-        <p class="text-lg font-bold">أفلت ملف Word هنا</p>
-      </template>
-      <template v-else>
-        <p class="font-bold" data-testid="drop-file-name">{{ card.name }}</p>
-        <p class="text-sm text-slate-500" data-testid="drop-file-size">
-          {{ (card.size / 1024).toFixed(1) }} ك.ب
-        </p>
-        <p v-if="card.state === 'importing'" class="mt-2 text-sm">جاري التحليل...</p>
-        <div v-else class="mt-2 text-sm" data-testid="drop-stats">
-          <p>عدد الكلمات: {{ card.wordCount }}</p>
-          <ul class="mt-1">
-            <li v-for="(v, k) in card.stats" :key="k">{{ k }}: {{ v }}</li>
-          </ul>
-          <div class="mt-3 flex justify-center gap-2">
-            <button
-              class="rounded bg-mizaj-emerald px-3 py-1 text-white"
-              data-testid="drop-diacritize"
-              @click="go(true)"
-            >
-              تشكيل المستند
-            </button>
-            <button class="rounded border px-3 py-1" data-testid="drop-open" @click="go(false)">
-              فتح فقط
-            </button>
+      <div
+        class="min-w-[22rem] rounded-lg border-2 border-dashed border-mizaj-emerald bg-white p-6 text-center dark:bg-slate-800"
+        :class="{ 'm-drop-card': !card }"
+      >
+        <template v-if="!card">
+          <p class="text-lg font-bold">أفلت ملف Word هنا</p>
+        </template>
+        <template v-else>
+          <p class="font-bold" data-testid="drop-file-name">
+            <SuccessCheck v-if="card.state === 'ready'" class="me-1 text-mizaj-emerald" />{{
+              card.name
+            }}
+          </p>
+          <p class="text-sm text-slate-500" data-testid="drop-file-size">
+            {{ (card.size / 1024).toFixed(1) }} ك.ب
+          </p>
+          <p v-if="card.state === 'importing'" class="mt-2 text-sm">جاري التحليل...</p>
+          <div v-else class="mt-2 text-sm" data-testid="drop-stats">
+            <p>عدد الكلمات: {{ card.wordCount }}</p>
+            <ul class="mt-1">
+              <li v-for="(v, k) in card.stats" :key="k">{{ k }}: {{ v }}</li>
+            </ul>
+            <div class="mt-3 flex justify-center gap-2">
+              <button
+                class="rounded bg-mizaj-emerald px-3 py-1 text-white"
+                data-testid="drop-diacritize"
+                @click="go(true)"
+              >
+                تشكيل المستند
+              </button>
+              <button class="rounded border px-3 py-1" data-testid="drop-open" @click="go(false)">
+                فتح فقط
+              </button>
+            </div>
           </div>
-        </div>
-      </template>
+        </template>
+      </div>
     </div>
-  </div>
+  </MotionTransition>
 </template>

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import MotionGroup from '@renderer/components/ui/MotionGroup.vue'
 import { onMounted, ref } from 'vue'
 import { useDictionaryStore, type DictExport } from '@renderer/stores/dictionary'
 import { notify } from '@renderer/api/toast'
@@ -103,7 +104,12 @@ async function doImport(ev: Event): Promise<void> {
       />
       <button class="rounded bg-mizaj-emerald px-3 text-white" data-testid="dict-add">إضافة</button>
     </form>
-    <ul class="max-h-64 divide-y overflow-auto dark:divide-slate-700" data-testid="dict-list">
+    <MotionGroup
+      tag="ul"
+      name="m-list"
+      class="relative max-h-64 divide-y overflow-auto dark:divide-slate-700"
+      data-testid="dict-list"
+    >
       <li
         v-for="e in dict.entries"
         :key="e.id"
@@ -142,6 +148,6 @@ async function doImport(ev: Event): Promise<void> {
       <li v-if="!dict.entries.length" class="py-2 text-sm text-slate-500" data-testid="dict-empty">
         لا توجد كلمات.
       </li>
-    </ul>
+    </MotionGroup>
   </div>
 </template>

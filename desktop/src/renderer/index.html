@@ -4,13 +4,69 @@
     <meta charset="UTF-8" />
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' data:; connect-src 'self' http://127.0.0.1:* ws://localhost:* http://localhost:*"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' http://127.0.0.1:*; object-src 'none'; base-uri 'none'; form-action 'none'"
     />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>مِزَاج</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        background: #0f172a;
+      }
+      /* static pre-JS splash; same geometry as components/ui/SplashScreen.vue (.m-splash) */
+      .pre-splash {
+        position: fixed;
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 12px;
+        background: #0f172a;
+        color: #f1f5f9;
+        font-family: Cairo, 'Segoe UI', Tahoma, sans-serif;
+      }
+      .pre-splash-name {
+        font-size: 28px;
+        font-weight: 700;
+      }
+    </style>
   </head>
   <body>
-    <div id="app"></div>
+    <div id="app">
+      <div class="pre-splash" data-testid="pre-splash" aria-hidden="true">
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          viewBox="0 0 512 512"
+          width="200"
+          height="200"
+          focusable="false"
+        >
+          <path
+            fill="#10B981"
+            fill-rule="evenodd"
+            d="M256 196C274 252 342 290 364 350C368 364 364 376 352 388C334 408 322 438 318 476Q256 456 194 476C190 438 178 408 160 388C148 376 144 364 148 350C170 290 238 252 256 196ZM262 318A24 24 0 1 1 250 318L250 186L262 186Z"
+          />
+          <path
+            fill="none"
+            stroke="#F59E0B"
+            stroke-width="27"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            d="M158 166C162 108 208 98 227 154C238 104 274 104 285 154C304 98 350 108 354 166"
+          />
+          <path
+            fill="none"
+            stroke="#10B981"
+            stroke-width="29"
+            stroke-linecap="round"
+            d="M186 78L326 36"
+          />
+        </svg>
+        <div class="pre-splash-name" lang="ar">مِزَاج</div>
+      </div>
+    </div>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

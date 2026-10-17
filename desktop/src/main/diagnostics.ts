@@ -2,6 +2,7 @@
 import { mkdirSync, readdirSync, readFileSync, writeFileSync, existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { createZip, type ZipEntry } from './zip'
+import { scrubSecrets } from './security'
 
 /** Local, opt-in diagnostics (7.6.4 + 7.7.6). Nothing here touches the network. */
 
@@ -11,7 +12,8 @@ const ARABIC_ANY = new RegExp(`[${AR}]`, 'g')
 
 /** Remove file paths, user names, e-mails and anything that could be document text. */
 export function sanitizeLine(line: string, homes: string[] = []): string {
-  let s = line
+  // anyHex: a diagnostics bundle may lose sha256 values, but can never leak a 32-byte token
+  let s = scrubSecrets(line, [], true)
   for (const h of homes) if (h && h.length > 2) s = s.split(h).join('~')
   s = s
     .replace(/[A-Za-z]:\\[^\s"'<>|]+/g, '<path>')
@@ -137,7 +139,11 @@ export function buildBundleEntries(i: BundleInput): ZipEntry[] {
     { name: 'versions.json', data: JSON.stringify(i.versions, null, 2) },
     {
       name: 'health.json',
-      data: JSON.stringify(i.health ?? { error: 'engine unavailable' }, null, 2)
+      data: scrubSecrets(
+        JSON.stringify(i.health ?? { error: 'engine unavailable' }, null, 2),
+        [],
+        true
+      )
     },
     {
       name: 'settings.json',

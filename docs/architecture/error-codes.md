@@ -19,3 +19,7 @@ All FastAPI error responses follow a strict JSON envelope:
 | `ERR_DISK_FULL` | `507` | `ENOSPC` during SQLite or DOCX save | Alert user to free disk space |
 | `ERR_DB_MIGRATION_FAILED`| `500` | SQLite schema migration failed on startup | Backup `.db` file automatically and alert user |
 | `ERR_TASK_CANCELLED` | `499` | User clicked Cancel during batch SSE stream | Keep already processed chunks in cache and stop stream |
+| `ERR_UNAUTHORIZED` | `401` | Missing/invalid `X-Mizaj-Token` (per-launch token from Electron) | Internal: client reloads config from main and retries once |
+| `ERR_HOST_NOT_ALLOWED` | `421` | `Host` header is not `127.0.0.1` / `localhost` (DNS-rebinding protection) | None (request is rejected) |
+| `ERR_PAYLOAD_TOO_LARGE` | `413` | Request body over 64 MiB or a field over its length limit | Ask the user to split the document |
+| `ERR_FILE_TOO_LARGE` | `413` | Input file over the per-format size limit | Show the limit and suggest another file |

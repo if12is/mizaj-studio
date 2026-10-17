@@ -71,11 +71,16 @@ const api = <T = unknown>(method: string, path: string, body?: unknown): Promise
   page.evaluate(
     async ([m, p, b]) => {
       const cfg = await (
-        window as unknown as { mizajAPI: { getBackendConfig(): Promise<{ baseUrl: string }> } }
+        window as unknown as {
+          mizajAPI: { getBackendConfig(): Promise<{ baseUrl: string; token: string }> }
+        }
       ).mizajAPI.getBackendConfig()
       const r = await fetch(`${cfg.baseUrl}${p as string}`, {
         method: m as string,
-        headers: b ? { 'Content-Type': 'application/json' } : undefined,
+        headers: {
+          'X-Mizaj-Token': cfg.token,
+          ...(b ? { 'Content-Type': 'application/json' } : {})
+        },
         body: b ? JSON.stringify(b) : undefined
       })
       return r.status === 204 ? null : await r.json()
@@ -123,6 +128,8 @@ test.beforeAll(async () => {
     }
   })
   page = await app.firstWindow()
+  // transitions would race instant visibility checks; motion has its own spec (motion.spec.ts)
+  await page.emulateMedia({ reducedMotion: 'reduce' })
   await expect(t('status-sidecar')).toContainText('المحرك: جاهز')
   await t('new-project').click()
   await t('new-project-input').fill('مشروع الاختبار')
@@ -199,7 +206,11 @@ test('batch dialog processes a folder of two TXT files and opens the output', as
   for (const f of ['docx', 'md', 'srt', 'epub']) await t(`batch-format-${f}`).uncheck()
   await t('batch-start').click()
   await expect(t('batch-status')).toHaveAttribute('data-status', 'done', { timeout: 60_000 })
-  expect(readdirSync(outDir).sort()).toEqual(['a.txt', 'b.txt'])
+  expect(
+    readdirSync(outDir)
+      .filter((f) => !f.endsWith('.done'))
+      .sort()
+  ).toEqual(['a.txt', 'b.txt'])
   expect((readFileSync(join(outDir, 'a.txt'), 'utf8').match(MARKS) ?? []).length).toBeGreaterThan(2)
   expect(readFileSync(join(inDir, 'a.txt'), 'utf8')).toBe('ذهب الولد إلى المدرسة') // untouched
   await t('batch-open-output').click()

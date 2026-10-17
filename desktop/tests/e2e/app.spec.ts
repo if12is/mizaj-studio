@@ -17,6 +17,7 @@ const MARKS = /[ً-ْ]/g
 let app: ElectronApplication
 let page: Page
 let userData: string
+let outDir: string // exports must go OUTSIDE userData (the backend refuses writes into its data dir)
 let exportPath: string
 
 const text = (id: string) => page.getByTestId(id)
@@ -62,7 +63,8 @@ function docxXml(path: string): string {
 
 test.beforeAll(async () => {
   userData = mkdtempSync(join(tmpdir(), 'mizaj-e2e-'))
-  exportPath = join(userData, 'exported.docx')
+  outDir = mkdtempSync(join(tmpdir(), 'mizaj-e2e-out-'))
+  exportPath = join(outDir, 'exported.docx')
   app = await electron.launch({
     args: ['.', '--no-sandbox', '--disable-gpu'],
     cwd: desktopDir,
@@ -75,11 +77,14 @@ test.beforeAll(async () => {
     }
   })
   page = await app.firstWindow()
+  // transitions would race instant visibility checks; motion has its own spec (motion.spec.ts)
+  await page.emulateMedia({ reducedMotion: 'reduce' })
 })
 
 test.afterAll(async () => {
   await app?.close()
   rmSync(userData, { recursive: true, force: true })
+  rmSync(outDir, { recursive: true, force: true })
 })
 
 test.describe.configure({ mode: 'serial' })
@@ -148,13 +153,12 @@ for (const name of ['sample_ar.docx', 'sample_mixed.docx']) {
         page.evaluate(async () => {
           const cfg = await (
             window as unknown as {
-              mizajAPI: { getBackendConfig(): Promise<{ baseUrl: string }> }
+              mizajAPI: { getBackendConfig(): Promise<{ baseUrl: string; token: string }> }
             }
           ).mizajAPI.getBackendConfig()
-          const all = (await (await fetch(`${cfg.baseUrl}/api/settings`)).json()) as Record<
-            string,
-            string
-          >
+          const all = (await (
+            await fetch(`${cfg.baseUrl}/api/settings`, { headers: { 'X-Mizaj-Token': cfg.token } })
+          ).json()) as Record<string, string>
           return Object.entries(all)
             .filter(([k]) => k.startsWith('manual_edits:'))
             .map(([, v]) => JSON.parse(v).count)

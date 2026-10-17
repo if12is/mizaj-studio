@@ -3,6 +3,7 @@ productName: Mizaj Studio
 artifactName: Mizaj-Studio-Setup-${version}.${ext}
 copyright: GPL-3.0-or-later
 asar: true
+afterPack: build/afterPack.cjs
 directories:
   buildResources: build
   output: dist

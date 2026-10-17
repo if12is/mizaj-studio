@@ -387,6 +387,13 @@ def undo_import(db: sqlite3.Connection, import_id: str) -> dict[str, Any]:
             if t not in _TABLES or pk not in ("id", "key"):
                 continue
             chk = op.get("chk", "updated_at")
+            # identifiers are interpolated below: the journal is stored data, so allow only real
+            # column names of the table (a tampered journal must never reach the SQL text)
+            cols_ok = {r[1] for r in db.execute(f"PRAGMA table_info({t})")}  # noqa: S608
+            used = {pk, chk, *(op["row"] if isinstance(op.get("row"), dict) else ())}
+            if not used <= cols_ok:
+                skipped += 1
+                continue
             cur = db.execute(f"SELECT {chk} FROM {t} WHERE {pk}=?", (op["id"],)).fetchone()  # noqa: S608
             if cur is None or cur[0] != op["after"]:
                 skipped += 1  # edited or removed by the user since the import

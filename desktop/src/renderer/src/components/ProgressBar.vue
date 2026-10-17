@@ -52,8 +52,8 @@ const label = computed(() =>
     <span>{{ label }}</span>
     <div class="h-2 flex-1 overflow-hidden rounded bg-slate-200 dark:bg-slate-700">
       <div
-        class="h-full bg-mizaj-emerald transition-all"
-        :style="{ width: editor.progress + '%' }"
+        class="m-progress-fill h-full bg-mizaj-emerald"
+        :style="{ transform: `scaleX(${editor.progress / 100})` }"
         data-testid="progress-fill"
       />
     </div>

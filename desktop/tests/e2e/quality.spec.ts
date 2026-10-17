@@ -54,9 +54,11 @@ const setDoc = (t: string, anchor = 0) =>
 const apiGet = (path: string) =>
   page.evaluate(async (p) => {
     const cfg = await (
-      window as unknown as { mizajAPI: { getBackendConfig(): Promise<{ baseUrl: string }> } }
+      window as unknown as {
+        mizajAPI: { getBackendConfig(): Promise<{ baseUrl: string; token: string }> }
+      }
     ).mizajAPI.getBackendConfig()
-    return (await fetch(`${cfg.baseUrl}${p}`)).json()
+    return (await fetch(`${cfg.baseUrl}${p}`, { headers: { 'X-Mizaj-Token': cfg.token } })).json()
   }, path)
 
 test.describe.configure({ mode: 'serial' })
@@ -68,6 +70,8 @@ test.beforeAll(async () => {
     env: { ...process.env, MIZAJ_ENGINE_MODE: 'mock', MIZAJ_USER_DATA_DIR: userData }
   })
   page = await app.firstWindow()
+  // transitions would race instant visibility checks; motion has its own spec (motion.spec.ts)
+  await page.emulateMedia({ reducedMotion: 'reduce' })
   await expect(text('status-sidecar')).toContainText('المحرك: جاهز')
   await text('new-project').click()
   await text('new-project-input').fill('جودة')

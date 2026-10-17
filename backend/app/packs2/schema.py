@@ -14,6 +14,7 @@ from typing import Any
 
 from app.api.health import VERSION
 from app.core import packs as v1
+from app.core import security
 from app.core.errors import pack_invalid
 
 DATA_KINDS = ("dictionary", "glossary", "templates", "settings")
@@ -133,6 +134,10 @@ def read_pack(path: Path) -> Pack:
         infos = zf.infolist()
         if len(infos) > MAX_MEMBERS:
             raise pack_invalid("too many files in pack")
+        security.check_zip(
+            zf, max_members=MAX_MEMBERS, max_total=MAX_MODELS_BYTES + MAX_JSON_BYTES * 4,
+            max_member=MAX_MODELS_BYTES, max_ratio=MAX_RATIO, error=lambda r: pack_invalid(r),
+        )  # fmt: skip
         names: dict[str, zipfile.ZipInfo] = {}
         for i in infos:
             if i.is_dir():

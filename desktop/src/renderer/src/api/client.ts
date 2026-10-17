@@ -1,3 +1,5 @@
+import { getApiToken, refreshConfig, waitForConfig, withToken } from './token'
+
 export interface ErrorEnvelope {
   error_code: string
   message_ar: string
@@ -51,13 +53,16 @@ export interface ApiClientOptions {
   getBaseUrl: () => string | null
   fetchImpl?: typeof fetch
   onError?: (e: ApiError) => void
+  /** token source; defaults to the shared per-launch token */
+  getToken?: () => string | null
 }
 
 export class ApiClient {
   constructor(private readonly o: ApiClientOptions) {}
 
   async request<T>(method: string, path: string, body?: unknown, silent = false): Promise<T> {
-    const base = this.o.getBaseUrl()
+    await waitForConfig()
+    let base = this.o.getBaseUrl()
     if (!base) {
       const err = new ApiError(
         0,
@@ -69,13 +74,24 @@ export class ApiClient {
       throw err
     }
     const f = this.o.fetchImpl ?? fetch
-    let res: Response
-    try {
-      res = await f(base + path, {
+    const send = (b: string): Promise<Response> =>
+      f(b + path, {
         method,
-        headers: body !== undefined ? { 'Content-Type': 'application/json' } : undefined,
+        headers: withToken(
+          body !== undefined ? { 'Content-Type': 'application/json' } : undefined,
+          (this.o.getToken ?? getApiToken)()
+        ),
         body: body !== undefined ? JSON.stringify(body) : undefined
       })
+    let res: Response
+    try {
+      res = await send(base)
+      if (res.status === 401) {
+        // stale/missed token: re-read the config from main once and retry
+        await refreshConfig()
+        base = this.o.getBaseUrl() ?? base
+        res = await send(base)
+      }
     } catch (e) {
       const err = new ApiError(
         0,

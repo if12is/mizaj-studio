@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import MotionTransition from '@renderer/components/ui/MotionTransition.vue'
+import MotionGroup from '@renderer/components/ui/MotionGroup.vue'
 import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import TitleBar from './components/TitleBar.vue'
 import Sidebar from './components/Sidebar.vue'
@@ -6,13 +8,12 @@ import EditorPane from './components/EditorPane.vue'
 import StatusBar from './components/StatusBar.vue'
 import UpdateBanner from './components/UpdateBanner.vue'
 import RightPanel from './components/RightPanel.vue'
-import SettingsModal from './components/SettingsModal.vue'
-import ShortcutsDialog from './components/ShortcutsDialog.vue'
-import AboutDialog from './components/AboutDialog.vue'
 import FileMenu from './components/files/FileMenu.vue'
-import BatchDialog from './components/files/BatchDialog.vue'
-import ImportPreviewDialog from './components/files/ImportPreviewDialog.vue'
-import OcrFailureDialog from './components/files/OcrFailureDialog.vue'
+import SplashScreen from './components/ui/SplashScreen.vue'
+import SuccessCheck from './components/ui/SuccessCheck.vue'
+import { editorReady } from './lib/boot'
+import { whenIdle } from './lib/idle'
+import { lazyDialog } from './lib/lazy'
 import { useFileStore } from './stores/fileio'
 import { zoomAction } from './a11y/zoom'
 import { toastClass, toasts } from './api/toast'
@@ -23,6 +24,14 @@ import { useProjectsStore } from './stores/projects'
 import { useSettingsStore } from './stores/settings'
 import { useSidecarStore } from './stores/sidecar'
 import { useUpdaterStore } from './stores/updater'
+
+// dialogs are separate chunks: fetched the first time they open
+const SettingsModal = lazyDialog(() => import('./components/SettingsModal.vue'))
+const ShortcutsDialog = lazyDialog(() => import('./components/ShortcutsDialog.vue'))
+const AboutDialog = lazyDialog(() => import('./components/AboutDialog.vue'))
+const BatchDialog = lazyDialog(() => import('./components/files/BatchDialog.vue'))
+const ImportPreviewDialog = lazyDialog(() => import('./components/files/ImportPreviewDialog.vue'))
+const OcrFailureDialog = lazyDialog(() => import('./components/files/OcrFailureDialog.vue'))
 
 const sidecar = useSidecarStore()
 const projects = useProjectsStore()
@@ -96,7 +105,7 @@ onMounted(async () => {
   offFlush = window.mizajAPI?.onBeforeQuitFlush(() => autosave.flush())
   files.registerHooks({ flush: () => autosave.flush(), openDocument: selectDocument })
   await sidecar.init()
-  void useUpdaterStore().init()
+  whenIdle(() => void useUpdaterStore().init(), 3000) // not needed for first interaction
   if (sidecar.isReady) void bootstrap()
 })
 watch(
@@ -175,14 +184,28 @@ onBeforeUnmount(() => {
       <RightPanel :open-document="selectDocument" />
     </div>
     <StatusBar />
-    <SettingsModal v-if="settings.settingsOpen" @close="settings.closeSettings()" />
-    <BatchDialog v-if="files.batchOpen" />
-    <ImportPreviewDialog v-if="files.preview" :preview="files.preview" />
-    <OcrFailureDialog />
-    <ShortcutsDialog v-if="editor.shortcutsOpen" />
-    <AboutDialog v-if="editor.aboutOpen" />
-    <div
-      class="fixed bottom-10 start-3 z-50 space-y-2"
+    <MotionTransition name="m-modal">
+      <SettingsModal v-if="settings.settingsOpen" @close="settings.closeSettings()" />
+    </MotionTransition>
+    <MotionTransition name="m-modal">
+      <BatchDialog v-if="files.batchOpen" />
+    </MotionTransition>
+    <MotionTransition name="m-modal">
+      <ImportPreviewDialog v-if="files.preview" :preview="files.preview" />
+    </MotionTransition>
+    <MotionTransition name="m-modal">
+      <OcrFailureDialog v-if="files.ocrFailure" />
+    </MotionTransition>
+    <MotionTransition name="m-modal">
+      <ShortcutsDialog v-if="editor.shortcutsOpen" />
+    </MotionTransition>
+    <MotionTransition name="m-modal">
+      <AboutDialog v-if="editor.aboutOpen" />
+    </MotionTransition>
+    <MotionGroup
+      tag="div"
+      name="m-toast"
+      class="fixed bottom-10 start-3 z-50 flex flex-col gap-2"
       role="region"
       aria-label="الإشعارات"
       data-testid="toasts"
@@ -190,13 +213,17 @@ onBeforeUnmount(() => {
       <div
         v-for="t in toasts"
         :key="t.id"
-        class="rounded px-3 py-2 text-sm text-white shadow"
+        class="flex items-center gap-2 rounded px-3 py-2 text-sm text-white shadow"
         :class="toastClass[t.kind]"
         :data-kind="t.kind"
         role="alert"
       >
-        {{ t.text }}
+        <SuccessCheck v-if="t.kind === 'success'" :size="16" />
+        <span>{{ t.text }}</span>
       </div>
-    </div>
+    </MotionGroup>
+    <MotionTransition name="m-splash">
+      <SplashScreen v-if="!editorReady" />
+    </MotionTransition>
   </div>
 </template>

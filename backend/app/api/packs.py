@@ -8,7 +8,7 @@ from typing import Any
 from fastapi import APIRouter, Request
 from pydantic import BaseModel
 
-from app.core.errors import not_found, validation_error
+from app.core import security
 from app.core.packs import apply_pack, installed_info
 from app.engine import config
 from app.engine.executor import run_blocking
@@ -16,6 +16,7 @@ from app.engine.manager import manager
 
 router = APIRouter(prefix="/api/packs", tags=["packs"])
 _apply_lock = asyncio.Lock()
+PACK_MAX_BYTES = 5 * 1024**3
 
 
 class ApplyRequest(BaseModel):
@@ -42,11 +43,9 @@ async def status(request: Request) -> dict[str, Any]:
 
 @router.post("/apply")
 async def apply(body: ApplyRequest, request: Request) -> dict[str, Any]:
-    p = Path(body.path)
-    if not p.is_absolute() or p.suffix.lower() != ".mizajpack":
-        raise validation_error("path must be an absolute path ending with .mizajpack")
-    if not p.is_file():
-        raise not_found("File", str(p))
+    p = security.safe_path(
+        body.path, "path", exts=(".mizajpack",), max_bytes=PACK_MAX_BYTES
+    )
     data_dir = request.app.state.data_dir
     async with _apply_lock:
         # release loaded sessions first (Windows keeps model files locked while mapped)

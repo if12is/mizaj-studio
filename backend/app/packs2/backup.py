@@ -17,6 +17,7 @@ from pathlib import Path
 from typing import Any
 
 from app.api.health import VERSION
+from app.core import security
 from app.core.errors import MizajError
 from app.core.migrations import DEFAULT_MIGRATIONS_DIR, discover, run_migrations
 from app.packs2.schema import MAX_MEMBERS, safe_member
@@ -90,6 +91,10 @@ def read_backup_manifest(zf: zipfile.ZipFile) -> dict[str, Any]:
     names = zf.namelist()
     if len(names) > MAX_MEMBERS * 20:
         raise _bad("too many files")
+    security.check_zip(
+        zf, max_members=MAX_MEMBERS * 20, max_total=MAX_BACKUP_BYTES,
+        max_member=MAX_BACKUP_BYTES, max_ratio=1000, error=lambda r: _bad(r),
+    )  # fmt: skip
     for n in names:
         safe_member(n)
     try:

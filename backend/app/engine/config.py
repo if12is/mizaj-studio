@@ -29,7 +29,7 @@ def exe_dir() -> Path | None:
 
 
 def _has_encoder(d: Path) -> bool:
-    return (d / "encoder.onnx").exists()
+    return (d / "encoder.onnx").exists() or (d / "encoder_int8.onnx").exists()
 
 
 def model_dir_candidates() -> list[tuple[str, Path]]:
@@ -62,7 +62,8 @@ def catt_dir() -> Path:
 
 
 def catt_precision() -> str:
-    """'auto' (default: INT8 encoder if present, else float), 'float' or 'int8'."""
+    """'auto' (default: float encoder if present, else INT8), 'float' or 'int8'.
+    INT8 is ~1.8x faster but measurably worse on internal letters (general: +0.09 DER, 8.3.3)."""
     return os.environ.get("MIZAJ_CATT_PRECISION", "auto").lower()
 
 
@@ -73,8 +74,10 @@ def int8_available() -> bool:
 def catt_encoder_path() -> Path:
     d = catt_dir()
     pref = catt_precision()
-    if pref in ("int8", "auto") and (d / "encoder_int8.onnx").exists():
+    if pref == "int8" and (d / "encoder_int8.onnx").exists():
         return d / "encoder_int8.onnx"
+    if pref == "auto" and not (d / "encoder.onnx").exists() and (d / "encoder_int8.onnx").exists():
+        return d / "encoder_int8.onnx"  # INT8-only install (model pack without the float file)
     if pref == "int8-attn" and (d / "encoder_int8_attn.onnx").exists():
         return d / "encoder_int8_attn.onnx"
     return d / "encoder.onnx"

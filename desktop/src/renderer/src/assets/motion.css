@@ -1,0 +1,469 @@
+/*
+ * Mizaj motion system (8.5.1)
+ * Tokens + Vue <Transition> presets. Rules: only transform/opacity are animated (compositor
+ * path); durations 120/200/320ms; reduced-motion removes non-essential motion (bottom of file);
+ * the app's high-contrast mode (html.hc) drops decorative effects (halo, shimmer, splash glide).
+ *
+ * Presets (use as <Transition name="m-...">):
+ *   m-modal  backdrop fade + dialog scale .98 -> 1   (root = backdrop, child [role=dialog])
+ *   m-panel  side panel sliding in from the inline-end side (RTL: from the left)
+ *   m-menu   dropdown/popover: fade + 4px drop, scale .98 from the top
+ *   m-toast  <TransitionGroup>: slide from the inline-start edge + fade, siblings glide
+ *   m-tab    cross-fade (use mode="out-in")
+ *   m-list   <TransitionGroup>: row add/remove with fade + 8px shift, siblings glide
+ *   m-fade   plain opacity
+ */
+:root {
+  --m-dur-fast: 120ms;
+  --m-dur-base: 200ms;
+  --m-dur-slow: 320ms;
+  --m-ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --m-ease-emphasized: cubic-bezier(0.3, 0, 0, 1.15);
+  --m-ease-decelerate: cubic-bezier(0, 0, 0, 1);
+  --m-ease-accelerate: cubic-bezier(0.3, 0, 1, 1);
+  /* sign of translateX that points toward the inline-end / inline-start edge (RTL default) */
+  --m-end-sign: -1;
+  --m-start-sign: 1;
+}
+html[dir='ltr'] {
+  --m-end-sign: 1;
+  --m-start-sign: -1;
+}
+
+/* ---- modal ---- */
+.m-modal-enter-active {
+  transition: opacity var(--m-dur-base) var(--m-ease-decelerate);
+}
+.m-modal-leave-active {
+  transition: opacity var(--m-dur-fast) var(--m-ease-accelerate);
+  pointer-events: none;
+}
+.m-modal-enter-active [role='dialog'] {
+  transition: transform var(--m-dur-base) var(--m-ease-decelerate);
+}
+.m-modal-leave-active [role='dialog'] {
+  transition: transform var(--m-dur-fast) var(--m-ease-accelerate);
+}
+.m-modal-enter-from,
+.m-modal-leave-to {
+  opacity: 0;
+}
+.m-modal-enter-from [role='dialog'],
+.m-modal-leave-to [role='dialog'] {
+  transform: scale(0.98);
+}
+
+/* ---- side panel ---- */
+.m-panel-enter-active {
+  transition:
+    transform var(--m-dur-slow) var(--m-ease-decelerate),
+    opacity var(--m-dur-base) var(--m-ease-decelerate);
+}
+.m-panel-leave-active {
+  transition:
+    transform var(--m-dur-base) var(--m-ease-accelerate),
+    opacity var(--m-dur-fast) var(--m-ease-accelerate);
+  pointer-events: none;
+}
+.m-panel-enter-from,
+.m-panel-leave-to {
+  opacity: 0;
+  transform: translateX(calc(var(--m-end-sign) * 28px));
+}
+
+/* ---- menu / dropdown ---- */
+.m-menu-enter-active {
+  transition:
+    opacity var(--m-dur-fast) var(--m-ease-decelerate),
+    transform var(--m-dur-fast) var(--m-ease-decelerate);
+  transform-origin: top;
+}
+.m-menu-leave-active {
+  transition:
+    opacity 90ms var(--m-ease-accelerate),
+    transform 90ms var(--m-ease-accelerate);
+  transform-origin: top;
+}
+.m-menu-enter-from,
+.m-menu-leave-to {
+  opacity: 0;
+  transform: translateY(-4px) scale(0.98);
+}
+
+/* ---- toast (TransitionGroup) ---- */
+.m-toast-enter-active {
+  transition:
+    transform var(--m-dur-slow) var(--m-ease-emphasized),
+    opacity var(--m-dur-base) var(--m-ease-decelerate);
+}
+.m-toast-leave-active {
+  transition:
+    transform var(--m-dur-base) var(--m-ease-accelerate),
+    opacity var(--m-dur-base) var(--m-ease-accelerate);
+  position: absolute;
+  bottom: 0;
+}
+.m-toast-move {
+  transition: transform var(--m-dur-base) var(--m-ease-standard);
+}
+.m-toast-enter-from {
+  opacity: 0;
+  transform: translateX(calc(var(--m-start-sign) * -24px)) translateY(8px);
+}
+.m-toast-leave-to {
+  opacity: 0;
+  transform: translateX(calc(var(--m-start-sign) * -24px));
+}
+
+/* ---- tab cross-fade ---- */
+.m-tab-enter-active {
+  transition: opacity var(--m-dur-base) var(--m-ease-decelerate);
+}
+.m-tab-leave-active {
+  transition: opacity var(--m-dur-fast) var(--m-ease-accelerate);
+}
+.m-tab-enter-from,
+.m-tab-leave-to {
+  opacity: 0;
+}
+
+/* ---- list add/remove (TransitionGroup) ---- */
+.m-list-enter-active {
+  transition:
+    opacity var(--m-dur-base) var(--m-ease-decelerate),
+    transform var(--m-dur-base) var(--m-ease-decelerate);
+}
+.m-list-leave-active {
+  transition:
+    opacity var(--m-dur-fast) var(--m-ease-accelerate),
+    transform var(--m-dur-fast) var(--m-ease-accelerate);
+  position: absolute;
+  inset-inline: 0;
+}
+.m-list-move {
+  transition: transform var(--m-dur-base) var(--m-ease-standard);
+}
+.m-list-enter-from,
+.m-list-leave-to {
+  opacity: 0;
+  transform: translateY(8px);
+}
+
+/* ---- plain fade ---- */
+.m-fade-enter-active {
+  transition: opacity var(--m-dur-base) var(--m-ease-decelerate);
+}
+.m-fade-leave-active {
+  transition: opacity var(--m-dur-base) var(--m-ease-accelerate);
+}
+.m-fade-enter-from,
+.m-fade-leave-to {
+  opacity: 0;
+}
+
+@keyframes m-fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+/* ---- progress bar: scaleX instead of width ---- */
+.m-progress-fill {
+  width: 100%;
+  transform-origin: right center;
+  transition: transform var(--m-dur-base) var(--m-ease-standard);
+  will-change: transform;
+}
+html[dir='ltr'] .m-progress-fill {
+  transform-origin: left center;
+}
+
+/* ---- button press feedback ---- */
+button:not(:disabled),
+[role='tab'],
+[role='menuitem'] {
+  transition: transform var(--m-dur-fast) var(--m-ease-standard);
+}
+button:not(:disabled):active,
+[role='tab']:active {
+  transform: scale(0.97);
+}
+[role='menuitem']:active {
+  transform: scale(0.985);
+}
+
+/* ---- focus ring eases in (the ring contracts from 6px out to its resting offset) ---- */
+@keyframes m-focus-ring {
+  from {
+    outline-offset: 6px;
+    outline-color: transparent;
+  }
+}
+:focus-visible:not(.cm-content):not(.cm-editor) {
+  animation: m-focus-ring var(--m-dur-base) var(--m-ease-decelerate);
+}
+
+/* ---- drag & drop overlay ---- */
+.m-drop-card {
+  animation: m-drop-pulse 1400ms var(--m-ease-standard) infinite;
+}
+@keyframes m-drop-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.025);
+  }
+}
+
+/* ---- success check (SuccessCheck.vue) ---- */
+.m-check {
+  display: inline-block;
+  vertical-align: middle;
+}
+.m-check-circle {
+  stroke-dasharray: 63;
+  stroke-dashoffset: 63;
+  animation: m-draw var(--m-dur-slow) var(--m-ease-decelerate) forwards;
+}
+.m-check-tick {
+  stroke-dasharray: 20;
+  stroke-dashoffset: 20;
+  animation: m-draw var(--m-dur-base) var(--m-ease-decelerate) 200ms forwards;
+}
+@keyframes m-draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+/* ---- skeletons ---- */
+.m-skeleton {
+  position: relative;
+  overflow: hidden;
+  border-radius: 6px;
+  background: rgb(148 163 184 / 0.22);
+}
+.m-skeleton::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  transform: translateX(100%);
+  background: linear-gradient(90deg, transparent, rgb(148 163 184 / 0.28), transparent);
+  animation: m-shimmer-rtl 1400ms var(--m-ease-standard) infinite;
+}
+html[dir='ltr'] .m-skeleton::after {
+  transform: translateX(-100%);
+  animation-name: m-shimmer;
+}
+@keyframes m-shimmer {
+  to {
+    transform: translateX(100%);
+  }
+}
+@keyframes m-shimmer-rtl {
+  to {
+    transform: translateX(-100%);
+  }
+}
+
+/* ---- newly applied diacritics (editor/fresh.ts decoration class) ---- */
+.cm-fresh {
+  animation: m-fresh var(--m-dur-slow) var(--m-ease-decelerate) both;
+}
+@keyframes m-fresh {
+  from {
+    opacity: 0.3;
+  }
+}
+
+/* ---- splash / engine state (SplashScreen.vue, BrandMark.vue) ---- */
+.m-splash {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  background: #0f172a;
+  color: #f1f5f9;
+}
+.m-splash-leave-active {
+  transition: opacity var(--m-dur-base) var(--m-ease-accelerate);
+  pointer-events: none;
+}
+.m-splash-leave-to {
+  opacity: 0;
+}
+.m-mark-body {
+  opacity: 0;
+  animation: m-mark-body 420ms var(--m-ease-decelerate) 40ms forwards;
+}
+.m-mark-crown {
+  opacity: 0;
+  animation: m-mark-crown 560ms var(--m-ease-emphasized) 220ms forwards;
+}
+.m-mark-nib {
+  opacity: 0;
+  animation: m-mark-nib 420ms var(--m-ease-decelerate) 380ms forwards;
+}
+.m-mark-halo {
+  opacity: 0;
+  animation: m-fade-in 700ms var(--m-ease-decelerate) 400ms forwards;
+}
+.m-mark-static .m-mark-body,
+.m-mark-static .m-mark-crown,
+.m-mark-static .m-mark-nib,
+.m-mark-static .m-mark-halo {
+  opacity: 1;
+  animation: none;
+}
+@keyframes m-mark-body {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes m-mark-crown {
+  from {
+    opacity: 0;
+    transform: translateY(-26px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes m-mark-nib {
+  from {
+    opacity: 0;
+    transform: translate(-14px, 6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+/* the finished mark breathes while the engine is still starting */
+.m-mark-breathe .m-mark-halo {
+  animation:
+    m-fade-in 700ms var(--m-ease-decelerate) 400ms forwards,
+    m-breathe 2200ms ease-in-out 1200ms infinite;
+}
+@keyframes m-breathe {
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+/* The name is already painted by the static splash in index.html: keep it visible so the
+   handover from the static splash to this one has no flicker. Only the status line fades in. */
+.m-splash-text {
+  opacity: 0;
+  animation: m-name-in var(--m-dur-slow) var(--m-ease-decelerate) forwards;
+}
+.m-splash-name {
+  font-size: 28px;
+  font-weight: 700;
+}
+.m-splash-text {
+  font-size: 14px;
+  min-height: 1.5em;
+  color: #94a3b8;
+  animation-delay: 700ms;
+}
+@keyframes m-name-in {
+  to {
+    opacity: 1;
+  }
+}
+
+/* engine-starting pill shown over the editor once the splash is gone */
+.m-engine-pill {
+  position: absolute;
+  inset-block-start: 8px;
+  inset-inline-end: 12px;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 12px 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  background: rgb(15 23 42 / 0.92);
+  color: #f1f5f9;
+  box-shadow: 0 4px 14px rgb(0 0 0 / 0.25);
+  pointer-events: none;
+}
+
+/* ---- reduced motion: only essential feedback survives ---- */
+@media (prefers-reduced-motion: reduce) {
+  .m-skeleton::after,
+  .m-drop-card,
+  .m-mark-breathe .m-mark-halo,
+  .cm-fresh {
+    animation: none !important;
+  }
+  .m-mark-body,
+  .m-mark-crown,
+  .m-mark-nib,
+  .m-mark-halo,
+  .m-splash-name,
+  .m-splash-text {
+    opacity: 1 !important;
+    transform: none !important;
+  }
+  .m-check-circle,
+  .m-check-tick {
+    stroke-dashoffset: 0 !important;
+  }
+  button:not(:disabled):active,
+  [role='tab']:active,
+  [role='menuitem']:active {
+    transform: none;
+  }
+  :focus-visible {
+    animation: none !important;
+  }
+}
+
+/* ---- high contrast: no decorative effects, static solid shapes ---- */
+html.hc .m-skeleton {
+  background: #404040;
+}
+html.hc .m-skeleton::after,
+html.hc .m-mark-halo,
+html.hc .m-drop-card {
+  display: none;
+  animation: none;
+}
+html.hc .m-mark-body,
+html.hc .m-mark-crown,
+html.hc .m-mark-nib,
+html.hc .m-splash-name,
+html.hc .m-splash-text {
+  opacity: 1;
+  animation: none;
+}
+html.hc .m-splash,
+html.hc .m-engine-pill {
+  background: #000;
+  color: #fff;
+}
+html.hc .m-splash-text {
+  color: #fff;
+}
+html.hc :focus-visible,
+html.hc .cm-fresh {
+  animation: none;
+}

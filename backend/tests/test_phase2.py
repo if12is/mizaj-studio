@@ -273,7 +273,7 @@ def test_health_responsive_during_stream(data_dir, monkeypatch):
 
     async def scenario():
         transport = httpx.ASGITransport(app=app)
-        async with httpx.AsyncClient(transport=transport, base_url="http://t") as c:
+        async with httpx.AsyncClient(transport=transport, base_url="http://127.0.0.1") as c:
             task = asyncio.create_task(
                 c.post("/api/tashkeel/stream", json={"text": text * 4}, timeout=60)
             )

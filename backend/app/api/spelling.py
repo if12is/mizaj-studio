@@ -48,12 +48,12 @@ class ReadabilityIn(BaseModel):
 
 
 class SuggestIn(BaseModel):
-    word: str
+    word: str = Field(max_length=100)
     limit: int = Field(default=5, ge=1, le=8)
 
 
 class IgnoreIn(BaseModel):
-    word: str
+    word: str = Field(max_length=100)
 
 
 def _engine():

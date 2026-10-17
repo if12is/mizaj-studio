@@ -35,7 +35,7 @@ class Document(DocumentSummary):
 class DocumentCreate(BaseModel):
     project_id: int
     title: str = Field(max_length=500)
-    raw_content: str = ""
+    raw_content: str = Field(default="", max_length=20_000_000)
     language: str = Field(default="ar", min_length=1, max_length=16)
     direction: Literal["rtl", "ltr"] = "rtl"
 
@@ -50,8 +50,8 @@ class DocumentCreate(BaseModel):
 
 class DocumentUpdate(BaseModel):
     title: str | None = Field(default=None, max_length=500)
-    raw_content: str | None = None
-    diacritized_content: str | None = None
+    raw_content: str | None = Field(default=None, max_length=20_000_000)
+    diacritized_content: str | None = Field(default=None, max_length=20_000_000)
 
     @field_validator("title")
     @classmethod

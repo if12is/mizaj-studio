@@ -1,0 +1,37 @@
+/* Arabic subsets only, WOFF2 only (Electron/Chromium always supports WOFF2; the WOFF fallbacks
+   that @fontsource ships would just add ~350 KB of dead weight to the package). */
+@font-face {
+  font-family: 'Cairo';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 400;
+  src: url('@fontsource/cairo/files/cairo-arabic-400-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Cairo';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 600;
+  src: url('@fontsource/cairo/files/cairo-arabic-600-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Cairo';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 700;
+  src: url('@fontsource/cairo/files/cairo-arabic-700-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Amiri';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 400;
+  src: url('@fontsource/amiri/files/amiri-arabic-400-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Amiri';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 700;
+  src: url('@fontsource/amiri/files/amiri-arabic-700-normal.woff2') format('woff2');
+}

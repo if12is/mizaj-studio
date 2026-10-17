@@ -4,7 +4,7 @@ import sqlite3
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Response
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, Field, field_validator
 
 from app.api.deps import get_db
 from app.core.database import now_iso, write
@@ -33,20 +33,20 @@ class DictEntry(BaseModel):
 
 
 class EntryIn(BaseModel):
-    word_or_phrase: str
-    diacritized_form: str
+    word_or_phrase: str = Field(max_length=500)
+    diacritized_form: str = Field(max_length=1000)
 
     _v = field_validator("word_or_phrase", "diacritized_form")(_nonempty)
 
 
 class FormIn(BaseModel):
-    diacritized_form: str
+    diacritized_form: str = Field(max_length=1000)
 
     _v = field_validator("diacritized_form")(_nonempty)
 
 
 class ImportIn(BaseModel):
-    entries: list[EntryIn]
+    entries: list[EntryIn] = Field(max_length=100_000)
 
 
 def _locked(db: sqlite3.Connection, eid: int) -> sqlite3.Row:

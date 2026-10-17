@@ -34,6 +34,17 @@ jobs:
         working-directory: ./backend
         run: |
           if [ -d tests ]; then pytest -v; fi
+      - name: Audit Python dependencies (pip-audit)
+        working-directory: ./backend
+        run: |
+          pip install "$(grep -E '^pip-audit==' requirements-build.txt)"
+          ARGS=""
+          if [ -f pip-audit-ignore.txt ]; then
+            for id in $(grep -vE '^[[:space:]]*(#|$)' pip-audit-ignore.txt | awk '{print $1}'); do
+              ARGS="$ARGS --ignore-vuln $id"
+            done
+          fi
+          pip-audit -r requirements.txt $ARGS
 
   backend-windows:
     runs-on: windows-latest
