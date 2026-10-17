@@ -32,6 +32,15 @@ _OBLIGATION = {fold(x) for x in ("يلتزم", "تلتزم", "يلتزمان", "
 _NEGATION = {fold(x) for x in ("لا", "لم", "لن", "ليس", "ليست", "غير", "دون", "بدون", "عدم", "إلا")}
 
 MAX_TEXT = 2_000_000
+# difflib is O(n*m) (or worse on repeated tokens) with autojunk off: beyond this many cells, let it
+# treat very frequent tokens as junk so a hostile / huge input cannot pin a CPU for minutes.
+_AUTOJUNK_CELLS = 4_000_000
+_PAIR_CELLS = 250_000  # paragraph-replace blocks bigger than this are reported as delete + insert
+_EXACT_RATIO_WORDS = 300
+
+
+def _matcher(x: list, y: list) -> SequenceMatcher:
+    return SequenceMatcher(None, x, y, autojunk=len(x) * len(y) > _AUTOJUNK_CELLS)
 
 
 def key(tok: str) -> str:
@@ -60,7 +69,7 @@ def _paragraphs(text: str) -> list[dict[str, Any]]:
 
 
 def _align_paragraphs(a: list[dict], b: list[dict]) -> list[tuple[int | None, int | None]]:
-    sm = SequenceMatcher(None, [p["key"] for p in a], [p["key"] for p in b], autojunk=False)
+    sm = _matcher([p["key"] for p in a], [p["key"] for p in b])
     pairs: list[tuple[int | None, int | None]] = []
     for tag, i1, i2, j1, j2 in sm.get_opcodes():
         if tag == "equal":
@@ -69,14 +78,21 @@ def _align_paragraphs(a: list[dict], b: list[dict]) -> list[tuple[int | None, in
             pairs += [(i, None) for i in range(i1, i2)]
         elif tag == "insert":
             pairs += [(None, j) for j in range(j1, j2)]
+        elif (i2 - i1) * (j2 - j1) > _PAIR_CELLS:  # too many candidate pairs to score
+            pairs += [(i, None) for i in range(i1, i2)]
+            pairs += [(None, j) for j in range(j1, j2)]
         else:  # replace: monotonic greedy pairing by similarity
             j_cur = j1
             for i in range(i1, i2):
                 best, best_r = None, 0.39
                 for j in range(j_cur, j2):
-                    r = SequenceMatcher(
-                        None, a[i]["key"].split(), b[j]["key"].split(), autojunk=False
-                    ).ratio()
+                    wi, wj = a[i]["key"].split(), b[j]["key"].split()
+                    sim = _matcher(wi, wj)
+                    r = (
+                        sim.ratio()
+                        if max(len(wi), len(wj)) <= _EXACT_RATIO_WORDS
+                        else sim.quick_ratio()
+                    )
                     if r > best_r:
                         best, best_r = j, r
                 if best is None:
@@ -128,7 +144,7 @@ def compare_texts(a: str, b: str) -> dict[str, Any]:
             aligned.append({"status": "removed", "a": _pr(pa[ia]), "b": None, "hunks": [idx]})
             continue
         wa, wb = pa[ia]["words"], pb[ib]["words"]
-        sm = SequenceMatcher(None, [w["key"] for w in wa], [w["key"] for w in wb], autojunk=False)
+        sm = _matcher([w["key"] for w in wa], [w["key"] for w in wb])
         idxs: list[int] = []
         status = "equal"
         for tag, i1, i2, j1, j2 in sm.get_opcodes():

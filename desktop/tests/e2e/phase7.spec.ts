@@ -58,6 +58,8 @@ test.beforeAll(async () => {
     }
   })
   page = await app.firstWindow()
+  // transitions would race instant visibility checks; motion has its own spec (motion.spec.ts)
+  await page.emulateMedia({ reducedMotion: 'reduce' })
   await expect(text('status-sidecar')).toContainText('المحرك: جاهز')
 })
 test.afterAll(async () => {
@@ -133,10 +135,15 @@ test('zoom shortcuts persist; high contrast applies a black/white palette', asyn
   await expect.poll(size).toBe(`${parseInt(before) + 2}px`)
   const persisted = await page.evaluate(async () => {
     const cfg = await (
-      window as unknown as { mizajAPI: { getBackendConfig(): Promise<{ baseUrl: string }> } }
+      window as unknown as {
+        mizajAPI: { getBackendConfig(): Promise<{ baseUrl: string; token: string }> }
+      }
     ).mizajAPI.getBackendConfig()
-    return ((await (await fetch(`${cfg.baseUrl}/api/settings`)).json()) as Record<string, string>)
-      .editor_font_size
+    return (
+      (await (
+        await fetch(`${cfg.baseUrl}/api/settings`, { headers: { 'X-Mizaj-Token': cfg.token } })
+      ).json()) as Record<string, string>
+    ).editor_font_size
   })
   expect(persisted).toBe(String(parseInt(before) + 2))
   await page.keyboard.press('Control+0')

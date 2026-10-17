@@ -23,8 +23,10 @@ monotonic numbering, and a notice that names Tanzil and Creative Commons.
 from __future__ import annotations
 
 import hashlib
+import http.client
 import json
 import re
+import time
 import urllib.parse
 import urllib.request
 from collections.abc import Callable
@@ -353,8 +355,17 @@ def _default_post(url: str, fields: dict[str, str]) -> bytes:
     )
     try:
         with urllib.request.build_opener(_NoOffsiteRedirect).open(req, timeout=60) as r:
-            return r.read(40_000_000)
-    except OSError as exc:
+            parts, total = [], 0
+            while chunk := r.read(1 << 16):
+                parts.append(chunk)
+                total += len(chunk)
+                if total > 40_000_000:
+                    raise OSError("response too large")
+            cl = r.headers.get("Content-Length")
+            if cl is not None and cl.isdigit() and int(cl) != total:
+                raise OSError(f"truncated response ({total} of {cl} bytes)")  # retried by caller
+            return b"".join(parts)
+    except (OSError, http.client.HTTPException) as exc:
         raise MizajError(
             "ERR_QURAN_DOWNLOAD",
             502,
@@ -362,6 +373,22 @@ def _default_post(url: str, fields: dict[str, str]) -> bytes:
             "Quran download failed.",
             {"reason": str(exc)},
         ) from exc
+
+
+POST_RETRIES = 4  # attempts after the first one, with exponential backoff (0.5 s, 1 s, 2 s, 4 s)
+
+
+def _post_with_retries(do_post, url: str, fields: dict[str, str]) -> bytes:
+    """Connection resets / timeouts / truncated bodies are transient: retry with backoff.
+    A POST cannot be Range-resumed, but the file is small (~1 MB) and validated before use."""
+    for attempt in range(POST_RETRIES + 1):
+        try:
+            return do_post(url, fields)
+        except MizajError as exc:
+            if exc.error_code != "ERR_QURAN_DOWNLOAD" or attempt == POST_RETRIES:
+                raise
+            time.sleep(0.5 * 2**attempt)
+    raise AssertionError("unreachable")
 
 
 def download_quran_text(
@@ -385,7 +412,7 @@ def download_quran_text(
     for kind in kinds:
         if kind not in KINDS:
             raise MizajError("ERR_VALIDATION", 422, "نوع غير صالح.", f"unknown kind {kind}")
-        raw = do_post(DOWNLOAD_ENDPOINT, _form_fields(kind))
+        raw = _post_with_retries(do_post, DOWNLOAD_ENDPOINT, _form_fields(kind))
         try:
             validate_tanzil_text(raw.decode("utf-8"))
         except UnicodeDecodeError as exc:

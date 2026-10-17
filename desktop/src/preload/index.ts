@@ -8,12 +8,18 @@ interface UpdaterStatus {
     | 'not-available'
     | 'downloading'
     | 'downloaded'
+    | 'retrying'
     | 'error'
   version?: string
   percent?: number
   bytesPerSecond?: number
   message?: string
   code?: 'not-packaged' | 'portable'
+  phase?: 'check' | 'download'
+  attempt?: number
+  maxAttempts?: number
+  nextRetryAt?: number | null
+  offline?: boolean
 }
 
 interface SidecarStatus {
@@ -23,11 +29,14 @@ interface SidecarStatus {
   message?: string
 }
 
+// Sandboxed preload: only `electron` is require()d (contextBridge, ipcRenderer, webUtils).
 const mizajAPI = {
   getBackendConfig: (): Promise<{
     port: number | null
     baseUrl: string | null
     status: SidecarStatus
+    /** per-launch API token: send as `X-Mizaj-Token` on every backend request */
+    token: string
   }> => ipcRenderer.invoke('backend:get-config'),
   onSidecarStatus: (cb: (s: SidecarStatus) => void): (() => void) => {
     const handler = (_e: unknown, s: SidecarStatus): void => cb(s)

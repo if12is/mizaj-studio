@@ -5,6 +5,7 @@ import type { ConfWord } from './confidence'
 import { isolateHistory } from '@codemirror/commands'
 import { stripMarks } from './arabic'
 import { diffMarkEdits, mapSelection } from './markEdits'
+import { freshAnnotations } from './fresh'
 
 export interface StreamChunk {
   chunk_id: number
@@ -120,7 +121,11 @@ export class RunSession {
     return {
       changes: { from, to, insert: chunk.text },
       selection: mapSelection(state.selection, edits),
-      annotations: [Transaction.addToHistory.of(false), allowQuranChange.of(true)]
+      annotations: [
+        Transaction.addToHistory.of(false),
+        allowQuranChange.of(true),
+        ...freshAnnotations()
+      ]
     }
   }
 

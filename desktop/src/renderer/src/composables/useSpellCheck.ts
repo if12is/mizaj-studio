@@ -1,3 +1,4 @@
+import { whenIdle } from '@renderer/lib/idle'
 import type { EditorView } from '@codemirror/view'
 import { ApiError } from '@renderer/api/client'
 import { useApi } from '@renderer/api'
@@ -41,6 +42,7 @@ export function useSpellCheck(getView: () => EditorView | null) {
   const editor = useEditorStore()
   const quality = useQualityStore()
   let timer: ReturnType<typeof setTimeout> | null = null
+  let cancelIdle: (() => void) | null = null
   let warnedMissing = false
 
   const enabled = (): boolean => settings.values.spell_check_enabled !== 'false'
@@ -147,7 +149,11 @@ export function useSpellCheck(getView: () => EditorView | null) {
 
   function schedule(): void {
     if (timer) clearTimeout(timer)
-    timer = setTimeout(() => void check(false), SPELL_DEBOUNCE_MS)
+    cancelIdle?.()
+    timer = setTimeout(() => {
+      // background work waits for an idle moment so typing/scrolling never competes with it
+      cancelIdle = whenIdle(() => void check(false))
+    }, SPELL_DEBOUNCE_MS)
   }
 
   async function ignoreWord(word: string): Promise<void> {
@@ -186,6 +192,9 @@ export function useSpellCheck(getView: () => EditorView | null) {
     ignoreWord,
     addToDictionary,
     fetchSuggestions,
-    dispose: () => timer && clearTimeout(timer)
+    dispose: () => {
+      if (timer) clearTimeout(timer)
+      cancelIdle?.()
+    }
   }
 }

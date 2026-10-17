@@ -16,7 +16,21 @@ from .text import Masker, OffsetMap
 
 TATWEEL_RE = re.compile("ـ+")
 _PRESENTATION = "ﭐ-﷿ﹰ-ﻼ"
-PRES_RUN_RE = re.compile(f"[؀-ۿ{_PRESENTATION}]*[{_PRESENTATION}][؀-ۿ{_PRESENTATION}]*")
+# maximal run of Arabic-block + presentation-form chars that contains a presentation form (the
+# naive `[run]*[pres][run]*` is O(n^2) on long runs without one)
+_PRES_BLOCK_RUN = re.compile(f"[؀-ۿ{_PRESENTATION}]+")
+_PRES_CHAR = re.compile(f"[{_PRESENTATION}]")
+
+
+class _PresRuns:
+    @staticmethod
+    def finditer(text: str):
+        for m in _PRES_BLOCK_RUN.finditer(text):
+            if _PRES_CHAR.search(m.group()):
+                yield m
+
+
+PRES_RUN_RE = _PresRuns()
 PERSIAN_MAP = {
     "ی": "ي",
     "ک": "ك",
@@ -30,7 +44,16 @@ PERSIAN_MAP = {
     "ۍ": "ي",
     "ٹ": "ت",
 }
-_PERSIAN_RUN = re.compile("[؀-ۿ]*[" + "".join(PERSIAN_MAP) + "][؀-ۿ]*")
+# A Persian/Urdu "run" is a maximal Arabic-block run containing a PERSIAN_MAP letter. Matching the
+# old pattern `[block]*[persian][block]*` rescans each run from every start (O(n^2) on long runs).
+_BLOCK_RUN = re.compile("[؀-ۿ]+")
+_PERSIAN_CHAR = re.compile("[" + "".join(PERSIAN_MAP) + "]")
+
+
+def _persian_runs(text: str):
+    for m in _BLOCK_RUN.finditer(text):
+        if _PERSIAN_CHAR.search(m.group()):
+            yield m
 _PERSIAN_ONLY = re.compile("[\u067e\u0686\u0698\u06af\u06a4\u0679\u0688\u0691]")
 ZW_RE = re.compile("[‌‍]")
 ODD_SPACE_RE = re.compile("[  -   　]")
@@ -104,7 +127,7 @@ def check_typography(text: str, masker: Masker, opt: TypographyOptions | None = 
             if new != m.group() and ok(*m.span()):
                 out.append(_edit(text, m.start(), m.end(), "TYPO_PRESENTATION_FORM", new, 0.95))
     if opt.persian_letters and not _PERSIAN_ONLY.search(text):  # whole text is not Persian/Urdu
-        for m in _PERSIAN_RUN.finditer(text):
+        for m in _persian_runs(text):
             run = m.group()
             if not re.search("[ء-ي]", run) or not ok(*m.span()):
                 continue  # purely Persian words are not "mistyped Arabic"

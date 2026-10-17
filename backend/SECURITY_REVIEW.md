@@ -1,0 +1,83 @@
+# Backend security review (Phase 8, Slice 8.1)
+
+Scope: `backend/app/**` (FastAPI sidecar bound to `127.0.0.1`), its dependencies and the single
+`pip-audit` CI step. The desktop side (token generation, sending the header) is a separate task.
+Regression tests: `backend/tests/test_phase8_security.py`. Items marked **lock** were found safe
+and are pinned by a test so they cannot regress; every other item has a test that failed before
+the fix.
+
+## 1. Threat model
+
+| Actor | Capability | What we defend |
+|---|---|---|
+| Other local process / local user | Can connect to `127.0.0.1:<random port>` | Per-launch secret (`X-Mizaj-Token`, constant-time compare); token is passed in env (not argv), scrubbed from `os.environ` after reading and never handed to child processes; never logged |
+| Malicious web page in the user's browser | Can send cross-origin requests to `127.0.0.1`, can rebind DNS | `Host` allowlist (127.0.0.1 / localhost) rejects rebinding; CORS limited to `null` + loopback origins; token header forces a preflight and the page cannot know the token; only `application/json` bodies are parsed (no "simple request" CSRF); `/openapi.json`, `/docs` disabled |
+| Malicious DOCX / EPUB / PDF / pack / backup file (user opens or imports it) | Controls file bytes | Zip-bomb limits (members, total size, per-member size, ratio) before any decompression; DOCTYPE/ENTITY declarations rejected in OOXML, entity declarations skipped in EPUB; hardened lxml parsers everywhere (including python-docx's); zip-slip checks (existing, locked); size caps per file type; hostile restored DB cannot run SQL from schema (`trusted_schema=OFF`) or inject SQL through a tampered undo journal |
+| Malicious path supplied by a compromised renderer / local caller | Controls every path string sent to the API | One validator (`core/security.safe_path`): absolute only, no UNC/`\\?\`/`\\.\`/`//`, no `..`, no Windows device names (CON, NUL, COM1, ...), no alternate data streams, extension allowlists, regular files only (no FIFOs/devices), size caps, outputs never inside the app data folder, never through a symlink, never the source file |
+| Network attacker / poisoned DNS (resource & Quran downloads) | Can answer DNS, redirect, or serve large/slow bodies | Host allowlist re-checked on every redirect; HTTPS only (except loopback); connection is made to the *validated* IP (resolve-then-pin) and every answer must be a global unicast address (no private, loopback, link-local, CGNAT, multicast); size and wall-clock caps; sha256 verification (existing) |
+| Hostile text input (DoS) | Sends huge/pathological text | 64 MiB body cap (Content-Length and streamed), per-field `max_length`, linear-time rewrites of every quadratic regex found, bounded diff work, bounded token length in the spell checker, batch file/page caps |
+
+Out of scope: a local attacker who already runs code as the same OS user (can read the token from
+Electron's memory or the data dir directly), and supply-chain attacks on the Electron side.
+
+## 2. Findings
+
+Severity is the risk before the fix. IDs are stable; tests are in `tests/test_phase8_security.py`.
+
+| ID | Sev | Location | Finding | Fix | Test(s) |
+|---|---|---|---|---|---|
+| S-01 | High | `main.py` (all routers) | Any local process or web page could call the full API (read/write documents, write files at attacker-chosen paths). | `core/security.SecurityMiddleware` (pure ASGI, SSE-safe): env `MIZAJ_API_TOKEN` (CLI `--api-token` fallback), header `X-Mizaj-Token`, `hmac.compare_digest`, 401 `ERR_UNAUTHORIZED`. `/health` (GET only) public but `{status, version}` unless authorized. No token configured => auth off + one WARNING. CORS allows the header. | `test_token_*`, `test_health_public_*`, `test_sse_stream_requires_token`, `test_auth_disabled_*`, `test_env_token_*`, `test_cli_flag_is_fallback`, `test_cors_preflight_*`, `test_token_never_logged` |
+| S-02 | High | `main.py` | DNS rebinding: a page on `evil.example` re-resolved to 127.0.0.1 could talk to the API with `Host: evil.example`. | Host header must be `127.0.0.1`, `localhost` or `[::1]` (any port), else 421 `ERR_HOST_NOT_ALLOWED`; checked before the token and also with auth disabled. (`testserver` is tolerated only when auth is disabled, so existing `TestClient(app)` tests keep working; with a token set it is rejected.) | `test_bad_host_*`, `test_loopback_hosts_accepted`, `test_host_check_applies_without_token_too` |
+| S-03 | High | every path-taking endpoint | `//server/share/x.docx` (POSIX-absolute) and `\\server\share\x.docx` (Windows) were accepted: SMB read/NTLM-hash leak, writes to network shares; device names (`CON.docx`, `\\.\pipe\x`) accepted. | `safe_path`/`safe_dir` (see threat model) wired into docx import/export, io import/export/convert/track-changes/batch, OCR, packs v1/v2 import/export, backup export/inspect/restore, Quran install, resource import, PDF `font_path`. Resolved path is re-checked for UNC (mapped network drives). | `test_safe_path_rejects`, `test_every_input_endpoint_*`, `test_every_output_endpoint_*`, `test_batch_dirs_rejected` |
+| S-04 | Medium | export endpoints | Exports could write into the app's own data dir (`mizaj.db`, models, logs) and to any extension (`.bat`, `.lnk`, `.dll`). | Outputs refuse the data dir (symlink-resolved) and use extension allowlists (`.docx .txt .md .markdown .srt .epub .pdf .mizajpack .mizajbackup`). | `test_exports_never_write_into_data_dir`, `test_output_extension_allowlist`, `test_output_through_symlinked_dir_into_data_dir_rejected` |
+| S-05 | Medium | `api/io.py`, `formats.pdf_export` | Output through a symlink was followed (PDF export wrote straight through it); FIFOs/devices as input blocked a worker forever (`/dev/zero`); source could be overwritten via `a/../src` aliasing. | Symlink targets rejected, only regular files accepted, source compared by resolved path; PDF export now writes a temp file + `replace`. | `test_output_symlink_not_followed`, `test_special_files_are_not_opened`, `test_source_never_overwritten` |
+| S-06 | Medium | all file inputs | No size limit on imported files (RAM exhaustion). | `max_bytes` per call: 256 MiB documents, 512 MiB PDF, 64 MiB Quran text, 2 GiB resources, 5 GiB packs, 17 GiB backups => 413 `ERR_FILE_TOO_LARGE`. | `test_input_size_limit` |
+| S-07 | Medium | `docx/service.py` (`open_source`) | DOCX DTD/entity declarations were parsed (python-docx's parser has `resolve_entities=False`, so XXE file disclosure is **not** possible - verified - but entity declarations are never legitimate in OOXML). | `guard_docx`: reject any `<!DOCTYPE`/`<!ENTITY` in XML parts (ASCII/UTF-16) before python-docx runs; python-docx's module-level parser is replaced by an explicitly hardened one (`resolve_entities=False, no_network=True, load_dtd=False, huge_tree=False`) that keeps its element classes. | `test_docx_with_dtd_or_entities_is_rejected`, `test_docx_billion_laughs_rejected_fast`, `test_python_docx_parser_does_not_expand_entities_lock`, `test_hardened_parser_flags` |
+| S-08 | Medium | DOCX, EPUB, packs v1/v2, backups | Only partial zip-bomb defence (v2 packs); DOCX/EPUB/v1/backup had none or total-only. | `check_zip` from the central directory: member count, total, per-member size, compression ratio (floor 1 MiB). EPUB entity-declaring XHTML is skipped; EPUB temp file no longer left behind on rejection. | `test_docx_zip_bomb_*`, `test_docx_member_count_bomb_*`, `test_epub_*`, `test_pack_v1_*`, `test_pack_v2_*`, `test_backup_zip_bomb_rejected`, `test_pack_zip_slip_still_rejected_lock` |
+| S-09 | Medium | `resources/net.py` | An allowlisted name that resolved to a private/loopback/link-local address (poisoned DNS, rebinding between check and connect) was contacted; no body-size or total-time cap. | `resolve_public` (all answers must be global, multicast excluded), `_SafeHTTPSConnection` connects to the validated IP with SNI/verification on the real hostname, IP literals checked, redirects re-checked (scheme + host), `max_bytes` (2 GiB) and `max_seconds` (1 h) enforced, partial file removed on violation. Behind an HTTP proxy the proxy resolves (documented). | `test_resolve_public_*`, `test_ip_literal_in_allowlist_*`, `test_download_to_allowlisted_host_resolving_privately_is_blocked`, `test_redirects_are_rechecked`, `test_download_size_limit_enforced` |
+| S-10 | Medium | `packs2/merge.py::undo_import` | Column names from the stored undo journal were interpolated into SQL (`f"SELECT {chk}..."`, `INSERT ... ({cols})`): a tampered DB/backup could inject SQL. | Identifiers must be real columns of the whitelisted table (`PRAGMA table_info`), otherwise the op is skipped. | `test_undo_with_tampered_journal_cannot_inject_sql`, `test_no_dynamic_sql_outside_vetted_sites` (AST scan: only `merge.py`, `engine/cache.py` (`?` placeholders) and `migrations.py` (`int()`) may build SQL dynamically) |
+| S-11 | Low | `core/database.py` | A restored backup is an untrusted SQLite file whose views/triggers/defaults could call SQL functions. | `PRAGMA trusted_schema=OFF` on every connection. | `test_connection_ignores_untrusted_schema` |
+| S-12 | Medium | `docx_export` (`documents.source_docx_path`) | The stored source path is trusted on export; a restored backup can plant `//server/share/x.docx`. | Re-validated with `safe_path` on every export; invalid => fall back to generating from the stored text. | `test_stored_source_path_is_revalidated` |
+| S-13 | Medium | `spelling/text.py::_MASK_RE` | E-mail mask `[\w.+-]+@...` rescanned each run from every start: O(n^2); 20k chars ~8 s, 100k+ chars = minutes, CPU pinned. | Lookbehind `(?<![\w.+-])` (same matches, linear). | `test_redos_email_mask_is_linear` |
+| S-14 | Medium | `spelling/typography.py` | `[block]*[persian][block]*` and the presentation-form twin: O(n^2) on long Arabic runs. | Iterate maximal runs, test membership (same results). | `test_redos_typography_runs_are_linear` |
+| S-15 | Medium | `spelling/style.py` | Paragraph split lazy regex O(n^2) on text without blank lines (>100 s at 40k lines); repeated-word detector rescanned all earlier positions. | Linear `paragraph_spans`; `bisect` window count. | `test_redos_paragraph_split_is_linear` |
+| S-16 | Medium | `legal/lint.py` | Money regex `(?<![\w/\-])(\d[\d,.]*)` restarted at every digit of `1.1.1...` (O(n^2)); per-sentence constant cost was ~0.7 ms (phrase regex recompiled, `fold` repeated) so `1.`x15000 took 12 s. | Extra lookbehind; compiled-phrase `lru_cache`; short-string `fold` memoised; non-Arabic sentences skip cue matching. | `test_redos_money_lint_is_linear` |
+| S-17 | High | `spelling` dictionary check | A single 8000-char "word" took 44 s and 30k chars was OOM-killed (suggester is super-linear in word length). | Tokens over 100 chars are skipped. | `test_spelling_unbroken_giant_word_is_bounded` |
+| S-18 | Medium | `legal/compare.py` | `difflib` with `autojunk=False` on repetitive input: 30k chars = 26 s; unbounded at 2 M chars. | `autojunk` switched on above 4M cells, replace-blocks above 250k candidate pairs become delete+insert, `quick_ratio` for paragraphs over 300 words. | `test_pathological_inputs_finish_quickly[*]` (every analysis endpoint x 12 hostile inputs, <10 s each) |
+| S-19 | Medium | `core/security.py` | Unbounded request bodies. | 64 MiB cap on `Content-Length` and on streamed/chunked bodies => 413 `ERR_PAYLOAD_TOO_LARGE`; `max_length` added to `documents.raw_content`, spelling `word`, template `body`, LanguageTool `text`, dictionary entries/lists, `io/export.text`, OCR `pages`. | `test_body_limit_*`, `test_field_length_limits` |
+| S-20 | Low | `io/ocr.py`, `tools/discovery.py` | Tesseract inherited the full environment (incl. the API token), stdin and could echo stderr (file paths); PDF OCR had no page/pixel caps. | `shell=False`, list argv built by `tesseract_cmd` (language regex, absolute image path, fixed flags), `timeout`, `stdin=DEVNULL`, token stripped from `env`, `CREATE_NO_WINDOW`; stderr no longer returned; <=1000 pages and <=120 MP per page. | `test_tesseract_runs_without_shell_*`, `test_ocr_language_cannot_inject_flags`, `test_ocr_endpoint_rejects_bad_lang`, `test_ocr_error_does_not_echo_stderr_or_paths` |
+| S-21 | Low | `io/batch.py`, `resources/manager.py`, PDF export | Job error entries embedded `str(exc)` (may contain absolute paths of other files); PDF export response included the system font path; batch outputs could escape through a pre-planted symlinked sub-folder; symlinked input folders could pull files from outside. | Generic `<ExceptionType> while processing` messages; font basename only; destination parent must resolve inside `output_dir`, sources inside `input_dir`. | `test_batch_and_download_errors_do_not_leak_exception_text`, `test_batch_output_escape_via_symlink_is_skipped` |
+| S-22 | Info | `main.py` | `/docs`, `/redoc`, `/openapi.json` served. | Disabled. | `test_openapi_and_docs_are_not_served` |
+| S-23 | High/Med | `requirements.txt` | `pip-audit` (8.1.7): lxml 5.1.0 (PYSEC-2026-87), starlette 0.36.3 (7 advisories), pytest 8.1.1 (PYSEC-2026-1845, dev only). | See section 4. | full suite green on the upgraded stack |
+
+### Reviewed and found safe (locked or documented)
+
+* **XXE through python-docx**: its parser already used `resolve_entities=False` (+ lxml defaults `no_network`, no DTD); entities are never expanded. Locked in `test_python_docx_parser_does_not_expand_entities_lock`.
+* **Zip-slip** in v1/v2 packs and backups: member names validated (`safe_member`, `_safe_rel`), sha256 per file, declared sizes enforced by `ZipExtFile`. Locked in `test_pack_zip_slip_still_rejected_lock`.
+* **Template engine** (`legal/templates.py`): hand-written parser/evaluator, no `eval`/`exec`/attribute access; `test_template_engine_is_not_evaluating_code`. Very deep `{{#if}}` nesting raises `RecursionError` => handled 500 envelope, server survives (`test_template_deep_nesting_does_not_crash_server`).
+* **SQL**: every other statement is parameterised (AST scan in `test_no_dynamic_sql_outside_vetted_sites`).
+* **Logging**: no document text, headers or tokens are logged (`test_document_text_not_logged`, `test_token_never_logged`); validation errors never echo the offending input; unhandled errors return a fixed envelope without traceback (`test_unhandled_errors_have_no_traceback_*`). Residual: `log.exception` writes a traceback to the *local* log file, and an exception message could in principle embed a text fragment.
+* **Cross-origin simple requests** (dev mode, no token): body is only parsed as JSON (`test_cross_origin_simple_requests_cannot_mutate_lock`).
+* **Local tool URLs** (Ollama, LanguageTool): `net.local_request` accepts loopback only (existing test).
+
+## 3. Residual risks / follow-ups
+
+* The token travels in an env var; a same-user process can read it from `/proc/<pid>/environ` on Linux or via process inspection on Windows. Accepted (same-user attacker is out of scope).
+* `--api-token` on the command line is visible in the process list; the desktop agent must use the env var.
+* Through an HTTP(S) proxy the download pin cannot be applied (the proxy resolves the name); the host allowlist and sha256 checks still apply.
+* Windows mapped network drives are rejected after `realpath` (UNC), but a *local* drive letter backed by a redirected folder cannot be told apart.
+* `RecursionError` on pathological template nesting yields a 500 (no crash). A depth cap in the parser would be cleaner.
+* Disk-space exhaustion by repeated large-but-legal exports is not rate limited.
+* `docs/architecture/error-codes.md` (outside `backend/`) should list the new codes: `ERR_UNAUTHORIZED` (401), `ERR_HOST_NOT_ALLOWED` (421), `ERR_PAYLOAD_TOO_LARGE` / `ERR_FILE_TOO_LARGE` (413).
+
+## 4. Dependency audit (8.1.7)
+
+`pip-audit==2.9.0` is pinned in `requirements-build.txt`; CI (`backend-ci`) runs
+`pip-audit -r requirements.txt` with ignores read from `backend/pip-audit-ignore.txt`
+(`ID  # reason`, currently empty).
+
+Before: `lxml 5.1.0` (PYSEC-2026-87, fix 6.1.0), `starlette 0.36.3` (PYSEC-2026-161/249/248/1943/1941/2281/2280, fixes up to 1.3.1), `pytest 8.1.1` (PYSEC-2026-1845, fix 9.0.3).
+
+Changes: `fastapi 0.110.0 -> 0.143.3`, `starlette 0.36.3 -> 1.8.0` (now pinned explicitly), `pydantic 2.6.4 -> 2.14.1`, `lxml 5.1.0 -> 6.1.0`, `pytest 8.1.1 -> 9.0.3`. `numpy 1.26.4` / `onnxruntime 1.17.1` / `python-docx 1.1.0` are unchanged. The complete suite passes on the new stack (verified in a copy of the venv and with a real `uvicorn` run: token, Host and handshake behave as specified). Not verified here: a PyInstaller build and the Windows e2e jobs - run `windows-e2e` before releasing.
+
+Unfixable / ignored: none.

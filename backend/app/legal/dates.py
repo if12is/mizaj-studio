@@ -4,9 +4,10 @@ al-Qura calendar, 1343-1500 AH only)."""
 from __future__ import annotations
 
 import datetime as dt
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from hijridate import Gregorian, Hijri
+if TYPE_CHECKING:
+    from hijridate import Hijri
 
 from app.legal.numbering import ordinal
 from app.legal.tafqeet import GEN, TafqeetError, canon, norm_case, number_words
@@ -37,6 +38,8 @@ HIJRI_RANGE = (1343, 1500)
 
 
 def _to_gregorian(y: int, m: int, d: int, calendar: str, adjust: int) -> tuple[dt.date, Hijri]:
+    from hijridate import Gregorian, Hijri  # lazy (startup time)
+
     try:
         if calendar == "hijri":
             h = Hijri(y, m, d)
@@ -85,6 +88,8 @@ def date_words(
     hij_date = (hij.year, hij.month, hij.day)
     # hijri_adjust shifts the displayed Hijri day for a Gregorian input
     if calendar == "gregorian" and hijri_adjust:
+        from hijridate import Gregorian
+
         shifted = greg - dt.timedelta(days=hijri_adjust)
         h2 = Gregorian(shifted.year, shifted.month, shifted.day).to_hijri()
         hij_date = (h2.year, h2.month, h2.day)

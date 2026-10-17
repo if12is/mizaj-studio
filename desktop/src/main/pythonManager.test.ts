@@ -45,6 +45,43 @@ afterEach(() => {
   vi.useRealTimers()
 })
 
+describe('API token handoff', () => {
+  const TOKEN = 'ab'.repeat(32)
+  it('goes to the child via env only, never argv, and is reused on restart', () => {
+    const { mgr, children, spawn } = setup({ apiToken: TOKEN, retryDelaysMs: [10] })
+    mgr.start()
+    const first = spawn.mock.calls[0] as unknown as [
+      string,
+      string[],
+      { env: Record<string, string> }
+    ]
+    expect(first[2].env.MIZAJ_API_TOKEN).toBe(TOKEN)
+    expect(first[1].join(' ')).not.toContain(TOKEN)
+    children[0].emit('exit', 1, null)
+    vi.advanceTimersByTime(20)
+    const second = spawn.mock.calls[1] as unknown as [
+      string,
+      string[],
+      { env: Record<string, string> }
+    ]
+    expect(second[2].env.MIZAJ_API_TOKEN).toBe(TOKEN)
+    expect(second[1].join(' ')).not.toContain(TOKEN)
+  })
+  it('overrides an inherited MIZAJ_API_TOKEN', () => {
+    process.env.MIZAJ_API_TOKEN = 'inherited'
+    try {
+      const { mgr, spawn } = setup({ apiToken: TOKEN })
+      mgr.start()
+      expect(
+        (spawn.mock.calls[0] as unknown as [string, string[], { env: Record<string, string> }])[2]
+          .env.MIZAJ_API_TOKEN
+      ).toBe(TOKEN)
+    } finally {
+      delete process.env.MIZAJ_API_TOKEN
+    }
+  })
+})
+
 describe('PythonProcessManager', () => {
   it('spawns with windowsHide and expected args, parses port across chunks', () => {
     const { mgr, children, spawn } = setup()

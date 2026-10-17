@@ -1,14 +1,19 @@
 <script setup lang="ts">
+import { useReducedMotion } from '@renderer/lib/motion'
 import { onBeforeUnmount, ref, watch } from 'vue'
-import TafqeetTool from './legal/TafqeetTool.vue'
-import DateTool from './legal/DateTool.vue'
-import LegalChecks from './legal/LegalChecks.vue'
-import TemplatesTool from './legal/TemplatesTool.vue'
-import LintTool from './legal/LintTool.vue'
-import CitationsTool from './legal/CitationsTool.vue'
-import RedactTool from './legal/RedactTool.vue'
-import CompareTool from './legal/CompareTool.vue'
+import { lazyPanel } from '@renderer/lib/lazy'
 import { useEditorStore } from '@renderer/stores/editor'
+
+// one chunk per tool; the tool code loads when its tab is first opened
+const reduced = useReducedMotion()
+const TafqeetTool = lazyPanel(() => import('./legal/TafqeetTool.vue'))
+const DateTool = lazyPanel(() => import('./legal/DateTool.vue'))
+const LegalChecks = lazyPanel(() => import('./legal/LegalChecks.vue'))
+const TemplatesTool = lazyPanel(() => import('./legal/TemplatesTool.vue'))
+const LintTool = lazyPanel(() => import('./legal/LintTool.vue'))
+const CitationsTool = lazyPanel(() => import('./legal/CitationsTool.vue'))
+const RedactTool = lazyPanel(() => import('./legal/RedactTool.vue'))
+const CompareTool = lazyPanel(() => import('./legal/CompareTool.vue'))
 
 defineProps<{ openDocument: (id: number) => Promise<void> }>()
 type Tab = 'tafqeet' | 'date' | 'checks' | 'lint' | 'citations' | 'redact' | 'compare' | 'templates'
@@ -45,15 +50,19 @@ onBeforeUnmount(() => (editor.legalWide = false))
         {{ label }}
       </button>
     </div>
-    <div class="min-h-0 flex-1 overflow-auto">
-      <TafqeetTool v-if="tab === 'tafqeet'" />
-      <DateTool v-else-if="tab === 'date'" />
-      <LegalChecks v-else-if="tab === 'checks'" />
-      <LintTool v-else-if="tab === 'lint'" />
-      <CitationsTool v-else-if="tab === 'citations'" />
-      <RedactTool v-else-if="tab === 'redact'" :open-document="openDocument" />
-      <CompareTool v-else-if="tab === 'compare'" />
-      <TemplatesTool v-else :open-document="openDocument" />
+    <div class="relative min-h-0 flex-1 overflow-auto">
+      <Transition name="m-tab" :mode="reduced ? undefined : 'out-in'" :css="!reduced">
+        <div :key="tab">
+          <TafqeetTool v-if="tab === 'tafqeet'" />
+          <DateTool v-else-if="tab === 'date'" />
+          <LegalChecks v-else-if="tab === 'checks'" />
+          <LintTool v-else-if="tab === 'lint'" />
+          <CitationsTool v-else-if="tab === 'citations'" />
+          <RedactTool v-else-if="tab === 'redact'" :open-document="openDocument" />
+          <CompareTool v-else-if="tab === 'compare'" />
+          <TemplatesTool v-else :open-document="openDocument" />
+        </div>
+      </Transition>
     </div>
   </div>
 </template>

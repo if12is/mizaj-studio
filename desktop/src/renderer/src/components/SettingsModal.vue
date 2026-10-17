@@ -1,12 +1,8 @@
 <script setup lang="ts">
+import { useReducedMotion } from '@renderer/lib/motion'
 import { computed, defineAsyncComponent, onMounted, ref } from 'vue'
+import { lazyPanel } from '@renderer/lib/lazy'
 import { useSettingsStore } from '@renderer/stores/settings'
-import DictionaryPanel from './DictionaryPanel.vue'
-import GlossaryPanel from './legal/GlossaryPanel.vue'
-import QuranSettings from './settings/QuranSettings.vue'
-import OnlineSettings from './settings/OnlineSettings.vue'
-import PacksSettings from './settings/PacksSettings.vue'
-import BackupSettings from './settings/BackupSettings.vue'
 import type { SettingsSection } from '@renderer/stores/settings'
 import { useFocusTrap } from '@renderer/composables/useFocusTrap'
 import { notify } from '@renderer/api/toast'
@@ -16,12 +12,21 @@ import { useUpdaterStore } from '@renderer/stores/updater'
 import { useSidecarStore } from '@renderer/stores/sidecar'
 import { ApiError } from '@renderer/api/client'
 
+const reduced = useReducedMotion()
 const emit = defineEmits<{ (e: 'close'): void }>()
 const dialog = ref<HTMLElement | null>(null)
 useFocusTrap(dialog, () => emit('close'))
 const settings = useSettingsStore()
 const sidecar = useSidecarStore()
 const tab = ref<SettingsSection>(settings.settingsSection)
+
+// each settings tab is its own chunk, loaded the first time it is opened
+const DictionaryPanel = lazyPanel(() => import('./DictionaryPanel.vue'))
+const GlossaryPanel = lazyPanel(() => import('./legal/GlossaryPanel.vue'))
+const QuranSettings = lazyPanel(() => import('./settings/QuranSettings.vue'))
+const OnlineSettings = lazyPanel(() => import('./settings/OnlineSettings.vue'))
+const PacksSettings = lazyPanel(() => import('./settings/PacksSettings.vue'))
+const BackupSettings = lazyPanel(() => import('./settings/BackupSettings.vue'))
 
 // EditorQualitySettings.vue is owned by another slice; glob keeps the build working while it is absent.
 const optional = import.meta.glob('./settings/EditorQualitySettings.vue')
@@ -175,243 +180,251 @@ const field = 'rounded border px-2 py-1 dark:border-slate-600 dark:bg-slate-800'
         </button>
       </div>
 
-      <div v-if="tab === 'general'" class="grid grid-cols-2 items-center gap-3 text-sm">
-        <label for="s-engine">وضع المحرك</label>
-        <select
-          id="s-engine"
-          :class="field"
-          :value="settings.values.engine_mode"
-          data-testid="setting-engine-mode"
-          @change="settings.update({ engine_mode: ($event.target as HTMLSelectElement).value })"
-        >
-          <option value="fast">سريع</option>
-          <option
-            value="accurate"
-            :disabled="sidecar.accurateMissing"
-            :title="
-              sidecar.accurateMissing
-                ? 'النموذج الدقيق غير متوفر. ثبّت حزمة النماذج من الإعدادات.'
-                : ''
-            "
-          >
-            دقيق
-          </option>
-        </select>
+      <Transition name="m-tab" :mode="reduced ? undefined : 'out-in'" :css="!reduced">
+        <div :key="tab">
+          <div v-if="tab === 'general'" class="grid grid-cols-2 items-center gap-3 text-sm">
+            <label for="s-engine">وضع المحرك</label>
+            <select
+              id="s-engine"
+              :class="field"
+              :value="settings.values.engine_mode"
+              data-testid="setting-engine-mode"
+              @change="settings.update({ engine_mode: ($event.target as HTMLSelectElement).value })"
+            >
+              <option value="fast">سريع</option>
+              <option
+                value="accurate"
+                :disabled="sidecar.accurateMissing"
+                :title="
+                  sidecar.accurateMissing
+                    ? 'النموذج الدقيق غير متوفر. ثبّت حزمة النماذج من الإعدادات.'
+                    : ''
+                "
+              >
+                دقيق
+              </option>
+            </select>
 
-        <label for="s-level">مستوى التشكيل</label>
-        <select
-          id="s-level"
-          :class="field"
-          :value="settings.values.tashkeel_level"
-          data-testid="setting-tashkeel-level"
-          @change="settings.update({ tashkeel_level: ($event.target as HTMLSelectElement).value })"
-        >
-          <option value="full">كامل</option>
-          <option value="irab_only">أواخر الكلمات (الإعراب)</option>
-          <option value="minimal">الحد الأدنى (فك اللبس)</option>
-          <option value="legal">قانوني (حيث يزيل اللبس)</option>
-        </select>
-
-        <label for="s-font">خط المحرر</label>
-        <select
-          id="s-font"
-          :class="field"
-          :value="settings.values.editor_font"
-          data-testid="setting-editor-font"
-          @change="settings.update({ editor_font: ($event.target as HTMLSelectElement).value })"
-        >
-          <option value="Amiri">أميري</option>
-          <option value="Cairo">القاهرة</option>
-        </select>
-
-        <label for="s-size">حجم الخط ({{ fontSize }})</label>
-        <input
-          id="s-size"
-          v-model.number="fontSize"
-          type="range"
-          min="12"
-          max="48"
-          data-testid="setting-font-size"
-          @change="settings.update({ editor_font_size: String(fontSize) })"
-        />
-
-        <label for="s-colored">تلوين الحركات</label>
-        <input
-          id="s-colored"
-          type="checkbox"
-          :checked="settings.colored"
-          data-testid="setting-colored"
-          @change="
-            settings.update({
-              colored_diacritics: String(($event.target as HTMLInputElement).checked)
-            })
-          "
-        />
-
-        <label for="s-theme">السمة</label>
-        <select
-          id="s-theme"
-          :class="field"
-          :value="settings.values.theme"
-          data-testid="setting-theme"
-          @change="settings.update({ theme: ($event.target as HTMLSelectElement).value })"
-        >
-          <option value="dark">ليلي</option>
-          <option value="light">نهاري</option>
-        </select>
-
-        <label for="s-hc">التباين العالي</label>
-        <select
-          id="s-hc"
-          :class="field"
-          :value="settings.values.high_contrast"
-          data-testid="setting-high-contrast"
-          @change="settings.update({ high_contrast: ($event.target as HTMLSelectElement).value })"
-        >
-          <option value="auto">حسب النظام</option>
-          <option value="true">مفعّل</option>
-          <option value="false">معطّل</option>
-        </select>
-      </div>
-      <div
-        v-if="tab === 'general'"
-        class="mt-4 border-t pt-3 text-sm dark:border-slate-700"
-        data-testid="spell-settings"
-      >
-        <h3 class="mb-2 font-semibold">التدقيق الإملائي</h3>
-        <label class="flex items-center gap-2">
-          <input
-            type="checkbox"
-            :checked="settings.values.spell_check_enabled !== 'false'"
-            data-testid="setting-spell-enabled"
-            @change="
-              settings.update({
-                spell_check_enabled: String(($event.target as HTMLInputElement).checked)
-              })
-            "
-          />
-          تفعيل التدقيق الإملائي أثناء الكتابة
-        </label>
-        <div class="mt-1 flex flex-wrap gap-4">
-          <label
-            v-for="[key, label] in [
-              ['spell_cat_spelling', 'إملائي (قاموس)'],
-              ['spell_cat_pattern', 'أخطاء شائعة'],
-              ['spell_cat_punctuation', 'ترقيم']
-            ]"
-            :key="key"
-            class="flex items-center gap-1"
-          >
-            <input
-              type="checkbox"
-              :checked="settings.values[key] !== 'false'"
-              :data-testid="`setting-${key.replace(/_/g, '-')}`"
+            <label for="s-level">مستوى التشكيل</label>
+            <select
+              id="s-level"
+              :class="field"
+              :value="settings.values.tashkeel_level"
+              data-testid="setting-tashkeel-level"
               @change="
-                settings.update({ [key]: String(($event.target as HTMLInputElement).checked) })
+                settings.update({ tashkeel_level: ($event.target as HTMLSelectElement).value })
+              "
+            >
+              <option value="full">كامل</option>
+              <option value="irab_only">أواخر الكلمات (الإعراب)</option>
+              <option value="minimal">الحد الأدنى (فك اللبس)</option>
+              <option value="legal">قانوني (حيث يزيل اللبس)</option>
+            </select>
+
+            <label for="s-font">خط المحرر</label>
+            <select
+              id="s-font"
+              :class="field"
+              :value="settings.values.editor_font"
+              data-testid="setting-editor-font"
+              @change="settings.update({ editor_font: ($event.target as HTMLSelectElement).value })"
+            >
+              <option value="Amiri">أميري</option>
+              <option value="Cairo">القاهرة</option>
+            </select>
+
+            <label for="s-size">حجم الخط ({{ fontSize }})</label>
+            <input
+              id="s-size"
+              v-model.number="fontSize"
+              type="range"
+              min="12"
+              max="48"
+              data-testid="setting-font-size"
+              @change="settings.update({ editor_font_size: String(fontSize) })"
+            />
+
+            <label for="s-colored">تلوين الحركات</label>
+            <input
+              id="s-colored"
+              type="checkbox"
+              :checked="settings.colored"
+              data-testid="setting-colored"
+              @change="
+                settings.update({
+                  colored_diacritics: String(($event.target as HTMLInputElement).checked)
+                })
               "
             />
-            {{ label }}
-          </label>
+
+            <label for="s-theme">السمة</label>
+            <select
+              id="s-theme"
+              :class="field"
+              :value="settings.values.theme"
+              data-testid="setting-theme"
+              @change="settings.update({ theme: ($event.target as HTMLSelectElement).value })"
+            >
+              <option value="dark">ليلي</option>
+              <option value="light">نهاري</option>
+            </select>
+
+            <label for="s-hc">التباين العالي</label>
+            <select
+              id="s-hc"
+              :class="field"
+              :value="settings.values.high_contrast"
+              data-testid="setting-high-contrast"
+              @change="
+                settings.update({ high_contrast: ($event.target as HTMLSelectElement).value })
+              "
+            >
+              <option value="auto">حسب النظام</option>
+              <option value="true">مفعّل</option>
+              <option value="false">معطّل</option>
+            </select>
+          </div>
+          <div
+            v-if="tab === 'general'"
+            class="mt-4 border-t pt-3 text-sm dark:border-slate-700"
+            data-testid="spell-settings"
+          >
+            <h3 class="mb-2 font-semibold">التدقيق الإملائي</h3>
+            <label class="flex items-center gap-2">
+              <input
+                type="checkbox"
+                :checked="settings.values.spell_check_enabled !== 'false'"
+                data-testid="setting-spell-enabled"
+                @change="
+                  settings.update({
+                    spell_check_enabled: String(($event.target as HTMLInputElement).checked)
+                  })
+                "
+              />
+              تفعيل التدقيق الإملائي أثناء الكتابة
+            </label>
+            <div class="mt-1 flex flex-wrap gap-4">
+              <label
+                v-for="[key, label] in [
+                  ['spell_cat_spelling', 'إملائي (قاموس)'],
+                  ['spell_cat_pattern', 'أخطاء شائعة'],
+                  ['spell_cat_punctuation', 'ترقيم']
+                ]"
+                :key="key"
+                class="flex items-center gap-1"
+              >
+                <input
+                  type="checkbox"
+                  :checked="settings.values[key] !== 'false'"
+                  :data-testid="`setting-${key.replace(/_/g, '-')}`"
+                  @change="
+                    settings.update({ [key]: String(($event.target as HTMLInputElement).checked) })
+                  "
+                />
+                {{ label }}
+              </label>
+            </div>
+          </div>
+          <div v-if="tab === 'general'" class="mt-4 border-t pt-3 text-sm dark:border-slate-700">
+            <h3 class="mb-2 font-semibold">النماذج</h3>
+            <p data-testid="pack-status">
+              الإصدار المثبّت:
+              <b data-testid="pack-version">{{ pack?.version ?? 'غير محدد' }}</b>
+              <span v-if="pack?.models_source" class="text-slate-500">
+                — {{ sourceLabel[pack.models_source] ?? pack.models_source }}
+              </span>
+            </p>
+            <button
+              class="mt-2 rounded border px-3 py-1 hover:bg-slate-100 disabled:opacity-50 dark:border-slate-600 dark:hover:bg-slate-700"
+              :disabled="packBusy"
+              data-testid="pack-apply"
+              @click="applyPack"
+            >
+              تحديث النماذج من ملف (.mizajpack)
+            </button>
+            <p
+              v-if="packMsg"
+              class="mt-2"
+              :class="packMsg.ok ? 'text-mizaj-emerald' : 'text-red-500'"
+              data-testid="pack-result"
+            >
+              {{ packMsg.text }}
+            </p>
+          </div>
+          <div
+            v-if="tab === 'general'"
+            class="mt-4 border-t pt-3 text-sm dark:border-slate-700"
+            data-testid="help-section"
+          >
+            <h3 class="mb-2 font-semibold">المساعدة</h3>
+            <div class="flex flex-wrap gap-2">
+              <button
+                class="rounded border px-3 py-1 hover:bg-slate-100 dark:border-slate-600 dark:hover:bg-slate-700"
+                data-testid="diag-export"
+                @click="exportDiag"
+              >
+                إنشاء حزمة تشخيص
+              </button>
+              <button
+                class="rounded border px-3 py-1 hover:bg-slate-100 dark:border-slate-600 dark:hover:bg-slate-700"
+                data-testid="open-shortcuts"
+                @click="editorStore.shortcutsOpen = true"
+              >
+                اختصارات لوحة المفاتيح
+              </button>
+              <button
+                class="rounded border px-3 py-1 hover:bg-slate-100 dark:border-slate-600 dark:hover:bg-slate-700"
+                data-testid="open-about"
+                @click="editorStore.aboutOpen = true"
+              >
+                حول مِزَاج والتراخيص
+              </button>
+            </div>
+            <p class="mt-1 text-xs text-slate-500">
+              حزمة التشخيص ملف محلي (سجلات منقّاة وإصدارات وإعدادات، بلا نص مستنداتك)؛ لا يُرسل شيء
+              عبر الشبكة.
+            </p>
+          </div>
+          <div
+            v-if="tab === 'general'"
+            class="mt-4 border-t pt-3 text-sm dark:border-slate-700"
+            data-testid="updates-section"
+          >
+            <h3 class="mb-2 font-semibold">التحديثات</h3>
+            <label class="flex items-center gap-2">
+              <input
+                type="checkbox"
+                :checked="settings.values.auto_update_check !== 'false'"
+                data-testid="setting-auto-update"
+                @change="
+                  settings.update({
+                    auto_update_check: String(($event.target as HTMLInputElement).checked)
+                  })
+                "
+              />
+              التحقق التلقائي من التحديثات
+            </label>
+            <p class="mt-1 text-xs text-slate-500">
+              الاتصال الوحيد بالإنترنت: فحص إصدارات المشروع على GitHub فقط.
+            </p>
+            <button
+              class="mt-2 rounded border px-3 py-1 hover:bg-slate-100 dark:border-slate-600 dark:hover:bg-slate-700"
+              data-testid="update-check"
+              @click="updater.check()"
+            >
+              التحقق من التحديثات
+            </button>
+            <p v-if="updateText" class="mt-2" data-testid="update-status">{{ updateText }}</p>
+          </div>
+          <DictionaryPanel v-else-if="tab === 'dictionary'" />
+          <GlossaryPanel v-else-if="tab === 'glossary'" />
+          <QuranSettings v-else-if="tab === 'quran'" />
+          <OnlineSettings v-else-if="tab === 'online'" />
+          <PacksSettings v-else-if="tab === 'packs'" />
+          <BackupSettings v-else-if="tab === 'backup'" />
+          <component :is="EditorQuality" v-else-if="tab === 'editor-quality' && EditorQuality" />
         </div>
-      </div>
-      <div v-if="tab === 'general'" class="mt-4 border-t pt-3 text-sm dark:border-slate-700">
-        <h3 class="mb-2 font-semibold">النماذج</h3>
-        <p data-testid="pack-status">
-          الإصدار المثبّت:
-          <b data-testid="pack-version">{{ pack?.version ?? 'غير محدد' }}</b>
-          <span v-if="pack?.models_source" class="text-slate-500">
-            — {{ sourceLabel[pack.models_source] ?? pack.models_source }}
-          </span>
-        </p>
-        <button
-          class="mt-2 rounded border px-3 py-1 hover:bg-slate-100 disabled:opacity-50 dark:border-slate-600 dark:hover:bg-slate-700"
-          :disabled="packBusy"
-          data-testid="pack-apply"
-          @click="applyPack"
-        >
-          تحديث النماذج من ملف (.mizajpack)
-        </button>
-        <p
-          v-if="packMsg"
-          class="mt-2"
-          :class="packMsg.ok ? 'text-mizaj-emerald' : 'text-red-500'"
-          data-testid="pack-result"
-        >
-          {{ packMsg.text }}
-        </p>
-      </div>
-      <div
-        v-if="tab === 'general'"
-        class="mt-4 border-t pt-3 text-sm dark:border-slate-700"
-        data-testid="help-section"
-      >
-        <h3 class="mb-2 font-semibold">المساعدة</h3>
-        <div class="flex flex-wrap gap-2">
-          <button
-            class="rounded border px-3 py-1 hover:bg-slate-100 dark:border-slate-600 dark:hover:bg-slate-700"
-            data-testid="diag-export"
-            @click="exportDiag"
-          >
-            إنشاء حزمة تشخيص
-          </button>
-          <button
-            class="rounded border px-3 py-1 hover:bg-slate-100 dark:border-slate-600 dark:hover:bg-slate-700"
-            data-testid="open-shortcuts"
-            @click="editorStore.shortcutsOpen = true"
-          >
-            اختصارات لوحة المفاتيح
-          </button>
-          <button
-            class="rounded border px-3 py-1 hover:bg-slate-100 dark:border-slate-600 dark:hover:bg-slate-700"
-            data-testid="open-about"
-            @click="editorStore.aboutOpen = true"
-          >
-            حول مِزَاج والتراخيص
-          </button>
-        </div>
-        <p class="mt-1 text-xs text-slate-500">
-          حزمة التشخيص ملف محلي (سجلات منقّاة وإصدارات وإعدادات، بلا نص مستنداتك)؛ لا يُرسل شيء عبر
-          الشبكة.
-        </p>
-      </div>
-      <div
-        v-if="tab === 'general'"
-        class="mt-4 border-t pt-3 text-sm dark:border-slate-700"
-        data-testid="updates-section"
-      >
-        <h3 class="mb-2 font-semibold">التحديثات</h3>
-        <label class="flex items-center gap-2">
-          <input
-            type="checkbox"
-            :checked="settings.values.auto_update_check !== 'false'"
-            data-testid="setting-auto-update"
-            @change="
-              settings.update({
-                auto_update_check: String(($event.target as HTMLInputElement).checked)
-              })
-            "
-          />
-          التحقق التلقائي من التحديثات
-        </label>
-        <p class="mt-1 text-xs text-slate-500">
-          الاتصال الوحيد بالإنترنت: فحص إصدارات المشروع على GitHub فقط.
-        </p>
-        <button
-          class="mt-2 rounded border px-3 py-1 hover:bg-slate-100 dark:border-slate-600 dark:hover:bg-slate-700"
-          data-testid="update-check"
-          @click="updater.check()"
-        >
-          التحقق من التحديثات
-        </button>
-        <p v-if="updateText" class="mt-2" data-testid="update-status">{{ updateText }}</p>
-      </div>
-      <DictionaryPanel v-else-if="tab === 'dictionary'" />
-      <GlossaryPanel v-else-if="tab === 'glossary'" />
-      <QuranSettings v-else-if="tab === 'quran'" />
-      <OnlineSettings v-else-if="tab === 'online'" />
-      <PacksSettings v-else-if="tab === 'packs'" />
-      <BackupSettings v-else-if="tab === 'backup'" />
-      <component :is="EditorQuality" v-else-if="tab === 'editor-quality' && EditorQuality" />
+      </Transition>
     </div>
   </div>
 </template>

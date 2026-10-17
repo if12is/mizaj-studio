@@ -1,9 +1,9 @@
 <script setup lang="ts">
+import MotionTransition from '@renderer/components/ui/MotionTransition.vue'
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { EditorState, type Extension } from '@codemirror/state'
 import { EditorView, keymap } from '@codemirror/view'
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands'
-import sampleText from '@fixtures/sample_long.txt?raw'
 import { useApi } from '@renderer/api'
 import { ApiError } from '@renderer/api/client'
 import { notify } from '@renderer/api/toast'
@@ -19,10 +19,17 @@ import { useEditorStore } from '@renderer/stores/editor'
 import { useProjectsStore } from '@renderer/stores/projects'
 import { useSettingsStore } from '@renderer/stores/settings'
 import { useSidecarStore } from '@renderer/stores/sidecar'
-import DiffView from './DiffView.vue'
 import DropOverlay from './DropOverlay.vue'
 import ProgressBar from './ProgressBar.vue'
-import StatsPanel from './StatsPanel.vue'
+import EnginePill from './ui/EnginePill.vue'
+import { lazyDialog, lazyPanel } from '@renderer/lib/lazy'
+import { markEditorReady } from '@renderer/lib/boot'
+import { freshExtension } from '@renderer/editor/fresh'
+
+// rarely used parts are separate chunks (diff view pulls in @codemirror/merge)
+const DiffView = lazyPanel(() => import('./DiffView.vue'))
+const StatsPanel = lazyPanel(() => import('./StatsPanel.vue'))
+const NormalizeDialog = lazyDialog(() => import('./NormalizeDialog.vue'))
 import { useSpellCheck } from '@renderer/composables/useSpellCheck'
 import { useSpellingStore } from '@renderer/stores/spelling'
 import { createThrottle as throttle2 } from '@renderer/composables/throttle'
@@ -43,7 +50,6 @@ import { stripMarks } from '@renderer/editor/arabic'
 import { isolateHistory } from '@codemirror/commands'
 import { useTts } from '@renderer/composables/useTts'
 import FindBar from './FindBar.vue'
-import NormalizeDialog from './NormalizeDialog.vue'
 import { useEditorQuality } from '@renderer/composables/useEditorQuality'
 import { useQuranDetect } from '@renderer/composables/useQuranDetect'
 import { useQualityStore } from '@renderer/stores/quality'
@@ -262,6 +268,7 @@ function extensions(): Extension[] {
     }),
     keymap.of([...defaultKeymap, ...historyKeymap]),
     readOnlyCompartment.of(EditorState.readOnly.of(false)),
+    freshExtension(),
     EditorView.lineWrapping,
     EditorView.perLineTextDirection.of(true),
     richPasteHandler(() => true),
@@ -306,7 +313,9 @@ function setText(text: string, notifyChange = false): void {
   if (notifyChange) emit('change')
 }
 
-function loadSample(): void {
+async function loadSample(): Promise<void> {
+  // 400 KB of text: fetched on demand so it never sits in the startup bundle
+  const { default: sampleText } = await import('@fixtures/sample_long.txt?raw')
   setText(sampleText, true)
 }
 
@@ -453,6 +462,7 @@ onMounted(() => {
     }
   })
   if (settings.values.spell_check_enabled !== 'false') spell.schedule()
+  markEditorReady()
 })
 onBeforeUnmount(() => {
   statsThrottle.cancel()
@@ -728,6 +738,7 @@ const btnCls =
         تقسيم الفقرات الطويلة عند الجمل
       </button>
     </div>
+    <EnginePill />
     <StatsPanel v-if="editor.showStats" />
     <ProgressBar @pause="run.pause()" @resume="run.resume()" @cancel="run.cancel()" />
     <DiffView v-if="editor.showDiff && editor.diffBase !== null" />
@@ -738,7 +749,9 @@ const btnCls =
       :class="[paletteClass, quality.confidenceShow ? '' : 'conf-off']"
       data-testid="editor-host"
     />
-    <NormalizeDialog v-if="quality.normalizeOpen" />
+    <MotionTransition name="m-modal">
+      <NormalizeDialog v-if="quality.normalizeOpen" />
+    </MotionTransition>
     <DropOverlay @open="openAndMaybeDiacritize" />
   </section>
 </template>

@@ -1,4 +1,5 @@
 import { ApiError, parseError } from './client'
+import { getApiToken, withToken } from './token'
 import type { StreamChunk } from '@renderer/editor/runSession'
 
 export interface SseEvent {
@@ -86,6 +87,8 @@ export interface StreamOptions {
   fetchImpl?: typeof fetch
   sleep?: (ms: number) => Promise<void>
   maxEngineRetries?: number
+  /** defaults to the shared per-launch token */
+  token?: string | null
 }
 
 const defaultSleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms))
@@ -123,7 +126,10 @@ export async function* streamTashkeel(o: StreamOptions): AsyncGenerator<StreamMs
   for (let attempt = 0; ; attempt++) {
     res = await f(`${o.baseUrl}/api/tashkeel/stream`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', Accept: 'text/event-stream' },
+      headers: withToken(
+        { 'Content-Type': 'application/json', Accept: 'text/event-stream' },
+        o.token === undefined ? getApiToken() : o.token
+      ),
       body: JSON.stringify(o.body),
       signal: o.signal
     })

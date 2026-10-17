@@ -37,6 +37,7 @@ from app.api import io as io_api
 from app.api import irab as irab_api
 from app.api import legal as legal_api
 from app.api import names as names_api
+from app.core import security
 from app.core.database import DB_NAME
 from app.core.errors import MizajError, install_handlers
 from app.core.logging_setup import setup_logging
@@ -50,8 +51,14 @@ from app.packs2.backup import apply_pending_restore
 log = logging.getLogger("mizaj.main")
 
 
-def create_app(data_dir: Path, migrations_dir: Path | None = None) -> FastAPI:
-    """Build an isolated app bound to `data_dir` (logs, db, backups)."""
+def create_app(
+    data_dir: Path, migrations_dir: Path | None = None, api_token: str | None = None
+) -> FastAPI:
+    """Build an isolated app bound to `data_dir` (logs, db, backups).
+
+    `api_token` (else env MIZAJ_API_TOKEN): when set, every request except `GET /health` must
+    carry `X-Mizaj-Token`. The env var is removed so child processes do not inherit it.
+    """
     data_dir = Path(data_dir)
     data_dir.mkdir(parents=True, exist_ok=True)
     setup_logging(data_dir)
@@ -69,16 +76,30 @@ def create_app(data_dir: Path, migrations_dir: Path | None = None) -> FastAPI:
             str(exc),
         ) from exc
     seed_templates(db_path)
-    app = FastAPI(title="Mizaj Studio Backend", version=health.VERSION)
+    env_token = os.environ.pop(security.TOKEN_ENV, "") or None
+    token = api_token or env_token
+    if not token:
+        security.warn_if_no_token()
+    # no interactive docs / schema: the surface is only for the bundled renderer
+    app = FastAPI(
+        title="Mizaj Studio Backend",
+        version=health.VERSION,
+        docs_url=None,
+        redoc_url=None,
+        openapi_url=None,
+    )
+    app.state.api_token = token
     app.state.data_dir = data_dir
     app.state.db_path = db_path
+    # Added first = innermost: CORS (added below) answers preflights before the token check.
+    app.add_middleware(security.SecurityMiddleware)
     # Renderer runs from file:// (Origin: null) in production or the vite dev server.
     app.add_middleware(
         CORSMiddleware,
         allow_origins=["null"],
         allow_origin_regex=r"^http://(localhost|127\.0\.0\.1)(:\d+)?$",
         allow_methods=["*"],
-        allow_headers=["*"],
+        allow_headers=["Content-Type", "Accept", "Authorization", "X-Mizaj-Token"],
     )
     install_handlers(app)
     for mod in (
@@ -104,7 +125,20 @@ def create_app(data_dir: Path, migrations_dir: Path | None = None) -> FastAPI:
         tools,
     ):
         app.include_router(mod.router)
+    _recover_interrupted_jobs(data_dir, db_path)
     return app
+
+
+def _recover_interrupted_jobs(data_dir: Path, db_path: Path) -> None:
+    """8.4: list downloads / batch jobs interrupted by a crash or restart as resumable."""
+    try:
+        from app.io import batch
+        from app.resources import manager as resources_manager
+
+        resources_manager.recover(data_dir, db_path)
+        batch.recover(data_dir)
+    except Exception:  # noqa: BLE001 - recovery must never prevent startup
+        log.exception("could not recover interrupted jobs")
 
 
 def _is_loopback(host: str) -> bool:
@@ -141,6 +175,11 @@ def main(argv: list[str] | None = None) -> int:
         default=None,
         help="exit when this process dies (default: env MIZAJ_PARENT_PID)",
     )
+    parser.add_argument(
+        "--api-token",
+        default=None,
+        help="API token (prefer env MIZAJ_API_TOKEN: argv is visible to other local users)",
+    )
     args = parser.parse_args(argv)
     if args.parent_pid is None and os.environ.get("MIZAJ_PARENT_PID", "").isdigit():
         args.parent_pid = int(os.environ["MIZAJ_PARENT_PID"])
@@ -150,7 +189,7 @@ def main(argv: list[str] | None = None) -> int:
         parser.error("port must be between 0 and 65535")
 
     try:
-        app = create_app(args.data_dir)
+        app = create_app(args.data_dir, api_token=args.api_token)
     except MizajError as exc:
         print(f"{exc.error_code}: {exc.message_en}", file=sys.stderr, flush=True)
         return 3

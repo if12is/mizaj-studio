@@ -86,6 +86,25 @@ def _relocate(entry):
 
 datas = [_relocate(d) for d in datas]
 
+# --- 8.3.3 size: things that are shipped but never used at runtime ---
+# 1. collect_all() also copies every package's .py SOURCE as data (25 MB: stopword tables etc.);
+#    the same modules are already in the PYZ as bytecode and nothing reads the .py files.
+datas = [d for d in datas if not d[0].endswith(".py")]
+# 2./3. (pdfminer CJK CMaps, unused lxml parts) are added by PyInstaller hooks during Analysis,
+#    so they are filtered from a.datas below.
+
+# Native libraries of optional Pillow/lxml codecs that no feature of Mizaj uses (AVIF 5 MB, lcms,
+# Tk bridge; objectify/sax/builder are lxml extras). _imaging/_webp/_imagingft keep their libs.
+_DROP_BINARIES = (
+    "PIL/_avif", "libavif", "PIL/_imagingtk", "PIL/_imagingcms", "liblcms2",
+    "lxml/objectify", "lxml/sax", "lxml/builder",
+)
+
+
+def _keep_binary(entry):
+    name = (entry[0] + "|" + entry[1]).replace("\\", "/")
+    return not any(x in name for x in _DROP_BINARIES)
+
 excludes = [
     "tkinter", "matplotlib", "IPython", "pytest", "ruff", "pip", "setuptools", "wheel",
     "pkg_resources", "distutils", "jaraco",
@@ -93,6 +112,9 @@ excludes = [
     "onnxruntime.tools", "onnxruntime.transformers", "onnxruntime.quantization",
     "onnxruntime.datasets", "onnxruntime.backend",
     "PyInstaller", "docx.tests", "numpy.tests", "numpy.f2py", "numpy.distutils",
+    "PIL._avif", "PIL._imagingtk", "PIL._imagingcms", "PIL.ImageTk", "PIL.ImageCms",
+    "lxml.objectify", "lxml.html", "lxml.isoschematron", "lxml.sax", "lxml.builder",
+    "lxml.cssselect",
 ]
 
 # --- Windows VERSIONINFO resource for mizaj-engine.exe (reduces AV "unknown binary" heuristics) ---
@@ -149,6 +171,11 @@ a = Analysis(  # noqa: F821
     excludes=excludes,
     noarchive=False,
 )
+a.binaries = [b for b in a.binaries if _keep_binary(b)]
+# (pdfminer's CJK CMaps are deliberately KEPT: a PDF naming one would otherwise fail to import.)
+# lxml: only lxml.etree is used (python-docx, our XML code); html/isoschematron are never imported.
+_DROP_DATA = ("lxml/html/", "lxml/isoschematron/", "lxml/includes/")
+a.datas = [d for d in a.datas if not d[0].replace("\\", "/").startswith(_DROP_DATA)]
 pyz = PYZ(a.pure)  # noqa: F821
 exe = EXE(  # noqa: F821
     pyz,

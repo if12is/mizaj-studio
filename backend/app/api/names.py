@@ -94,7 +94,7 @@ def delete_name(nid: int, db: Db) -> Response:
 
 
 class NameImport(BaseModel):
-    entries: list[NameIn]
+    entries: list[NameIn] = Field(max_length=100_000)
 
 
 @router.post("/import")

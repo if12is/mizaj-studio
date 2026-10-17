@@ -17,6 +17,7 @@ from typing import Any
 
 from lxml import etree
 
+from app.core import security
 from app.core.errors import MizajError, validation_error
 from app.engine.normalize import MARKS, has_arabic_letters, split_pairs, strip_marks
 
@@ -200,11 +201,17 @@ def _redistribute(slots: list[tuple[Any, str]], new_text: str) -> None:
         k += n
 
 
+def _check_epub(zin: zipfile.ZipFile, src: Path) -> None:
+    security.check_zip(
+        zin, max_members=20_000, max_total=1024**3, max_member=256 * 1024**2, max_ratio=500,
+        error=lambda r: bad_input(f"EPUB rejected: {r}", src),
+    )  # fmt: skip
+
+
 def diacritize_xhtml(data: bytes, fn: Diacritize) -> tuple[bytes, int]:
-    parser = etree.XMLParser(
-        resolve_entities=False, no_network=True, load_dtd=False, huge_tree=False
-    )
-    tree = etree.fromstring(data, parser).getroottree()
+    if security.has_xml_declaration(data, security.ENTITY_MARKERS):
+        raise etree.XMLSyntaxError("entity declarations are not allowed", 0, 0, 0)
+    tree = etree.fromstring(data, security.hardened_xml_parser()).getroottree()
     root = tree.getroot()
     changed = 0
     for el in root.iter():
@@ -232,11 +239,13 @@ def diacritize_epub(src: Path, dst: Path, fn: Diacritize) -> dict[str, Any]:
         zin = zipfile.ZipFile(src)
     except (zipfile.BadZipFile, OSError) as exc:
         raise bad_input("not a valid EPUB (zip)", src) from exc
+    try:
+        _check_epub(zin, src)
+    except BaseException:
+        zin.close()
+        raise
     tmp = Path(dst).with_name(f".~mizaj_tmp.{Path(dst).name}")
     with zin, zipfile.ZipFile(tmp, "w") as zout:
-        total = sum(i.file_size for i in zin.infolist())
-        if total > 1024**3 or len(zin.infolist()) > 20000:
-            raise bad_input("EPUB too large", src)
         names = [i.filename for i in zin.infolist()]
         if "mimetype" in names:  # must be first and stored
             zout.writestr("mimetype", zin.read("mimetype"), compress_type=zipfile.ZIP_STORED)
@@ -262,13 +271,17 @@ def epub_text(src: Path) -> str:
     except (zipfile.BadZipFile, OSError) as exc:
         raise bad_input("not a valid EPUB (zip)", src) from exc
     parts: list[str] = []
-    parser = etree.XMLParser(resolve_entities=False, no_network=True, load_dtd=False)
+    parser = security.hardened_xml_parser()
     with zin:
+        _check_epub(zin, src)
         for info in zin.infolist():
             if not info.filename.lower().endswith(XHTML_EXT) or info.file_size > 50 * 1024**2:
                 continue
+            data = zin.read(info)
+            if security.has_xml_declaration(data, security.ENTITY_MARKERS):
+                continue
             try:
-                root = etree.fromstring(zin.read(info), parser)
+                root = etree.fromstring(data, parser)
             except etree.XMLSyntaxError:
                 continue
             for el in root.iter():
@@ -350,7 +363,8 @@ def pdf_export(
     width, height = A4
     margin, size = 56, 16
     leading = size * 1.9
-    c = canvas.Canvas(str(path), pagesize=A4)
+    tmp_pdf = Path(path).with_name(f".~mizaj_tmp.{Path(path).name}")
+    c = canvas.Canvas(str(tmp_pdf), pagesize=A4)
     c.setTitle(title or "Mizaj")
     c.setFont("MizajArabic", size)
     y = height - margin
@@ -377,7 +391,8 @@ def pdf_export(
             c.drawRightString(width - margin, y, get_display(reshaper.reshape(ln)))
             y -= leading
     c.save()
-    return {"pages": pages, "font": font}
+    tmp_pdf.replace(path)
+    return {"pages": pages, "font": Path(font).name}
 
 
 # ---------------------------------------------------------------- dispatch

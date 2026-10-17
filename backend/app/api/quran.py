@@ -7,6 +7,7 @@ from pathlib import Path
 from fastapi import APIRouter, Request
 from pydantic import BaseModel, Field
 
+from app.core import security
 from app.engine.executor import run_blocking
 from app.quran import store
 from app.quran.detect import get_index
@@ -19,10 +20,13 @@ class DetectIn(BaseModel):
     include_partial: bool = True
 
 
+QURAN_EXTS = ("", ".txt", ".xml", ".sql", ".csv", ".json")
+
+
 class InstallIn(BaseModel):
-    kind: str  # one of store.KINDS (e.g. "uthmani", "simple-clean")
+    kind: str = Field(max_length=40)  # one of store.KINDS (e.g. "uthmani", "simple-clean")
     source_path: str
-    sha256: str | None = None
+    sha256: str | None = Field(default=None, max_length=64)
 
 
 def _status(data_dir: Path) -> dict:
@@ -59,7 +63,10 @@ def _download(data_dir: Path, db_path: Path, body: DownloadIn) -> dict:
 
 
 def _install(data_dir: Path, body: InstallIn) -> dict:
-    store.install_quran_text(data_dir, Path(body.source_path), body.kind, body.sha256)
+    src = security.safe_path(
+        body.source_path, "source_path", exts=QURAN_EXTS, max_bytes=64 * security.MB
+    )
+    store.install_quran_text(data_dir, src, body.kind, body.sha256)
     return _status(data_dir)
 
 

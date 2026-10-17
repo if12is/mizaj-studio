@@ -18,7 +18,7 @@ class OllamaIn(BaseModel):
 
 
 class LtIn(BaseModel):
-    text: str
+    text: str = Field(max_length=200_000)
     language: str = "ar"
 
 

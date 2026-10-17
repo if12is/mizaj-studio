@@ -17,12 +17,14 @@ from datetime import UTC, datetime
 from pathlib import Path, PurePosixPath
 from typing import Any
 
+from app.core import security
 from app.core.errors import pack_invalid
 
 log = logging.getLogger("mizaj.packs")
 MANIFEST = "manifest.json"
 INFO_FILE = "pack.json"
 MAX_TOTAL_BYTES = 4 * 1024**3
+MAX_MEMBERS = 5000
 _CHUNK = 1 << 20
 
 
@@ -53,6 +55,8 @@ def read_manifest(zf: zipfile.ZipFile) -> dict[str, Any]:
     files = m.get("files")
     if not isinstance(files, list) or not files:
         raise pack_invalid("manifest lists no files")
+    if len(files) > MAX_MEMBERS:
+        raise pack_invalid("manifest lists too many files")
     for f in files:
         if not isinstance(f, dict) or not isinstance(f.get("sha256"), str):
             raise pack_invalid("malformed file entry in manifest")
@@ -76,6 +80,10 @@ def apply_pack(pack_path: Path, data_dir: Path) -> dict[str, Any]:
         except (zipfile.BadZipFile, OSError) as exc:
             raise pack_invalid("not a valid zip archive") from exc
         with zf:
+            security.check_zip(
+                zf, max_members=MAX_MEMBERS, max_total=MAX_TOTAL_BYTES, max_member=MAX_TOTAL_BYTES,
+                max_ratio=1000, error=lambda r: pack_invalid(r),
+            )  # fmt: skip
             manifest = read_manifest(zf)
             names = {i.filename: i for i in zf.infolist()}
             tmp.mkdir()

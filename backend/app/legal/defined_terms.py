@@ -8,6 +8,7 @@ checks are suggestions only - nothing is rewritten.
 from __future__ import annotations
 
 import re
+from functools import lru_cache
 from typing import Any
 
 from app.engine.normalize import strip_marks
@@ -39,7 +40,20 @@ GENERIC_ROLES = [
 
 
 def fold(s: str) -> str:
-    """Matching key: no marks/tatweel/quotes, hamza & ya & ta-marbuta folded, ASCII digits."""
+    """Matching key: no marks/tatweel/quotes, hamza & ya & ta-marbuta folded, ASCII digits.
+
+    Short inputs (phrase lists, role names, single words) are memoised: lint/compare call this
+    hundreds of thousands of times with the same few constants."""
+    return _fold_cached(s) if len(s) <= 80 else _fold(s)
+
+
+@lru_cache(maxsize=16384)
+def _fold_cached(s: str) -> str:
+    return _fold(s)
+
+
+def _fold(s: str) -> str:
+    """Uncached implementation of `fold`."""
     s = strip_marks(s).replace("ـ", "").translate(_DIGITS)
     for a, b in (("أ", "ا"), ("إ", "ا"), ("آ", "ا"), ("ٱ", "ا"), ("ى", "ي"), ("ة", "ه"), ("ؤ", "و"),
                  ("ئ", "ي")):  # fmt: skip

@@ -1,0 +1,4 @@
+# pip-audit ignore list (one advisory ID per line, optional "# reason" after it).
+# Read by .github/workflows/ci.yml (backend-ci). Every entry needs a reason and a review date;
+# remove the entry as soon as a fixed version is pinned in requirements.txt.
+# Format:  PYSEC-XXXX-NNNN   # why it does not apply / who reviewed / until when

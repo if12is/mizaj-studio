@@ -3,7 +3,7 @@ from __future__ import annotations
 import sqlite3
 from typing import Annotated, Literal
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from pydantic import BaseModel
 
 from app.api.deps import get_db
@@ -27,8 +27,18 @@ class Health(BaseModel):
     engines: dict[str, str]
 
 
-@router.get("/health", response_model=Health)
-def health(db: Annotated[sqlite3.Connection, Depends(get_db)]) -> Health:
+class PublicHealth(BaseModel):
+    status: str
+    version: str
+
+
+@router.get("/health", response_model=Health | PublicHealth)
+def health(
+    request: Request, db: Annotated[sqlite3.Connection, Depends(get_db)]
+) -> Health | PublicHealth:
+    # /health is the only unauthenticated route: strangers get just {status, version}
+    if not request.scope.get("state", {}).get("authorized", True):
+        return PublicHealth(status="ok", version=VERSION)
     uv = db.execute("PRAGMA user_version").fetchone()[0]
     return Health(
         status="ok",

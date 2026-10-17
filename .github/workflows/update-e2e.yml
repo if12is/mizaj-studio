@@ -70,6 +70,8 @@ jobs:
           Step 'download models' { python scripts/download_models.py }
           Step 'freeze engine' { python scripts/build_backend.py }
           Push-Location desktop
+          # test builds only: Playwright needs the Node-inspect fuse (release builds keep it OFF, see build/afterPack.cjs)
+          $env:MIZAJ_E2E_BUILD = '1'
           Step 'npm run build' { npm run build }
           Step 'package 99.0.0' { npx electron-builder --win --publish never '--config.extraMetadata.version=99.0.0' '--config.directories.output=dist-a' }
           Step 'package 99.0.1' { npx electron-builder --win --publish never '--config.extraMetadata.version=99.0.1' '--config.directories.output=dist-b' }

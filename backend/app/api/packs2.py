@@ -11,8 +11,9 @@ from fastapi import APIRouter, Depends, Request
 from pydantic import BaseModel, Field
 
 from app.api.deps import get_db
+from app.core import security
 from app.core.database import connect, write
-from app.core.errors import not_found, validation_error
+from app.core.errors import validation_error
 from app.engine.executor import run_blocking
 from app.engine.manager import manager
 from app.packs2 import backup, merge
@@ -24,11 +25,21 @@ router = APIRouter(tags=["packs2"])
 Db = Annotated[sqlite3.Connection, Depends(get_db)]
 
 
+PACK_MAX_BYTES = 5 * 1024**3
+BACKUP_MAX_BYTES = 17 * 1024**3
+
+
 def _path(raw: str, suffix: str) -> Path:
-    p = Path(raw)
-    if not p.is_absolute() or p.suffix.lower() != suffix:
-        raise validation_error(f"path must be absolute and end with {suffix}")
-    return p
+    """Input file: absolute, right extension, regular file, size-capped (no UNC/devices)."""
+    cap = BACKUP_MAX_BYTES if suffix == ".mizajbackup" else PACK_MAX_BYTES
+    return security.safe_path(raw, "path", exts=(suffix,), max_bytes=cap)
+
+
+def _out(raw: str, suffix: str, data_dir: Path) -> Path:
+    """Output file: absolute, right extension, outside the app data folder, no symlink."""
+    return security.safe_path(
+        raw, "target_path", exts=(suffix,), kind="output", data_dir=data_dir
+    )
 
 
 class ExportIn(BaseModel):
@@ -80,9 +91,7 @@ def _describe(pack, plans) -> dict[str, Any]:
 
 @router.post("/api/packs/v2/export")
 async def export(body: ExportIn, request: Request) -> dict[str, Any]:
-    target = _path(body.target_path, ".mizajpack")
-    if not target.parent.is_dir():
-        raise validation_error("target directory does not exist")
+    target = _out(body.target_path, ".mizajpack", request.app.state.data_dir)
     if set(body.kinds) - set(DATA_KINDS):
         raise validation_error("unsupported kinds", {"allowed": list(DATA_KINDS)})
 
@@ -103,8 +112,6 @@ async def export(body: ExportIn, request: Request) -> dict[str, Any]:
 
 def _load(db_path: Path, body: PreviewIn):
     p = _path(body.path, ".mizajpack")
-    if not p.is_file():
-        raise not_found("File", str(p))
     pack = read_pack(p)
     conn = connect(db_path)
     try:
@@ -192,9 +199,7 @@ def undo(import_id: str, db: Db) -> dict[str, Any]:
 # ------------------------------------------------------------------ backup
 @router.post("/api/backup/export")
 async def backup_export(body: BackupExportIn, request: Request) -> dict[str, Any]:
-    target = _path(body.target_path, ".mizajbackup")
-    if not target.parent.is_dir():
-        raise validation_error("target directory does not exist")
+    target = _out(body.target_path, ".mizajbackup", request.app.state.data_dir)
     return await run_blocking(
         backup.export_backup,
         request.app.state.db_path,
@@ -207,16 +212,12 @@ async def backup_export(body: BackupExportIn, request: Request) -> dict[str, Any
 @router.post("/api/backup/inspect")
 async def backup_inspect(body: BackupPathIn) -> dict[str, Any]:
     p = _path(body.path, ".mizajbackup")
-    if not p.is_file():
-        raise not_found("File", str(p))
     return await run_blocking(backup.inspect_backup, p)
 
 
 @router.post("/api/backup/restore")
 async def backup_restore(body: BackupPathIn, request: Request) -> dict[str, Any]:
     p = _path(body.path, ".mizajbackup")
-    if not p.is_file():
-        raise not_found("File", str(p))
     manager.reset()
     gc.collect()
     res = await run_blocking(

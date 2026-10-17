@@ -345,8 +345,24 @@ def test_int8_encoder_selection(tmp_path, monkeypatch):
     assert config.catt_encoder_path().name == "encoder.onnx" and not config.int8_available()
     (d / "encoder_int8.onnx").write_bytes(b"q")
     assert config.int8_available()
-    assert config.catt_encoder_path().name == "encoder_int8.onnx"  # auto
+    assert config.catt_encoder_path().name == "encoder.onnx"  # auto prefers float when present
     monkeypatch.setenv("MIZAJ_CATT_PRECISION", "float")
     assert config.catt_encoder_path().name == "encoder.onnx"
     monkeypatch.setenv("MIZAJ_CATT_PRECISION", "int8")
     assert config.catt_encoder_path().name == "encoder_int8.onnx"
+
+
+def test_int8_only_install_is_found(tmp_path, monkeypatch):
+    """An INT8-only model dir (no float encoder) is still found and used in auto mode."""
+    d = tmp_path / "catt_eo"
+    d.mkdir()
+    (d / "encoder_int8.onnx").write_bytes(b"q")
+    (d / "decoder.onnx").write_bytes(b"d")
+    monkeypatch.setattr(config, "CATT_DIR", tmp_path / "nowhere")
+    monkeypatch.setenv("MIZAJ_MODELS_DIR", str(tmp_path))
+    monkeypatch.delenv("MIZAJ_CATT_PRECISION", raising=False)
+    assert config.resolve_model_dir() == ("env", d)
+    assert config.catt_encoder_path().name == "encoder_int8.onnx"  # auto picks INT8
+    assert config.model_present()
+    monkeypatch.setenv("MIZAJ_CATT_PRECISION", "float")  # explicit float: absent -> not present
+    assert not config.model_present()

@@ -5,6 +5,8 @@ from __future__ import annotations
 
 import csv
 import io
+import os
+import re
 import subprocess
 import tempfile
 from pathlib import Path
@@ -38,20 +40,41 @@ def require_tesseract(lang: str) -> str:
     return binary
 
 
+MAX_OCR_PAGES = 1000
+MAX_PAGE_PIXELS = 120_000_000
+_LANG_RE = re.compile(r"^[A-Za-z_]{2,30}(\+[A-Za-z_]{2,30})*$")
+
+
+def _child_env() -> dict[str, str]:
+    """Environment for child processes: never hand over the API token."""
+    return {k: v for k, v in os.environ.items() if k != "MIZAJ_API_TOKEN"}
+
+
+def tesseract_cmd(binary: str, image: Path, lang: str) -> list[str]:
+    """argv for Tesseract: fixed flags, validated language, absolute image path (no shell)."""
+    if not _LANG_RE.fullmatch(lang):
+        raise validation_error("invalid OCR language", {"field": "lang"})
+    if not Path(image).is_absolute():
+        raise validation_error("image path must be absolute")
+    return [binary, str(image), "stdout", "-l", lang, "tsv"]
+
+
 def ocr_image_file(binary: str, image: Path, lang: str, timeout: int = 180) -> dict[str, Any]:
     try:
         proc = subprocess.run(
-            [binary, str(image), "stdout", "-l", lang, "tsv"],
-            capture_output=True, timeout=timeout, check=False,
+            tesseract_cmd(binary, image, lang),
+            capture_output=True, timeout=timeout, check=False, shell=False,
+            stdin=subprocess.DEVNULL, env=_child_env(),
+            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
         )  # fmt: skip
     except (OSError, subprocess.SubprocessError) as exc:
         raise MizajError(
-            "ERR_OCR_FAILED", 500, "فشل التعرف الضوئي على الحروف.", f"Tesseract failed: {exc}", {}
+            "ERR_OCR_FAILED", 500, "فشل التعرف الضوئي على الحروف.", f"Tesseract failed: {type(exc).__name__}", {}
         ) from exc
     if proc.returncode != 0:
         raise MizajError(
             "ERR_OCR_FAILED", 500, "فشل التعرف الضوئي على الحروف.",
-            "Tesseract exited with an error.", {"stderr": proc.stderr.decode("utf-8", "replace")[-500:]},
+            "Tesseract exited with an error.", {"returncode": proc.returncode},
         )  # fmt: skip
     rows = csv.DictReader(
         io.StringIO(proc.stdout.decode("utf-8", "replace")), delimiter="\t", quoting=csv.QUOTE_NONE
@@ -100,9 +123,11 @@ def ocr_path(
             pdf = pdfium.PdfDocument(str(path))
         except Exception as exc:  # noqa: BLE001
             raise MizajError(
-                "ERR_FILE_INVALID", 422, "ملف PDF غير صالح.", f"Cannot open PDF: {exc}", {}
+                "ERR_FILE_INVALID", 422, "ملف PDF غير صالح.", f"Cannot open PDF: {type(exc).__name__}", {}
             ) from exc
         with tempfile.TemporaryDirectory(prefix="mizaj-ocr-") as tmp:
+            if len(pdf) > MAX_OCR_PAGES and not pages:
+                raise validation_error(f"PDF has more than {MAX_OCR_PAGES} pages; pick pages")
             for idx in range(len(pdf)):
                 if pages and (idx + 1) not in pages:
                     continue
@@ -115,6 +140,9 @@ def ocr_path(
                     out_pages.append({"page": idx + 1, "method": "text", "text": existing,
                                       "confidence": None, "words": len(existing.split())})  # fmt: skip
                     continue
+                w, h = page.get_size()
+                if w * h * (dpi / 72) ** 2 > MAX_PAGE_PIXELS:
+                    raise validation_error("page is too large to render at this dpi")
                 img = page.render(scale=dpi / 72).to_pil()
                 f = Path(tmp) / f"p{idx + 1}.png"
                 img.save(f)

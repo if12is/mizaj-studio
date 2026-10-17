@@ -16,12 +16,19 @@ declare global {
       | 'not-available'
       | 'downloading'
       | 'downloaded'
+      | 'retrying'
       | 'error'
     version?: string
     percent?: number
     bytesPerSecond?: number
     message?: string
     code?: 'not-packaged' | 'portable'
+    /** state 'retrying' (network trouble): what is retried and when */
+    phase?: 'check' | 'download'
+    attempt?: number
+    maxAttempts?: number
+    nextRetryAt?: number | null
+    offline?: boolean
   }
 
   interface MizajAPI {
@@ -29,6 +36,7 @@ declare global {
       port: number | null
       baseUrl: string | null
       status: SidecarStatus
+      token: string
     }>
     onSidecarStatus(cb: (s: SidecarStatus) => void): () => void
     windowMinimize(): Promise<void>

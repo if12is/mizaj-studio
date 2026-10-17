@@ -22,3 +22,17 @@ describe('rotateLogFile', () => {
     expect(existsSync(`${f}.6`)).toBe(false)
   })
 })
+
+describe('log scrubbing', () => {
+  it('never lets a registered secret through strings, Errors or nested objects', async () => {
+    const { registerSecret, scrubValue } = await import('./logger')
+    const tok = 'f0'.repeat(32)
+    registerSecret(tok)
+    expect(scrubValue(`header ${tok}`)).not.toContain(tok)
+    const e = scrubValue(new Error(`boom ${tok}`)) as Error
+    expect(e.message).not.toContain(tok)
+    expect(e.stack).not.toContain(tok)
+    expect(JSON.stringify(scrubValue({ a: [{ b: `x${tok}` }] }))).not.toContain(tok)
+    expect(scrubValue(42)).toBe(42)
+  })
+})

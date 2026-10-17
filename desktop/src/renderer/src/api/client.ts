@@ -1,3 +1,5 @@
+import { getApiToken, withToken } from './token'
+
 export interface ErrorEnvelope {
   error_code: string
   message_ar: string
@@ -51,6 +53,8 @@ export interface ApiClientOptions {
   getBaseUrl: () => string | null
   fetchImpl?: typeof fetch
   onError?: (e: ApiError) => void
+  /** token source; defaults to the shared per-launch token */
+  getToken?: () => string | null
 }
 
 export class ApiClient {
@@ -73,7 +77,10 @@ export class ApiClient {
     try {
       res = await f(base + path, {
         method,
-        headers: body !== undefined ? { 'Content-Type': 'application/json' } : undefined,
+        headers: withToken(
+          body !== undefined ? { 'Content-Type': 'application/json' } : undefined,
+          (this.o.getToken ?? getApiToken)()
+        ),
         body: body !== undefined ? JSON.stringify(body) : undefined
       })
     } catch (e) {

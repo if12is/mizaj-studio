@@ -68,8 +68,11 @@ def find_tesseract() -> str | None:
 def tesseract_languages(binary: str) -> list[str]:
     try:
         out = subprocess.run(
-            [binary, "--list-langs"], capture_output=True, text=True, timeout=15, check=False
-        )
+            [binary, "--list-langs"], capture_output=True, text=True, timeout=15, check=False,
+            shell=False, stdin=subprocess.DEVNULL,
+            env={k: v for k, v in os.environ.items() if k != "MIZAJ_API_TOKEN"},
+            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+        )  # fmt: skip
     except (OSError, subprocess.SubprocessError):
         return []
     lines = (out.stdout + "\n" + out.stderr).splitlines()

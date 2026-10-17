@@ -24,7 +24,8 @@
     "test:e2e": "electron-vite build && xvfb-run -a playwright test",
     "sbom": "node scripts/sbom.cjs --python ../backend/.venv/bin/python",
     "dist:win:portable": "electron-vite build && electron-builder --win portable --publish never",
-    "test:perf": "electron-vite build && xvfb-run -a playwright test -c playwright.perf.config.ts"
+    "test:perf": "electron-vite build && xvfb-run -a playwright test -c playwright.perf.config.ts",
+    "test:updater-net": "node scripts/update-resilience.mjs"
   },
   "dependencies": {
     "@codemirror/commands": "6.5.0",
@@ -39,6 +40,7 @@
     "vue": "3.4.27"
   },
   "devDependencies": {
+    "@electron/fuses": "1.8.0",
     "@playwright/test": "1.47.2",
     "@types/node": "20.14.2",
     "@typescript-eslint/eslint-plugin": "7.13.0",

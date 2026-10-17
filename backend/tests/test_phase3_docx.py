@@ -548,7 +548,7 @@ def test_export_does_not_block_health(client, rich, tmp_path, monkeypatch):
 
     async def scenario():
         async with httpx.AsyncClient(
-            transport=httpx.ASGITransport(app=app), base_url="http://t"
+            transport=httpx.ASGITransport(app=app), base_url="http://127.0.0.1"
         ) as c:
             task = asyncio.create_task(
                 c.post(

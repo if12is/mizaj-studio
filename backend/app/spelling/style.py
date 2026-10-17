@@ -10,6 +10,7 @@ heuristics, shown as indicators rather than verdicts.
 from __future__ import annotations
 
 import re
+from bisect import bisect_left
 
 from .osman import osman as osman_score
 from .text import AR_WORD_RE, Masker, OffsetMap, strip_for_lookup
@@ -19,7 +20,22 @@ REFERENCE = (
     "https://aclanthology.org/L16-1038/ ; reference: https://github.com/drelhaj/OsmanReadability"
 )
 SENT_SPLIT = re.compile(r"[^.!؟?؛\n]+[.!؟?؛]?", re.DOTALL)
-PARA_SPLIT = re.compile(r"\S(?:.*?\S)?(?=\n\s*\n|\Z)", re.DOTALL)
+_BLANK_LINE = re.compile(r"\n\s*\n")
+
+
+def paragraph_spans(text: str):
+    """(start, end) of each non-blank paragraph (blank-line separated, trimmed). Linear time: the
+    former lazy regex `\\S(?:.*?\\S)?(?=\\n\\s*\\n|\\Z)` was O(n^2) on text without blank lines."""
+    pos = 0
+    seps = [*_BLANK_LINE.finditer(text), None]
+    for m in seps:
+        end = m.start() if m else len(text)
+        seg = text[pos:end]
+        lead = len(seg) - len(seg.lstrip())
+        trail = len(seg.rstrip())
+        if trail > lead:
+            yield pos + lead, pos + trail
+        pos = m.end() if m else len(text)
 FASEEH = set("ءئؤذظ")
 HARAKAT_SYLL = set("ًٌٍَُِ")
 PASSIVE_AUX = {"تم", "تمت", "يتم", "تتم", "سيتم", "ستتم", "جرى", "جرت", "يجري", "تجري"}
@@ -98,19 +114,20 @@ def analyze(
             continue
         pos = counts.setdefault(k, [])
         pos.append(idx)
-        recent = [p for p in pos if idx - p <= repeat_window]
-        if len(recent) >= 3:
-            repeated[k] = max(repeated.get(k, 0), len(recent))
+        recent = len(pos) - bisect_left(pos, idx - repeat_window)  # O(log n), not a rescan
+        if recent >= 3:
+            repeated[k] = max(repeated.get(k, 0), recent)
     rep_list = sorted(
         ({"word": k, "count": c} for k, c in repeated.items()), key=lambda d: -d["count"]
     )[:20]
 
     long_par = []
-    for m in PARA_SPLIT.finditer(text):
-        wc = sum(1 for _ in AR_WORD_RE.finditer(m.group()))
+    paragraphs = 0
+    for ps, pe in paragraph_spans(text):
+        wc = sum(1 for _ in AR_WORD_RE.finditer(text, ps, pe))
+        paragraphs += wc > 0
         if wc > max_paragraph_words:
-            long_par.append({**span(m.start(), m.end()), "words": wc})
-    paragraphs = sum(1 for m in PARA_SPLIT.finditer(text) if AR_WORD_RE.search(m.group()))
+            long_par.append({**span(ps, pe), "words": wc})
 
     return {
         "metrics": {**metrics, "paragraphs": paragraphs},

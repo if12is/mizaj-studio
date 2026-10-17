@@ -1,7 +1,9 @@
 import { BrowserWindow, dialog, ipcMain } from 'electron'
 import { join } from 'node:path'
 import type { SidecarStatus } from './pythonManager'
-import { registerFileIpc } from './fileIpc'
+import { registerFileIpc, dialogPaths } from './fileIpc'
+import { handleSecure, isTrustedSender } from './ipcGuard'
+import { MAX_NAME_LENGTH } from './security'
 
 export const FLUSH_TIMEOUT_MS = 2000
 
@@ -18,16 +20,18 @@ export function createMainWindow(): BrowserWindow {
       preload: join(__dirname, '../preload/index.js'),
       contextIsolation: true,
       nodeIntegration: false,
-      sandbox: true
+      sandbox: true,
+      webSecurity: true,
+      allowRunningInsecureContent: false,
+      spellcheck: false,
+      webviewTag: false,
+      nodeIntegrationInWorker: false,
+      nodeIntegrationInSubFrames: false,
+      safeDialogs: true
     }
   })
   win.once('ready-to-show', () => win.show())
-  win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
-  win.webContents.on('will-navigate', (e, url) => {
-    if (!url.startsWith('file://') && !url.startsWith(process.env.ELECTRON_RENDERER_URL ?? '\0')) {
-      e.preventDefault()
-    }
-  })
+  // Navigation / window.open / webview are locked down for all webContents in hardening.ts.
   if (process.env.ELECTRON_RENDERER_URL) void win.loadURL(process.env.ELECTRON_RENDERER_URL)
   else void win.loadFile(join(__dirname, '../renderer/index.html'))
   attachFlushOnClose(win)
@@ -45,7 +49,7 @@ export function requestFlush(win: BrowserWindow, timeoutMs = FLUSH_TIMEOUT_MS): 
       resolve()
     }
     const onDone = (e: Electron.IpcMainEvent): void => {
-      if (e.sender.id === id) done()
+      if (e.sender.id === id && isTrustedSender(e)) done()
     }
     const timer = setTimeout(done, timeoutMs)
     ipcMain.on('app:flush-done', onDone)
@@ -65,48 +69,57 @@ function attachFlushOnClose(win: BrowserWindow): void {
   })
 }
 
-export function registerIpc(getStatus: () => SidecarStatus): void {
+export function registerIpc(getStatus: () => SidecarStatus, apiToken: string): void {
   registerFileIpc()
   const winOf = (e: Electron.IpcMainInvokeEvent): BrowserWindow | null =>
     BrowserWindow.fromWebContents(e.sender)
-  ipcMain.handle('backend:get-config', () => {
+  handleSecure('backend:get-config', () => {
     const s = getStatus()
     return {
       port: s.port,
       baseUrl: s.port ? `http://127.0.0.1:${s.port}` : null,
-      status: s
+      status: s,
+      // The only way the token reaches the renderer (never logged, never in a URL).
+      token: apiToken
     }
   })
-  ipcMain.handle('window:minimize', (e) => winOf(e)?.minimize())
-  ipcMain.handle('window:toggle-maximize', (e) => {
+  handleSecure('window:minimize', (e) => winOf(e)?.minimize())
+  handleSecure('window:toggle-maximize', (e) => {
     const w = winOf(e)
     if (!w) return
     if (w.isMaximized()) w.unmaximize()
     else w.maximize()
   })
-  ipcMain.handle('window:close', (e) => winOf(e)?.close())
-  ipcMain.handle('dialog:open-pack', async (e) => {
-    if (process.env.MIZAJ_E2E_PACK_PATH) return process.env.MIZAJ_E2E_PACK_PATH
+  handleSecure('window:close', (e) => winOf(e)?.close())
+  handleSecure('dialog:open-pack', async (e) => {
+    if (process.env.MIZAJ_E2E_PACK_PATH)
+      return dialogPaths.addAndReturn(process.env.MIZAJ_E2E_PACK_PATH)
     const w = winOf(e)
     const opts = {
       properties: ['openFile' as const],
       filters: [{ name: 'Mizaj model pack', extensions: ['mizajpack'] }]
     }
     const r = w ? await dialog.showOpenDialog(w, opts) : await dialog.showOpenDialog(opts)
-    return r.canceled || !r.filePaths[0] ? null : r.filePaths[0]
+    return r.canceled || !r.filePaths[0] ? null : dialogPaths.addAndReturn(r.filePaths[0])
   })
-  ipcMain.handle('dialog:save-docx', async (e, defaultName: unknown) => {
+  handleSecure('dialog:save-docx', async (e, defaultName: unknown) => {
     // test-only stub for the native dialog
-    if (process.env.MIZAJ_E2E_SAVE_PATH) return process.env.MIZAJ_E2E_SAVE_PATH
+    if (process.env.MIZAJ_E2E_SAVE_PATH)
+      return dialogPaths.addAndReturn(process.env.MIZAJ_E2E_SAVE_PATH)
     const w = winOf(e)
-    const name = typeof defaultName === 'string' && defaultName ? defaultName : 'mizaj.docx'
+    const name =
+      typeof defaultName === 'string' && defaultName && defaultName.length <= MAX_NAME_LENGTH
+        ? defaultName
+        : 'mizaj.docx'
     const opts = {
       defaultPath: name.replace(/[\\/:*?"<>|]/g, '_'),
       filters: [{ name: 'Word', extensions: ['docx'] }]
     }
     const r = w ? await dialog.showSaveDialog(w, opts) : await dialog.showSaveDialog(opts)
     if (r.canceled || !r.filePath) return null
-    return r.filePath.toLowerCase().endsWith('.docx') ? r.filePath : `${r.filePath}.docx`
+    return dialogPaths.addAndReturn(
+      r.filePath.toLowerCase().endsWith('.docx') ? r.filePath : `${r.filePath}.docx`
+    )
   })
 }
 

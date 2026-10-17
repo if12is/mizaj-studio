@@ -1,4 +1,6 @@
-import { app, BrowserWindow, dialog, ipcMain } from 'electron'
+import { app, BrowserWindow, dialog } from 'electron'
+import { handleSecure } from './ipcGuard'
+import { TOKEN_HEADER } from './security'
 import { readFileSync, existsSync, writeFileSync } from 'node:fs'
 import { freemem, homedir, release, totalmem, userInfo } from 'node:os'
 import { join } from 'node:path'
@@ -9,6 +11,7 @@ interface Deps {
   manager: PythonProcessManager
   log: { error(...a: unknown[]): void; info(...a: unknown[]): void }
   portable: boolean
+  apiToken: string
 }
 
 function homes(): string[] {
@@ -37,10 +40,13 @@ export function versionInfo(portable: boolean): VersionInfo {
   }
 }
 
-async function getJson(port: number | null, path: string): Promise<unknown> {
+async function getJson(port: number | null, path: string, token: string): Promise<unknown> {
   if (!port) return null
   try {
-    const r = await fetch(`http://127.0.0.1:${port}${path}`, { signal: AbortSignal.timeout(3000) })
+    const r = await fetch(`http://127.0.0.1:${port}${path}`, {
+      signal: AbortSignal.timeout(3000),
+      headers: { [TOKEN_HEADER]: token }
+    })
     return await r.json()
   } catch {
     return null
@@ -55,7 +61,7 @@ function licensesPath(): string | null {
   return candidates.find((p) => existsSync(p)) ?? null
 }
 
-export function registerDiagnostics({ manager, log, portable }: Deps): void {
+export function registerDiagnostics({ manager, log, portable, apiToken }: Deps): void {
   const crashDir = (): string => join(app.getPath('userData'), 'crash')
   const report = (
     kind: string,
@@ -94,11 +100,11 @@ export function registerDiagnostics({ manager, log, portable }: Deps): void {
       report('sidecar-' + s.state, new Error(s.message ?? `sidecar ${s.state}`), { retry: s.retry })
   })
 
-  ipcMain.handle('diagnostics:export', async (e) => {
+  handleSecure('diagnostics:export', async (e) => {
     const port = manager.getStatus().port
     const [health, settings] = await Promise.all([
-      getJson(port, '/health'),
-      getJson(port, '/api/settings')
+      getJson(port, '/health', apiToken),
+      getJson(port, '/api/settings', apiToken)
     ])
     const zip = buildBundle({
       userData: app.getPath('userData'),
@@ -122,7 +128,7 @@ export function registerDiagnostics({ manager, log, portable }: Deps): void {
     return target
   })
 
-  ipcMain.handle('about:info', () => {
+  handleSecure('about:info', () => {
     const p = licensesPath()
     return {
       version: app.getVersion(),

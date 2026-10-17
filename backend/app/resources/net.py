@@ -9,11 +9,15 @@ from __future__ import annotations
 
 import hashlib
 import http.client
+import ipaddress
 import json
 import logging
 import os
+import socket
 import sqlite3
+import ssl
 import threading
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -108,6 +112,61 @@ class _Redirect(urllib.request.HTTPRedirectHandler):
         return super().redirect_request(req, fp, code, msg, headers, newurl)
 
 
+MAX_DOWNLOAD_BYTES = 2 * 1024**3
+MAX_DOWNLOAD_SECONDS = 3600.0
+
+
+def _blocked_address(host: str, why: str) -> MizajError:
+    return MizajError(
+        "ERR_HOST_NOT_ALLOWED",
+        403,
+        "عنوان التنزيل غير مسموح به.",
+        f"Host '{host}' resolves to a {why} address.",
+        {"host": host},
+    )
+
+
+def _addr_is_public(addr: str) -> bool:
+    ip = ipaddress.ip_address(addr.split("%", 1)[0])
+    if isinstance(ip, ipaddress.IPv6Address) and ip.ipv4_mapped:
+        ip = ip.ipv4_mapped
+    return ip.is_global and not ip.is_multicast
+
+
+def resolve_public(host: str, port: int = 443) -> str:
+    """Resolve `host` and return one address, failing when ANY answer is private, loopback,
+    link-local, multicast, reserved or otherwise non-global (SSRF / DNS-rebinding guard)."""
+    try:
+        infos = socket.getaddrinfo(host, port, type=socket.SOCK_STREAM)
+    except OSError as exc:
+        raise _net_error(f"cannot resolve {host}") from exc
+    addrs = [i[4][0] for i in infos]
+    if not addrs:
+        raise _net_error(f"cannot resolve {host}")
+    for a in addrs:
+        if not _addr_is_public(a):
+            _record("download", host, "blocked-private-address")
+            raise _blocked_address(host, "private/loopback/link-local")
+    return addrs[0]
+
+
+class _SafeHTTPSConnection(http.client.HTTPSConnection):
+    """Connects to the validated IP itself, so DNS cannot change between check and connect."""
+
+    def connect(self) -> None:
+        if self._tunnel_host or self.host in LOOPBACK:  # via an HTTP proxy: it does the DNS
+            super().connect()
+            return
+        ip = resolve_public(self.host, self.port)
+        sock = socket.create_connection((ip, self.port), self.timeout, self.source_address)
+        self.sock = self._context.wrap_socket(sock, server_hostname=self.host)
+
+
+class _SafeHTTPSHandler(urllib.request.HTTPSHandler):
+    def https_open(self, req):  # noqa: ANN001
+        return self.do_open(_SafeHTTPSConnection, req, context=ssl.create_default_context())
+
+
 def _check_url(url: str) -> None:
     p = urllib.parse.urlparse(url)
     host = (p.hostname or "").lower()
@@ -124,6 +183,13 @@ def _check_url(url: str) -> None:
         raise MizajError(
             "ERR_HOST_NOT_ALLOWED", 403, "يجب استخدام HTTPS.", "Plain HTTP is not allowed.", {}
         )
+    if host not in LOOPBACK:
+        try:
+            literal = ipaddress.ip_address(host)
+        except ValueError:
+            literal = None
+        if literal is not None and not _addr_is_public(host):
+            raise _blocked_address(host, "private/loopback/link-local")
 
 
 def download(
@@ -137,6 +203,8 @@ def download(
     progress: Callable[[int, int | None], None] | None = None,
     cancelled: Callable[[], bool] | None = None,
     timeout: float = 30.0,
+    max_bytes: int = MAX_DOWNLOAD_BYTES,
+    max_seconds: float = MAX_DOWNLOAD_SECONDS,
 ) -> str:
     """Download to `dest` (via dest.part, resumable). Returns the sha256 hex digest."""
     require_switch(db_path, switch)
@@ -148,7 +216,7 @@ def download(
     headers = {"User-Agent": "MizajStudio/0.1 (+offline-first)"}
     if have:
         headers["Range"] = f"bytes={have}-"
-    opener = urllib.request.build_opener(_Redirect)
+    opener = urllib.request.build_opener(_Redirect, _SafeHTTPSHandler)
     _record("download", url, f"start resume_from={have}")
     try:
         resp = opener.open(urllib.request.Request(url, headers=headers), timeout=timeout)
@@ -164,7 +232,13 @@ def download(
     if resp is not None:
         with resp:
             total = resp.headers.get("Content-Length")
-            total_n = int(total) + (have if resp.status == 206 else 0) if total else None
+            try:
+                total_n = int(total) + (have if resp.status == 206 else 0) if total else None
+            except ValueError:
+                raise _net_error("bad Content-Length") from None
+            if total_n is not None and total_n > max_bytes:
+                raise _net_error("file exceeds the size limit")
+            deadline = time.monotonic() + max_seconds
             mode = "ab" if resp.status == 206 else "wb"
             done = have if resp.status == 206 else 0
             try:
@@ -176,6 +250,9 @@ def download(
                             )
                         out.write(chunk)
                         done += len(chunk)
+                        if done > max_bytes or time.monotonic() > deadline:
+                            part.unlink(missing_ok=True)
+                            raise _net_error("file exceeds the size or time limit")
                         if progress:
                             progress(done, total_n)
             except (OSError, http.client.HTTPException) as exc:

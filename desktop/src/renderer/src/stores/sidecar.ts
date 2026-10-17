@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 import { parseEngines, type EnginesInfo } from './engines'
+import { setApiToken, withToken } from '@renderer/api/token'
 
 function devBackendOverride(): string | null {
   // Browser-only (Playwright / plain vite): ?backend=http://127.0.0.1:PORT
@@ -33,7 +34,7 @@ export const useSidecarStore = defineStore('sidecar', () => {
     const base = baseUrl.value
     if (!base) return
     try {
-      const r = await fetch(`${base}/health`)
+      const r = await fetch(`${base}/health`, { headers: withToken(undefined) })
       engines.value = parseEngines(await r.json())
     } catch {
       return
@@ -60,6 +61,7 @@ export const useSidecarStore = defineStore('sidecar', () => {
     if (!api) return
     api.onSidecarStatus(apply)
     const cfg = await api.getBackendConfig()
+    setApiToken(cfg.token)
     apply(cfg.status)
   }
 

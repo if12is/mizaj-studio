@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import MotionTransition from '@renderer/components/ui/MotionTransition.vue'
 import { onBeforeUnmount, onMounted, ref } from 'vue'
 import { EXPORT_FORMATS } from '@renderer/files/formats'
 import { useFileStore } from '@renderer/stores/fileio'
@@ -45,42 +46,44 @@ const item =
     >
       ملف
     </button>
-    <div
-      v-if="open"
-      class="absolute start-0 top-full z-40 mt-1 w-60 rounded border bg-white py-1 shadow-lg dark:border-slate-600 dark:bg-slate-800"
-      role="menu"
-      data-testid="file-menu-list"
-    >
-      <button
-        :class="item"
-        role="menuitem"
-        data-testid="file-import"
-        @click="close(), files.importFile()"
+    <MotionTransition name="m-menu">
+      <div
+        v-if="open"
+        class="absolute start-0 top-full z-40 mt-1 w-60 rounded border bg-white py-1 shadow-lg dark:border-slate-600 dark:bg-slate-800"
+        role="menu"
+        data-testid="file-menu-list"
       >
-        استيراد ملف…
-      </button>
-      <div class="my-1 border-t dark:border-slate-600" role="separator" />
-      <p class="px-3 py-0.5 text-xs text-slate-500">تصدير المستند الحالي كـ…</p>
-      <button
-        v-for="f in EXPORT_FORMATS"
-        :key="f.id"
-        :class="item"
-        role="menuitem"
-        :disabled="!projects.currentDocument || files.busy"
-        :data-testid="`file-export-${f.id}`"
-        @click="close(), files.exportAs(f.id)"
-      >
-        {{ f.label }}
-      </button>
-      <div class="my-1 border-t dark:border-slate-600" role="separator" />
-      <button
-        :class="item"
-        role="menuitem"
-        data-testid="file-batch"
-        @click="close(), (files.batchOpen = true)"
-      >
-        معالجة مجلد…
-      </button>
-    </div>
+        <button
+          :class="item"
+          role="menuitem"
+          data-testid="file-import"
+          @click="close(), files.importFile()"
+        >
+          استيراد ملف…
+        </button>
+        <div class="my-1 border-t dark:border-slate-600" role="separator" />
+        <p class="px-3 py-0.5 text-xs text-slate-500">تصدير المستند الحالي كـ…</p>
+        <button
+          v-for="f in EXPORT_FORMATS"
+          :key="f.id"
+          :class="item"
+          role="menuitem"
+          :disabled="!projects.currentDocument || files.busy"
+          :data-testid="`file-export-${f.id}`"
+          @click="close(), files.exportAs(f.id)"
+        >
+          {{ f.label }}
+        </button>
+        <div class="my-1 border-t dark:border-slate-600" role="separator" />
+        <button
+          :class="item"
+          role="menuitem"
+          data-testid="file-batch"
+          @click="close(), (files.batchOpen = true)"
+        >
+          معالجة مجلد…
+        </button>
+      </div>
+    </MotionTransition>
   </div>
 </template>
