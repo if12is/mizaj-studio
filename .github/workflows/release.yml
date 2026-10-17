@@ -77,6 +77,15 @@ jobs:
         working-directory: desktop
         run: node scripts/sync-version.cjs
 
+      # Reproducible builds (7.6.6): timestamps inside archives derive from the commit, and Python's
+      # hash randomisation is off for PyInstaller. See docs/guides/reproducible-builds.md.
+      - name: Reproducible-build environment
+        run: |
+          $epoch = (git log -1 --format=%ct).Trim()
+          "SOURCE_DATE_EPOCH=$epoch" >> $env:GITHUB_ENV
+          'PYTHONHASHSEED=0' >> $env:GITHUB_ENV
+          Write-Host "SOURCE_DATE_EPOCH=$epoch"
+
       - name: Preflight
         run: |
           if ('${{ steps.mode.outputs.publish }}' -eq 'true' -and [string]::IsNullOrEmpty($env:GH_TOKEN)) {
@@ -124,6 +133,9 @@ jobs:
           MIZAJ_ENGINE_MODE: real
         run: python scripts/quantize_catt.py --guard 0.3
 
+      - name: Build domain packs (.mizajpack) and point the catalog at this release
+        run: python scripts/build_domain_packs.py --version "${{ steps.version.outputs.version }}"
+
       # Bootloader compiled from source + VERSIONINFO: avoids the prebuilt-bootloader
       # signatures that trigger antivirus false positives (see desktop/WINDOWS_DEFENDER.md).
       - name: Build frozen engine (PyInstaller)
@@ -146,6 +158,23 @@ jobs:
         working-directory: desktop
         run: npx electron-builder --win --publish ${{ steps.mode.outputs.mode }}
 
+      - name: Delta-update report (blockmap sizes) appended to the release notes
+        run: |
+          $v = '${{ steps.version.outputs.version }}'
+          $exe = Get-Item "desktop/dist/Mizaj-Studio-Setup-$v.exe"
+          $bm = Get-Item "desktop/dist/Mizaj-Studio-Setup-$v.exe.blockmap"
+          $packs = (Get-ChildItem resources/packs -Filter *.mizajpack | ForEach-Object { "$($_.Name) ($([math]::Round($_.Length/1KB,1)) KB)" }) -join ', '
+          $report = @"
+
+          ### Update sizes
+          - Installer: $([math]::Round($exe.Length/1MB,1)) MB; blockmap: $([math]::Round($bm.Length/1KB,1)) KB.
+          - Existing installs download only the changed blocks (electron-updater differential download, HTTP range requests against the blockmap), so a typical update is much smaller than the installer.
+          - Model and data packs ship as .mizajpack assets (not inside the installer): $packs
+          "@
+          Add-Content -Path "$env:RUNNER_TEMP/release-notes.md" -Value $report -Encoding utf8
+          Write-Host $report
+          "::notice title=Delta update::installer $([math]::Round($exe.Length/1MB,1)) MB, blockmap $([math]::Round($bm.Length/1KB,1)) KB"
+
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -156,6 +185,7 @@ jobs:
             desktop/dist/*.exe
             desktop/dist/latest.yml
             desktop/dist/*.blockmap
+            resources/packs/*.mizajpack
 
       - name: Set release notes
         if: steps.mode.outputs.publish == 'true'
@@ -164,6 +194,10 @@ jobs:
       - name: Attach SBOM to the release
         if: steps.mode.outputs.publish == 'true'
         run: gh release upload "v${{ steps.version.outputs.version }}" desktop/sbom/sbom.json --repo "${{ github.repository }}" --clobber
+
+      - name: Upload domain packs as release assets (catalog download URLs)
+        if: steps.mode.outputs.publish == 'true'
+        run: gh release upload "v${{ steps.version.outputs.version }}" (Get-ChildItem resources/packs -Filter *.mizajpack).FullName --repo "${{ github.repository }}" --clobber
 
       - name: Verify release assets
         if: steps.mode.outputs.publish == 'true'

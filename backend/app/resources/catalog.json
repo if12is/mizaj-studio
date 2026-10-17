@@ -52,6 +52,45 @@
       "license_url": "https://github.com/abjadai/catt/blob/main/LICENSE",
       "attribution": "abjadai/catt",
       "notes": "Same archive as scripts/download_models.py."
+    },
+    {
+      "id": "mizaj-legal-terms",
+      "name": "Mizaj legal terms (contracts and courts)",
+      "kind": "mizajpack",
+      "url": "https://github.com/if12is/mizaj-studio/releases/download/v0.1.0/mizaj-legal-terms.mizajpack",
+      "filename": "mizaj-legal-terms.mizajpack",
+      "sha256": "26970789ee0e6e10a05ed4551edf652e61a777542479f27ce3085fcc6007bdf6",
+      "size": 8362,
+      "license": "CC0-1.0",
+      "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "attribution": "Mizaj Studio contributors (CC0 1.0)",
+      "notes": "Domain pack (.mizajpack v2). Downloaded from the matching GitHub release; import it from the packs screen. Needs expert review before professional use."
+    },
+    {
+      "id": "mizaj-names-eg-gulf-levant",
+      "name": "Egyptian, Gulf and Levantine names and places",
+      "kind": "mizajpack",
+      "url": "https://github.com/if12is/mizaj-studio/releases/download/v0.1.0/mizaj-names-eg-gulf-levant.mizajpack",
+      "filename": "mizaj-names-eg-gulf-levant.mizajpack",
+      "sha256": "46c2b5a91c36e7c4caf1198b1ddb1acecd28009587ea626d8d4dd5c822eaa31c",
+      "size": 2762,
+      "license": "CC0-1.0",
+      "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "attribution": "Mizaj Studio contributors (CC0 1.0)",
+      "notes": "Domain pack (.mizajpack v2). Downloaded from the matching GitHub release; import it from the packs screen. Needs expert review before professional use."
+    },
+    {
+      "id": "mizaj-official-phrases",
+      "name": "Official correspondence phrases",
+      "kind": "mizajpack",
+      "url": "https://github.com/if12is/mizaj-studio/releases/download/v0.1.0/mizaj-official-phrases.mizajpack",
+      "filename": "mizaj-official-phrases.mizajpack",
+      "sha256": "f61ff1f777f8cff9db364996636ed4dd3152f8b57fba3e9e6ec14daa0823849a",
+      "size": 2825,
+      "license": "CC0-1.0",
+      "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "attribution": "Mizaj Studio contributors (CC0 1.0)",
+      "notes": "Domain pack (.mizajpack v2). Downloaded from the matching GitHub release; import it from the packs screen. Needs expert review before professional use."
     }
   ]
 }

@@ -17,6 +17,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api import arud as arud_api
 from app.api import corrections as corrections_api
+from app.api import dialect as dialect_api
 from app.api import (
     dictionary,
     documents,
@@ -93,6 +94,7 @@ def create_app(data_dir: Path, migrations_dir: Path | None = None) -> FastAPI:
         spelling,
         arud_api,
         corrections_api,
+        dialect_api,
         irab_api,
         names_api,
         quran,

@@ -243,3 +243,18 @@ def test_arud_api(client):
         "/api/arud/analyze", json={"text": strip_marks(verse), "diacritize": False}
     ).json()
     assert j3["diacritized"] is False and j3["meter"] is None
+
+
+def test_dialect_hint(client):
+    egy = client.post("/api/text/dialect-hint", json={"text": "أنا عايز أروح دلوقتي مش عارف إزاي"})
+    assert egy.status_code == 200
+    j = egy.json()
+    assert j["likely_dialectal"] and j["dialect"] == "egyptian" and j["markers"]
+    msa_text = "يلتزم الطرف الأول بتسليم العين المؤجرة"
+    msa = client.post("/api/text/dialect-hint", json={"text": msa_text}).json()
+    assert msa["likely_dialectal"] is False and msa["score"] == 0
+    assert client.post("/api/text/dialect-hint", json={"text": ""}).json()["words"] == 0
+    lev = client.post("/api/text/dialect-hint", json={"text": "شو بدك هلق كتير منيح"}).json()
+    assert lev["dialect"] == "levantine"
+    gulf = client.post("/api/text/dialect-hint", json={"text": "وايد زين شفيك ابغى اروح"}).json()
+    assert gulf["likely_dialectal"]

@@ -3,6 +3,7 @@ import hashlib
 import json
 import socket
 import stat
+import sys
 import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -278,13 +279,32 @@ def test_languagetool_maps_to_issue_shape(ioc, server):
 
 
 # ------------------------------------------------------------------ 7.3.7 OCR
-FAKE_TESS = """#!/bin/sh
-if [ "$1" = "--list-langs" ]; then echo "List of available languages (2):"; echo ara; echo eng; exit 0; fi
-printf 'level\\tpage_num\\tblock_num\\tpar_num\\tline_num\\tword_num\\tleft\\ttop\\twidth\\theight\\tconf\\ttext\\n'
-printf '5\\t1\\t1\\t1\\t1\\t1\\t0\\t0\\t1\\t1\\t90.5\\tمرحبا\\n'
-printf '5\\t1\\t1\\t1\\t1\\t2\\t0\\t0\\t1\\t1\\t70.5\\tبكم\\n'
-printf '5\\t1\\t1\\t1\\t2\\t1\\t0\\t0\\t1\\t1\\t80\\tسطر\\n'
+# Cross-platform fake `tesseract`: a Python script, wrapped in a .cmd on Windows.
+FAKE_TESS_PY = r"""
+import sys
+if len(sys.argv) > 1 and sys.argv[1] == "--list-langs":
+    print("List of available languages (2):"); print("ara"); print("eng"); sys.exit(0)
+rows = [
+    "level\tpage_num\tblock_num\tpar_num\tline_num\tword_num\tleft\ttop\twidth\theight\tconf\ttext",
+    "5\t1\t1\t1\t1\t1\t0\t0\t1\t1\t90.5\t\u0645\u0631\u062d\u0628\u0627",
+    "5\t1\t1\t1\t1\t2\t0\t0\t1\t1\t70.5\t\u0628\u0643\u0645",
+    "5\t1\t1\t1\t2\t1\t0\t0\t1\t1\t80\t\u0633\u0637\u0631",
+]
+sys.stdout.buffer.write(("\n".join(rows) + "\n").encode("utf-8"))
 """
+
+
+def make_fake_tesseract(tmp_path):
+    script = tmp_path / "fake_tesseract.py"
+    script.write_text(FAKE_TESS_PY, encoding="utf-8")
+    if sys.platform == "win32":
+        exe = tmp_path / "tesseract.cmd"
+        exe.write_text(f'@"{sys.executable}" "{script}" %*\r\n', encoding="utf-8")
+    else:
+        exe = tmp_path / "tesseract"
+        exe.write_text(f'#!/bin/sh\nexec "{sys.executable}" "{script}" "$@"\n')
+        exe.chmod(exe.stat().st_mode | stat.S_IEXEC)
+    return exe
 
 
 def test_ocr_missing_tesseract(ioc, monkeypatch, tmp_path):
@@ -301,9 +321,7 @@ def test_ocr_missing_tesseract(ioc, monkeypatch, tmp_path):
 def test_ocr_image_and_scanned_pdf(ioc, monkeypatch, tmp_path):
     from PIL import Image
 
-    tess = tmp_path / "tesseract"
-    tess.write_text(FAKE_TESS)
-    tess.chmod(tess.stat().st_mode | stat.S_IEXEC)
+    tess = make_fake_tesseract(tmp_path)
     monkeypatch.setenv("MIZAJ_TESSERACT", str(tess))
     img = tmp_path / "a.png"
     Image.new("RGB", (200, 100), "white").save(img)

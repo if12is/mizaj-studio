@@ -1,0 +1,134 @@
+name: Windows E2E
+
+# Task 7.7.1: build the installer like the release workflow (real models, INT8 quantization,
+# frozen engine; nothing is published), install it silently, then drive the INSTALLED app with
+# Playwright _electron in REAL engine mode (no MIZAJ_ENGINE_MODE=mock anywhere).
+# Spec: desktop/tests/win-e2e/installed.spec.ts. Logs are not reachable from outside the runner, so
+# failures are surfaced as annotations (and the log tail / screenshots are uploaded as artifacts).
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '17 3 * * 1'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  windows-e2e:
+    name: Installed app, real engine
+    runs-on: windows-latest
+    timeout-minutes: 90
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11.7'
+          cache: pip
+          cache-dependency-path: |
+            backend/requirements.txt
+            backend/requirements-build.txt
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20.11.0'
+          cache: npm
+          cache-dependency-path: desktop/package-lock.json
+
+      - name: Reproducible-build environment
+        run: |
+          $epoch = (git log -1 --format=%ct).Trim()
+          "SOURCE_DATE_EPOCH=$epoch" >> $env:GITHUB_ENV
+          'PYTHONHASHSEED=0' >> $env:GITHUB_ENV
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements.txt -r backend/requirements-build.txt
+          Push-Location desktop
+          npm ci
+          Pop-Location
+
+      - name: Download CATT models (sha256 verified)
+        run: python scripts/download_models.py
+
+      - name: Quantize CATT encoder to INT8 (fails if DER regresses > 0.3 pt)
+        env:
+          MIZAJ_ENGINE_MODE: real
+        run: python scripts/quantize_catt.py --guard 0.3
+
+      - name: Build frozen engine
+        run: python scripts/build_backend.py
+
+      - name: Build app and package the installer (no publish)
+        working-directory: desktop
+        run: |
+          npm run build
+          npx electron-builder --win --publish never
+
+      - name: Silently install the NSIS build
+        id: inst
+        run: |
+          $setup = Get-ChildItem desktop/dist -Filter 'Mizaj-Studio-Setup-*.exe' | Select-Object -First 1
+          if (-not $setup) {
+            Write-Host '::error title=Windows E2E install::no installer was produced in desktop/dist'
+            exit 1
+          }
+          $p = Start-Process -FilePath $setup.FullName -ArgumentList '/S' -Wait -PassThru
+          if ($p.ExitCode -ne 0) {
+            Write-Host "::error title=Windows E2E install::installer exited with code $($p.ExitCode)"
+            exit 1
+          }
+          $roots = @("$env:LOCALAPPDATA\Programs", "$env:ProgramFiles")
+          $exe = Get-ChildItem -Path $roots -Recurse -Filter *.exe -ErrorAction SilentlyContinue |
+            Where-Object { $_.Name -notmatch 'Uninstall|mizaj-engine|elevate' -and $_.DirectoryName -match 'Mizaj' } |
+            Select-Object -First 1
+          if (-not $exe) {
+            Write-Host '::error title=Windows E2E install::installed executable not found'
+            exit 1
+          }
+          Write-Host "::notice title=Windows E2E::installed $($exe.FullName) ($($exe.VersionInfo.ProductVersion))"
+          "exe=$($exe.FullName)" >> $env:GITHUB_OUTPUT
+
+      - name: Run the installed-app E2E (real engine)
+        working-directory: desktop
+        env:
+          MIZAJ_INSTALLED_EXE: ${{ steps.inst.outputs.exe }}
+          MIZAJ_E2E_USERDATA: ${{ runner.temp }}\win-e2e-userdata
+        run: |
+          Remove-Item Env:MIZAJ_ENGINE_MODE -ErrorAction SilentlyContinue
+          npx playwright test -c playwright.win.config.ts
+          $code = $LASTEXITCODE
+          if ($code -ne 0) {
+            $log = Join-Path $env:MIZAJ_E2E_USERDATA 'logs\mizaj-main.log'
+            if (Test-Path $log) {
+              $tail = ((Get-Content $log -Tail 15) -join "`n").Replace('%','%25').Replace("`r",'').Replace("`n",'%0A')
+              Write-Host "::error title=Windows E2E main log tail::$tail"
+            }
+            exit $code
+          }
+
+      - name: Stop leftover processes
+        if: always()
+        run: |
+          Get-Process | Where-Object { $_.Path -match 'Mizaj' } | Stop-Process -Force -ErrorAction SilentlyContinue
+
+      - name: Upload failure evidence
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-e2e-failure
+          if-no-files-found: ignore
+          path: |
+            ${{ runner.temp }}\win-e2e-userdata\logs
+            ${{ runner.temp }}\win-e2e-userdata\*.png
+            desktop/test-results
