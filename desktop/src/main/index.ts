@@ -1,4 +1,4 @@
-import { app, BrowserWindow } from 'electron'
+import { app, BrowserWindow, Menu } from 'electron'
 import { resolve } from 'node:path'
 import { initLogger } from './logger'
 import { PythonProcessManager, resolvePythonExe, STATUS_EVENT } from './pythonManager'
@@ -26,6 +26,14 @@ app.on('will-quit', (e) => {
 })
 
 app.on('window-all-closed', () => app.quit())
+
+// Remove Electron's default menu: its accelerators (e.g. Ctrl+Shift+R "Force Reload")
+// would shadow the editor shortcuts. The window is frameless, so no menu is shown anyway.
+Menu.setApplicationMenu(
+  process.platform === 'darwin'
+    ? Menu.buildFromTemplate([{ role: 'appMenu' }, { role: 'editMenu' }])
+    : null
+)
 
 void app.whenReady().then(() => {
   log.info('Mizaj Studio starting, userData=', app.getPath('userData'))
