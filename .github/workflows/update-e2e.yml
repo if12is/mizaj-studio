@@ -99,8 +99,17 @@ jobs:
       - name: Silently install the old version
         shell: pwsh
         run: |
-          $p = Start-Process -FilePath '${{ steps.v.outputs.installer }}' -ArgumentList '/S' -Wait -PassThru
-          if ($p.ExitCode -ne 0) { throw "installer exit code $($p.ExitCode)" }
+          $inst = '${{ steps.v.outputs.installer }}'
+          if (-not (Test-Path $inst)) {
+            $near = (Get-ChildItem (Split-Path $inst) -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Name) -join ', '
+            Write-Host "::error title=Install old version::installer not found: $inst (dir has: $near)"
+            exit 1
+          }
+          $p = Start-Process -FilePath $inst -ArgumentList '/S' -Wait -PassThru
+          if ($p.ExitCode -ne 0) {
+            Write-Host "::error title=Install old version::installer $inst exited with code $($p.ExitCode)"
+            exit 1
+          }
 
       - name: Locate installed app and check its version
         id: app
