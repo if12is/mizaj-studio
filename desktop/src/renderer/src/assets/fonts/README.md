@@ -1,26 +1,41 @@
-# Amiri-Mizaj-Colr.woff2 (NOT YET GENERATED)
+# Amiri-Mizaj-Colr.woff2
 
-This folder must contain `Amiri-Mizaj-Colr.woff2`, an Amiri build with OpenType
-`COLR` v0 + `CPAL` tables where the combining marks (fatha, damma, kasra, shadda,
-sukun, tanween U+064B-U+0652) are layered glyphs using CPAL palette entry 0
-(and entry 1 for shadda), and base glyphs use the foreground colour (0xFFFF).
+Amiri (SIL OFL 1.1) with OpenType `COLR` v0 + `CPAL` tables. Family name:
+**`Amiri Mizaj Colr`**.
 
-The binary could not be produced in Phase 1 (no font tooling in the build
-environment) and is intentionally NOT fabricated. Until it exists the app falls
-back to the plain bundled `@fontsource/amiri` font: everything works, the
-"colored diacritics" toggle just has no visible effect (the CSS
-`font-palette: --mizaj-colored` is ignored by fonts without CPAL).
+- All 62 Arabic combining-mark glyphs (GDEF class 3: U+0610-061A, U+064B-065F,
+  U+0670, U+06D6-06ED and their GSUB alternates) have a COLR layer
+  `[(glyph, paletteEntry)]`. Base glyphs have no COLR entry, so they render with
+  the text colour (dark/light theme works).
+- CPAL entry 0 = mark colour, entry 1 = shadda (U+0651) colour.
+  - palette 0 (emerald): `#10B981`, `#F59E0B`
+  - palette 1 (amber):   `#F59E0B`, `#F59E0B`
+- GSUB / GPOS / GDEF / glyf / cmap / hmtx are untouched: shaping and mark
+  positioning are identical to the source. Text width is identical in all palettes.
+- Source: `@fontsource/amiri` 5.0.8 `amiri-arabic-400-normal.woff2`
+  (SHA256 `0d23e3fc...348d`, from https://github.com/aliftype/amiri).
+- Licence: `OFL.txt`. Amiri declares no Reserved Font Name, so the derived
+  family name is permitted.
 
-## How to generate (fonttools)
+## CSS behaviour (verified in Chromium)
 
-1. `pip install fonttools brotli ufo2ft`
-2. Get Amiri source (OFL): https://github.com/alif-type/amiri
-3. Build a layered glyph set: for each mark glyph create a colour layer glyph
-   (`<mark>.colr`) and map it with `fontTools.colorLib.builder.buildCOLR`
-   (`{ "fatha": [("fatha.colr", 0)], ... }`) and `buildCPAL([[emerald, amber]])`
-   with palette 0 = `#10B981`, entry 1 = `#F59E0B`. Base letters stay uncoloured.
-4. Insert the tables: `font["COLR"] = buildCOLR(...)`, `font["CPAL"] = buildCPAL(...)`.
-5. Rename family to `Amiri Mizaj Colr`, save, then
-   `python -c "from fontTools.ttLib import TTFont; f=TTFont('out.ttf'); f.flavor='woff2'; f.save('Amiri-Mizaj-Colr.woff2')"`.
-6. Drop the file here. No code change needed: `main.css` already declares
-   `@font-face 'Amiri Mizaj Colr'` and `@font-palette-values --mizaj-colored`.
+`font-palette: normal` is NOT "off": a COLR font always paints palette 0, so marks
+are emerald. To switch colouring off with this font you must override the
+entries to the text colour, or use the plain Amiri face:
+
+```css
+@font-palette-values --mizaj-colored { font-family: "Amiri Mizaj Colr"; base-palette: 0; }
+@font-palette-values --mizaj-amber   { font-family: "Amiri Mizaj Colr"; base-palette: 1; }
+/* "off": explicit colours (currentcolor in override-colors is not honoured) */
+@font-palette-values --mizaj-off     { font-family: "Amiri Mizaj Colr"; base-palette: 0;
+                                       override-colors: 0 #1F2937, 1 #1F2937; }
+```
+For dark mode define a second `--mizaj-off-dark` with light colours, or fall back
+to the plain `@fontsource/amiri` family when the toggle is off.
+
+## Regenerate
+
+```
+python3 -m venv .venv && .venv/bin/pip install -r scripts/requirements-fonts.txt
+.venv/bin/python scripts/build_colr_font.py [--input FONT] [--no-verify]
+```
