@@ -68,7 +68,8 @@ def test_install_is_verbatim_and_checksum_verified(qc):
     with pytest.raises(Exception) as e:
         store.install_quran_text(qc.data_dir, FIX, "simple", "0" * 64, validate=False)
     assert e.value.error_code == "ERR_QURAN_CHECKSUM"
-    r = qc.post("/api/quran/install", json={"kind": "simple", "source_path": str(FIX.parent / "nope.txt")})
+    nope = str(FIX.parent / "nope.txt")
+    r = qc.post("/api/quran/install", json={"kind": "simple", "source_path": nope})
     assert r.status_code == 404
 
 
