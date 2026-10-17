@@ -58,6 +58,32 @@ def duplicate_word(word: str) -> MizajError:
     )
 
 
+def engine_not_ready(mode: str) -> MizajError:
+    return MizajError(
+        "ERR_ENGINE_NOT_READY",
+        503,
+        "المحرك لا يزال قيد التحميل، حاول مجدداً بعد لحظات.",
+        "The engine is still loading.",
+        {"mode": mode},
+    )
+
+
+def model_missing(path: str) -> MizajError:
+    return MizajError(
+        "ERR_MODEL_MISSING",
+        500,
+        "ملف النموذج غير موجود. شغّل إصلاح النماذج أو استخدم الوضع السريع.",
+        "The CATT model file is missing.",
+        {"path": path},
+    )
+
+
+def task_cancelled() -> MizajError:
+    return MizajError(
+        "ERR_TASK_CANCELLED", 499, "تم إلغاء المهمة.", "The task was cancelled by the client."
+    )
+
+
 def _json(err: MizajError) -> JSONResponse:
     return JSONResponse(status_code=err.status, content=err.envelope())
 

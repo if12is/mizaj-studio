@@ -4,9 +4,12 @@ pydantic==2.6.4
 pyarabic==0.6.15
 mishkal==0.4.1
 onnxruntime==1.17.1
+# onnxruntime 1.17.1 fails to import with numpy 2.x
+numpy==1.26.4
 python-docx==1.1.0
 lxml==5.1.0
 httpx==0.27.0
 pytest==8.1.1
 ruff==0.3.2
-# NOTE: libtashkeel intentionally NOT included in Phase 1 (PyPI availability unverified; Phase 2 concern).
+# NOTE: libtashkeel is NOT on PyPI (verified). Fast mode uses mishkal; LibtashkeelEngine is an
+# optional adapter used only if `import libtashkeel` succeeds.

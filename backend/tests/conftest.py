@@ -21,3 +21,13 @@ def client(data_dir):
     with TestClient(app) as c:
         c.data_dir = data_dir
         yield c
+
+
+@pytest.fixture(autouse=True)
+def _reset_engines(monkeypatch):
+    from app.engine.manager import manager
+
+    monkeypatch.setenv("MIZAJ_ENGINE_MODE", "mock")
+    manager.reset()
+    yield
+    manager.reset()

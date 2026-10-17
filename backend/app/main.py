@@ -13,7 +13,7 @@ import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import dictionary, documents, health, projects, settings
+from app.api import dictionary, documents, health, projects, settings, tashkeel
 from app.core.database import DB_NAME
 from app.core.errors import MizajError, install_handlers
 from app.core.logging_setup import setup_logging
@@ -49,7 +49,7 @@ def create_app(data_dir: Path, migrations_dir: Path | None = None) -> FastAPI:
         allow_headers=["*"],
     )
     install_handlers(app)
-    for mod in (health, projects, documents, settings, dictionary):
+    for mod in (health, projects, documents, settings, dictionary, tashkeel):
         app.include_router(mod.router)
     return app
 

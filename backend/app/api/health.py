@@ -1,24 +1,20 @@
 from __future__ import annotations
 
-import os
 import sqlite3
-from pathlib import Path
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 
 from app.api.deps import get_db
+from app.engine import config
 
 router = APIRouter()
 VERSION = "0.1.0"
-MODEL_PATH = Path(__file__).resolve().parent.parent.parent / "models" / "catt_encoder_int8.onnx"
 
 
 def engine_mode() -> Literal["mock", "real"]:
-    if os.environ.get("MIZAJ_ENGINE_MODE", "").lower() == "mock" or not MODEL_PATH.exists():
-        return "mock"
-    return "real"
+    return "mock" if config.is_mock() else "real"
 
 
 class Health(BaseModel):
