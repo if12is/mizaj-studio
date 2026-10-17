@@ -27,7 +27,9 @@ try {
     if ($p.HasExited) { throw "Engine exited early with code $($p.ExitCode)`n$(Get-Content $err -Raw)" }
     if (Test-Path $out) {
       $txt = Get-Content $out -Raw
-      if ($txt -match 'MIZAJ_PORT=(\d+)' -and $txt -match 'MIZAJ_STATUS=READY') { $port = $Matches[1]; break }
+      # Capture the port first: a second -match would overwrite $Matches.
+      $m = [regex]::Match($txt, 'MIZAJ_PORT=(\d+)')
+      if ($m.Success -and $txt.Contains('MIZAJ_STATUS=READY')) { $port = $m.Groups[1].Value; break }
     }
     Start-Sleep -Milliseconds 500
   }
@@ -36,11 +38,18 @@ try {
   $health = Invoke-RestMethod "$base/health"
   if ($health.status -ne 'ok') { throw "Unexpected /health: $($health | ConvertTo-Json)" }
   Write-Host "health ok: engine_mode=$($health.engine_mode) port=$port"
-  $body = [Text.Encoding]::UTF8.GetBytes((@{ text = 'كتاب جميل'; mode = 'accurate' } | ConvertTo-Json))
+  # Arabic built from code points so the script is safe regardless of how the file is decoded.
+  $sample = -join ([char[]](0x0643, 0x062A, 0x0627, 0x0628, 0x0020, 0x062C, 0x0645, 0x064A, 0x0644))
+  $body = [Text.Encoding]::UTF8.GetBytes((@{ text = $sample; mode = 'accurate' } | ConvertTo-Json))
   $r = Invoke-RestMethod "$base/api/tashkeel" -Method Post -ContentType 'application/json; charset=utf-8' -Body $body
   Write-Host "tashkeel -> $($r.text) (engine=$($r.engine))"
-  if ($r.text -notmatch '[ً-ْ]') { throw "No diacritics in output: $($r.text)" }
+  if ($r.text -notmatch '[\u064B-\u0652]') { throw "No diacritics in output: $($r.text)" }
   Write-Host 'frozen engine smoke test PASSED'
+}
+catch {
+  Write-Host '--- engine stdout ---'; if (Test-Path $out) { Get-Content $out | Write-Host }
+  Write-Host '--- engine stderr ---'; if (Test-Path $err) { Get-Content $err | Write-Host }
+  throw
 }
 finally {
   if ($p -and -not $p.HasExited) { Stop-Process -Id $p.Id -Force }
