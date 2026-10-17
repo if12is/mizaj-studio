@@ -143,7 +143,7 @@ describe('event -> status mapping', () => {
 })
 
 describe('install sequence', () => {
-  it('flush -> stop sidecar -> quitAndInstall(false, true), in order', async () => {
+  it('flush -> stop sidecar -> quitAndInstall(true, true) silently, in order', async () => {
     const order: string[] = []
     const { updater, ctl } = make({ order })
     await ctl.installNow()
@@ -151,6 +151,6 @@ describe('install sequence', () => {
     updater.emit('update-downloaded', { version: '0.1.1' })
     await ctl.installNow()
     expect(order).toEqual(['flush', 'stop', 'quitAndInstall'])
-    expect(updater.quitAndInstall).toHaveBeenCalledWith(false, true)
+    expect(updater.quitAndInstall).toHaveBeenCalledWith(true, true)
   })
 })

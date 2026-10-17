@@ -46,6 +46,10 @@ class StubUpdater extends EventEmitter {
   }
   quitAndInstall(): void {}
 }
+// Test-only: CI's update E2E serves locally built releases from a generic feed instead of GitHub.
+if (app.isPackaged && process.env.MIZAJ_UPDATE_FEED_URL) {
+  autoUpdater.setFeedURL({ provider: 'generic', url: process.env.MIZAJ_UPDATE_FEED_URL })
+}
 const updater = new UpdaterController({
   updater: (app.isPackaged ? autoUpdater : new StubUpdater()) as unknown as UpdaterLike,
   isPackaged: app.isPackaged,

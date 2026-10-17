@@ -1,14 +1,23 @@
 name: Update E2E
 
-# End-to-end test of the in-app auto-updater on real Windows:
-# install an OLD published release, let it discover the LATEST GitHub release,
-# download it, restart & install, then verify the installed version changed.
+# End-to-end test of the in-app auto-updater on real Windows: install an OLD version,
+# let it discover the NEW one, download it, restart & install, then verify the installed
+# version changed and the app relaunched.
+#   mode=local  : build two installers (99.0.0 -> 99.0.1) from this commit and serve the
+#                 newer one from a local feed (MIZAJ_UPDATE_FEED_URL). Tests the current code.
+#   mode=github : install published release <from_version> and update to the latest GitHub release.
 on:
   workflow_dispatch:
     inputs:
-      from_version:
-        description: 'Old version to install first (e.g. 0.1.0)'
+      mode:
+        description: 'local (build two versions of this commit) or github (published releases)'
         required: true
+        type: choice
+        options: [local, github]
+        default: local
+      from_version:
+        description: 'github mode: old published version to install first (e.g. 0.1.0)'
+        required: false
         type: string
         default: '0.1.0'
 
@@ -18,7 +27,7 @@ permissions:
 jobs:
   update:
     runs-on: windows-latest
-    timeout-minutes: 45
+    timeout-minutes: 75
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
@@ -30,29 +39,56 @@ jobs:
           cache: npm
           cache-dependency-path: desktop/package-lock.json
 
-      - name: Install Playwright driver (no browsers needed for Electron)
+      - name: Install desktop dependencies
         working-directory: desktop
-        env:
-          ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
         run: npm ci
+
+      - name: Set up Python (local mode)
+        if: inputs.mode == 'local'
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11.7'
+          cache: pip
+          cache-dependency-path: backend/requirements*.txt
+
+      - name: Build two installers 99.0.0 and 99.0.1 (local mode)
+        if: inputs.mode == 'local'
+        shell: pwsh
+        run: |
+          pip install -r backend/requirements.txt -r backend/requirements-build.txt
+          python scripts/build_backend.py
+          Push-Location desktop
+          npm run build
+          npx electron-builder --win --publish never -c.extraMetadata.version=99.0.0 -c.directories.output=dist-a
+          if ($LASTEXITCODE -ne 0) { throw 'build 99.0.0 failed' }
+          npx electron-builder --win --publish never -c.extraMetadata.version=99.0.1 -c.directories.output=dist-b
+          if ($LASTEXITCODE -ne 0) { throw 'build 99.0.1 failed' }
+          Get-ChildItem dist-b -File | Select-Object Name, Length | Format-Table | Out-String | Write-Host
+          Pop-Location
 
       - name: Resolve versions
         id: v
         shell: pwsh
         run: |
+          if ('${{ inputs.mode }}' -eq 'local') {
+            "from=99.0.0" >> $env:GITHUB_OUTPUT
+            "latest=99.0.1" >> $env:GITHUB_OUTPUT
+            "installer=$env:GITHUB_WORKSPACE\desktop\dist-a\Mizaj-Studio-Setup-99.0.0.exe" >> $env:GITHUB_OUTPUT
+            exit 0
+          }
           $latest = (gh release view --repo ${{ github.repository }} --json tagName | ConvertFrom-Json).tagName.TrimStart('v')
           $from = '${{ inputs.from_version }}'
           if ([version]$latest -le [version]$from) { throw "Latest release $latest is not newer than $from" }
+          gh release download "v$from" --repo ${{ github.repository }} --pattern "Mizaj-Studio-Setup-$from.exe" --dir "$env:RUNNER_TEMP\old"
           "from=$from" >> $env:GITHUB_OUTPUT
           "latest=$latest" >> $env:GITHUB_OUTPUT
+          "installer=$env:RUNNER_TEMP\old\Mizaj-Studio-Setup-$from.exe" >> $env:GITHUB_OUTPUT
           Write-Host "Updating $from -> $latest"
 
-      - name: Download and silently install the old version
+      - name: Silently install the old version
         shell: pwsh
         run: |
-          $from = '${{ steps.v.outputs.from }}'
-          gh release download "v$from" --repo ${{ github.repository }} --pattern "Mizaj-Studio-Setup-$from.exe" --dir "$env:RUNNER_TEMP\old"
-          $p = Start-Process -FilePath "$env:RUNNER_TEMP\old\Mizaj-Studio-Setup-$from.exe" -ArgumentList '/S' -Wait -PassThru
+          $p = Start-Process -FilePath '${{ steps.v.outputs.installer }}' -ArgumentList '/S' -Wait -PassThru
           if ($p.ExitCode -ne 0) { throw "installer exit code $($p.ExitCode)" }
 
       - name: Locate installed app and check its version
@@ -77,6 +113,13 @@ jobs:
           $exe = '${{ steps.app.outputs.exe }}'
           $want = '${{ steps.v.outputs.latest }}'
           $ud = "$env:RUNNER_TEMP\userdata"
+          if ('${{ inputs.mode }}' -eq 'local') {
+            # Same step as the update: Actions kills a step's processes when it ends.
+            $feed = Start-Process -FilePath python -ArgumentList @('-m','http.server','8765','--bind','127.0.0.1','--directory',"$env:GITHUB_WORKSPACE\desktop\dist-b") -PassThru -WindowStyle Hidden
+            $env:MIZAJ_UPDATE_FEED_URL = 'http://127.0.0.1:8765/'
+            $env:MIZAJ_ENGINE_MODE = 'mock'
+            Start-Sleep -Seconds 2
+          }
           Push-Location desktop
           node scripts/update-e2e.mjs "$exe" "$want" "$ud"
           $uiExit = $LASTEXITCODE

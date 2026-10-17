@@ -174,12 +174,17 @@ export class UpdaterController {
     }
   }
 
-  /** flush autosave -> stop sidecar -> quitAndInstall(false, true). */
+  /**
+   * flush autosave -> stop sidecar -> quitAndInstall(true, true).
+   * Silent: the assisted (oneClick: false) NSIS installer would otherwise show its wizard
+   * and wait for clicks during an update; silent installs into the existing location and
+   * relaunches the app.
+   */
   async installNow(): Promise<void> {
     if (this.status.state !== 'downloaded') return
     await this.d.flushRenderer()
     await this.d.stopSidecar()
     this.stop()
-    this.d.updater.quitAndInstall(false, true)
+    this.d.updater.quitAndInstall(true, true)
   }
 }
