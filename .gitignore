@@ -1,0 +1,36 @@
+# Node / Electron / Vue
+node_modules/
+dist/
+dist-electron/
+out/
+release/
+*.log
+.DS_Store
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+env/
+.pytest_cache/
+.ruff_cache/
+build/
+*.spec
+
+# Models & Weights (Downloaded via scripts/download_models.py)
+backend/models/*.onnx
+backend/models/*.bin
+backend/models/*.pt
+
+# Local SQLite & Logs
+*.db
+*.db-shm
+*.db-wal
+logs/
+userData/
+
+# IDE
+.vscode/
+.idea/
