@@ -7,6 +7,9 @@ import StatusBar from './components/StatusBar.vue'
 import UpdateBanner from './components/UpdateBanner.vue'
 import RightPanel from './components/RightPanel.vue'
 import SettingsModal from './components/SettingsModal.vue'
+import ShortcutsDialog from './components/ShortcutsDialog.vue'
+import AboutDialog from './components/AboutDialog.vue'
+import { zoomAction } from './a11y/zoom'
 import { toastClass, toasts } from './api/toast'
 import { createAutosave } from './composables/autosave'
 import type { DocumentFull } from './api/client'
@@ -63,8 +66,26 @@ async function bootstrap(): Promise<void> {
   }
 }
 
+function onGlobalKey(e: KeyboardEvent): void {
+  const z = zoomAction(e)
+  if (z) {
+    e.preventDefault()
+    void settings.zoom(z)
+    return
+  }
+  if ((e.ctrlKey || e.metaKey) && e.key === '/') {
+    e.preventDefault()
+    editor.shortcutsOpen = !editor.shortcutsOpen
+  }
+}
+const focusEl = (sel: string): void => {
+  const el = document.querySelector<HTMLElement>(sel)
+  el?.focus()
+}
+
 onMounted(async () => {
   settings.applyToDom()
+  window.addEventListener('keydown', onGlobalKey)
   window.addEventListener('blur', flushNow)
   window.addEventListener('beforeunload', flushNow)
   offFlush = window.mizajAPI?.onBeforeQuitFlush(() => autosave.flush())
@@ -79,6 +100,7 @@ watch(
   }
 )
 onBeforeUnmount(() => {
+  window.removeEventListener('keydown', onGlobalKey)
   window.removeEventListener('blur', flushNow)
   window.removeEventListener('beforeunload', flushNow)
   offFlush?.()
@@ -91,11 +113,34 @@ onBeforeUnmount(() => {
     class="flex h-full flex-col bg-white text-slate-900 dark:bg-mizaj-slate dark:text-slate-100"
     data-testid="app-root"
   >
+    <a
+      href="#editor-region"
+      class="sr-only skip-link"
+      data-testid="skip-to-editor"
+      @click.prevent="focusEl('.cm-content')"
+      >انتقل إلى المحرر</a
+    >
+    <a
+      href="#sidebar"
+      class="sr-only skip-link"
+      data-testid="skip-to-sidebar"
+      @click.prevent="focusEl('[data-testid=new-project]')"
+      >انتقل إلى قائمة المشاريع</a
+    >
     <TitleBar />
     <UpdateBanner />
+    <div
+      class="sr-only"
+      role="status"
+      aria-live="polite"
+      aria-atomic="true"
+      data-testid="live-region"
+    >
+      {{ editor.announcement }}
+    </div>
     <div class="flex min-h-0 flex-1">
       <Sidebar @select-document="selectDocument" />
-      <main class="flex min-w-0 flex-1 flex-col">
+      <main class="flex min-w-0 flex-1 flex-col" aria-label="المحتوى الرئيسي">
         <div
           class="flex items-center justify-between border-b border-slate-200 px-3 py-1 dark:border-slate-700"
         >
@@ -121,7 +166,14 @@ onBeforeUnmount(() => {
     </div>
     <StatusBar />
     <SettingsModal v-if="showSettings" @close="showSettings = false" />
-    <div class="fixed bottom-10 start-3 z-50 space-y-2" data-testid="toasts">
+    <ShortcutsDialog v-if="editor.shortcutsOpen" />
+    <AboutDialog v-if="editor.aboutOpen" />
+    <div
+      class="fixed bottom-10 start-3 z-50 space-y-2"
+      role="region"
+      aria-label="الإشعارات"
+      data-testid="toasts"
+    >
       <div
         v-for="t in toasts"
         :key="t.id"

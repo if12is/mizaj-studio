@@ -1,0 +1,14 @@
+{
+  "headroom": "set from 3 local runs (median): load 10-26ms, long-line typing 29ms, scroll 60fps, run 17-26k words/s, undo 40-70ms. Times get ~4-5x headroom and rates ~0.25x so only real regressions (not slower shared CI runners) fail.",
+  "maxMs": {
+    "loadSampleMs": 150,
+    "typeLongLineMs": 150,
+    "undoRunMs": 300,
+    "undoRunSingleLineMs": 300
+  },
+  "minRate": {
+    "scrollFps": 25,
+    "runWordsPerSec": 4500,
+    "runSingleLineWordsPerSec": 4500
+  }
+}

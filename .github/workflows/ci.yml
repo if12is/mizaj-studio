@@ -102,3 +102,11 @@ jobs:
         run: |
           npm ci
           npm run test:e2e
+      - name: Performance budgets (7.7.2)
+        working-directory: ./desktop
+        env:
+          MIZAJ_PYTHON: python
+        run: npm run test:perf
+      - name: SBOM and license policy (npm + python)
+        working-directory: ./desktop
+        run: node scripts/sbom.cjs --python python --out sbom/sbom.json

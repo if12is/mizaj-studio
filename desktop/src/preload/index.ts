@@ -13,7 +13,7 @@ interface UpdaterStatus {
   percent?: number
   bytesPerSecond?: number
   message?: string
-  code?: 'not-packaged'
+  code?: 'not-packaged' | 'portable'
 }
 
 interface SidecarStatus {
@@ -54,6 +54,14 @@ const mizajAPI = {
     ipcRenderer.on('updater:status', handler)
     return () => ipcRenderer.removeListener('updater:status', handler)
   },
+  exportDiagnostics: (): Promise<string | null> => ipcRenderer.invoke('diagnostics:export'),
+  getAboutInfo: (): Promise<{
+    version: string
+    electron: string
+    license: string
+    portable: boolean
+    licenses: string | null
+  }> => ipcRenderer.invoke('about:info'),
   showOpenPackDialog: (): Promise<string | null> => ipcRenderer.invoke('dialog:open-pack'),
   showSaveDialog: (defaultName: string): Promise<string | null> =>
     ipcRenderer.invoke('dialog:save-docx', defaultName),

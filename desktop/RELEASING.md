@@ -76,3 +76,37 @@ by providing a certificate secret (`CSC_LINK` / `CSC_KEY_PASSWORD`) to electron-
 
 Local packaging check without GitHub: `npm run dist:linux` (AppImage) or `npm run dist:win`
 on Windows (`--publish never`).
+
+## Portable build (Windows)
+
+`npm run dist:win:portable` builds `Mizaj-Studio-Portable-<version>.exe` (electron-builder `portable`
+target). When it runs, electron-builder sets `PORTABLE_EXECUTABLE_DIR`; the app then keeps its
+user data (SQLite database, logs, updated model packs, crash reports) in `MizajData` next to the
+exe. The in-app updater is disabled in the portable build (a portable exe cannot replace itself);
+the settings page says so. Note: SQLite WAL on USB or network drives can be corrupted by removing
+the drive abruptly; close the app first.
+
+## SBOM and license compliance
+
+`node scripts/sbom.cjs --python <python-with-backend-deps>` writes a CycloneDX 1.5 `sbom/sbom.json`
+(npm production packages via `npm sbom`, the engine's runtime Python packages, bundled models and
+fonts) and `build/THIRD_PARTY_LICENSES.txt`, which is shipped inside the app (About dialog) next to
+`LICENSE.txt` (GPL-3.0). It fails when a component's license is incompatible with
+GPL-3.0-or-later (GPL-2.0-only, proprietary, non-commercial, ...); reviewed exceptions go in
+`scripts/license-exceptions.json`. The Release workflow runs it before packaging and attaches
+`sbom.json` to the GitHub Release; CI runs it too.
+
+## Performance budgets
+
+`npm run test:perf` (built app + real sidecar, mock engine, under xvfb) measures document load,
+typing in a very long line, scroll FPS, tashkeel throughput and undo time, and fails when a median
+exceeds `perf/budgets.json`. Budgets are the locally measured numbers with 4-5x headroom for times
+and 0.25x for rates (shared CI runners are slower and noisier). Run with `PERF_REPORT=1` to print the
+measured values when you want to re-tune them.
+
+## Diagnostics and crash reports (local only)
+
+Settings > المساعدة > «إنشاء حزمة تشخيص» saves a zip (versions, `/health`, whitelisted settings and
+sanitized log tails, no document text) wherever the user chooses; nothing is sent. Uncaught
+exceptions, renderer/child process crashes and sidecar crashes also write a small sanitized JSON
+report to `<userData>/crash/`, which is included in that bundle.

@@ -37,8 +37,14 @@ def mask_spans(text: str) -> list[tuple[int, int]]:
 
 
 class Masker:
-    def __init__(self, text: str) -> None:
-        self.spans = mask_spans(text)
+    def __init__(self, text: str, extra: list[tuple[int, int]] | None = None) -> None:
+        merged: list[tuple[int, int]] = []
+        for s, e in sorted([*mask_spans(text), *(extra or [])]):
+            if merged and s <= merged[-1][1]:
+                merged[-1] = (merged[-1][0], max(e, merged[-1][1]))
+            else:
+                merged.append((s, e))
+        self.spans = merged
         self._starts = [s for s, _ in self.spans]
 
     def covers(self, pos: int) -> bool:

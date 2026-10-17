@@ -151,11 +151,13 @@ def override_word(
     glossary_pairs: list[tuple[str, str]],
     shift: int,
     skip: int,
+    keep_final: bool = False,
 ) -> list[tuple[str, str]]:
     """Replace the marks of aligned letters by the glossary's marks (text letter `shift + j` <->
     glossary letter `j`). The final letter keeps only the glossary's shadda (plus the engine's
     tanween) - the case ending is not the glossary's call. The first `skip` glossary letters
-    (the merged lam of "لل") keep the engine's marks."""
+    (the merged lam of "لل") keep the engine's marks. With `keep_final` the engine's whole
+    last-letter mark (the case ending) is kept (proper nouns)."""
     out = list(engine_pairs)
     last = len(out) - 1
     for j, (_, gm) in enumerate(glossary_pairs):
@@ -163,7 +165,10 @@ def override_word(
         if j < skip or not 0 <= pos <= last:
             continue
         base, em = out[pos]
-        if pos == last:
+        if pos == last and keep_final:
+            if SHADDA in gm and SHADDA not in em:
+                out[pos] = (base, SHADDA + em)
+        elif pos == last:
             out[pos] = (
                 base,
                 (SHADDA if SHADDA in gm else "") + "".join(c for c in em if c in TANWEEN),

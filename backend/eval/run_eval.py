@@ -20,15 +20,34 @@ import time
 from pathlib import Path
 from typing import Any
 
+from eval.calibration import calibration
 from eval.corpus import GOLD_DIR, load_corpus, load_gold
 from eval.metrics import compute
 
 EVAL_DIR = Path(__file__).resolve().parent
-ALL_ENGINES = ("mock", "fast", "accurate", "accurate-nofilter")
+# name -> pipeline options. "accurate" is CATT alone (the morph filter is a separate variant).
+SPECS: dict[str, dict[str, Any]] = {
+    "mock": {"mode": "fast", "mock": True},
+    "fast": {"mode": "fast"},
+    "accurate": {"mode": "accurate", "morph": False},
+    "accurate+mf1": {"mode": "accurate", "morph": True, "morph_version": "1"},
+    "accurate+mf2": {"mode": "accurate", "morph": True, "morph_version": "2"},
+    "accurate+irab": {"mode": "accurate", "morph": False, "irab": True},
+    "accurate+mf2+irab": {"mode": "accurate", "morph": True, "morph_version": "2", "irab": True},
+    "accurate-int8": {"mode": "accurate", "morph": False, "precision": "int8"},
+    "accurate-int8+mf2": {
+        "mode": "accurate",
+        "morph": True,
+        "morph_version": "2",
+        "precision": "int8",
+    },
+    "accurate-int8-attn": {"mode": "accurate", "morph": False, "precision": "int8-attn"},
+}
+ALL_ENGINES = ("mock", "fast", "accurate", "accurate+mf1", "accurate+mf2", "accurate-int8+mf2")
 PRIMARY = ("with_case_ending", "all")  # the number used for regression checks
 
 
-async def _run_engine(name: str, sentences: list[str], data_dir: Path) -> tuple[list[str], float]:
+async def _run_engine(name: str, sentences: list[str], data_dir: Path):
     from app.core.database import connect
     from app.engine import config
     from app.engine.executor import run_blocking
@@ -36,37 +55,50 @@ async def _run_engine(name: str, sentences: list[str], data_dir: Path) -> tuple[
     from app.engine.manager import manager
     from app.engine.normalize import strip_marks
 
-    if name == "mock":
+    if name == "shakkala":
+        from eval.candidates import run_shakkala
+
+        t0 = time.perf_counter()
+        outs = await run_blocking(run_shakkala, [strip_marks(s) for s in sentences])
+        return outs, time.perf_counter() - t0, [[] for _ in sentences]
+    spec = SPECS.get(name)
+    if spec is None:
+        raise RuntimeError(f"unknown engine spec '{name}'")
+    if spec.get("mock"):
         os.environ["MIZAJ_ENGINE_MODE"] = "mock"
     else:
         os.environ.pop("MIZAJ_ENGINE_MODE", None)
+    os.environ["MIZAJ_MORPH_VERSION"] = spec.get("morph_version", "2")
+    os.environ["MIZAJ_CATT_PRECISION"] = spec.get("precision", "float")
     manager.reset()
-    mode = "accurate" if name.startswith("accurate") else "fast"
+    mode = spec["mode"]
     if mode == "accurate" and not config.model_present():
         raise RuntimeError("CATT model not available")
+    if spec.get("precision", "float") != "float" and not config.int8_available():
+        raise RuntimeError("INT8 encoder not available (run scripts/quantize_catt.py)")
     pipeline = await build_pipeline(
         mode,
         "full",
         keep_existing=False,
-        morph_filter=None if name != "accurate-nofilter" else False,
+        morph_filter=spec.get("morph", False),
         use_cache=False,
+        irab_rules=spec.get("irab", False),
+        use_names=False,  # measure the engine, not the dictionary
+        protect_quran=False,
     )
-    if name == "accurate":
-        pipeline_filter = pipeline.morph is not None
-        if not pipeline_filter:
-            raise RuntimeError("morph filter disabled by MIZAJ_MORPH_FILTER")
     db = data_dir / "mizaj.db"
 
-    def work() -> list[str]:
+    def work():
         conn = connect(db)
         try:
-            return [pipeline.run_text(conn, strip_marks(s)) for s in sentences]
+            res = [pipeline.run_text_ex(conn, strip_marks(s)) for s in sentences]
+            return [r[0] for r in res], [r[1] for r in res]
         finally:
             conn.close()
 
     t0 = time.perf_counter()
-    preds = await run_blocking(work)
-    return preds, time.perf_counter() - t0
+    preds, wconfs = await run_blocking(work)
+    return preds, time.perf_counter() - t0, wconfs
 
 
 def evaluate(
@@ -91,13 +123,14 @@ def evaluate(
         logging.getLogger().setLevel(logging.WARNING)
         for name in engines:
             try:
-                preds, secs = asyncio.run(_run_engine(name, sentences, data_dir))
+                preds, secs, wconfs = asyncio.run(_run_engine(name, sentences, data_dir))
             except RuntimeError as exc:
                 results["engines"][name] = {"skipped": str(exc)}
                 if progress:
                     print(f"[SKIP] {name}: {exc}", file=sys.stderr)
                 continue
             m = compute(sentences, preds)
+            m["calibration"] = calibration(sentences, preds, wconfs)
             m["seconds"] = round(secs, 2)
             m["words_per_second"] = round(n_words / secs, 1) if secs else None
             by_cat: dict[str, Any] = {}

@@ -43,6 +43,7 @@ export function mizajKeymap(onDiacritize: () => void): KeyBinding[] {
     { key: 'Mod-Shift-r', preventDefault: true, run: stripSelection },
     { key: 'Mod-Shift-c', preventDefault: true, run: copyStripped },
     { key: 'Ctrl-Space', preventDefault: true, run: (v) => openInspectorAt(v) },
+    { key: 'Mod-.', preventDefault: true, run: (v) => openInspectorAt(v) },
     { key: 'Escape', run: closeInspector }
   ]
 }

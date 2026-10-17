@@ -43,27 +43,39 @@ async function copy(): Promise<void> {
 
 <template>
   <div class="space-y-2 p-3 text-sm" data-testid="date-tool">
-    <input v-model="date" type="date" :class="field" class="w-full" data-testid="date-input" />
+    <input
+      v-model="date"
+      type="date"
+      :class="field"
+      class="w-full"
+      aria-label="التاريخ"
+      data-testid="date-input"
+    />
     <div class="grid grid-cols-2 gap-2">
-      <select v-model="calendar" :class="field" data-testid="date-calendar">
+      <select v-model="calendar" :class="field" data-testid="date-calendar" aria-label="التقويم">
         <option value="gregorian">ميلادي</option>
         <option value="hijri">هجري</option>
       </select>
-      <select v-model="adjust" :class="field" title="تعديل التقويم الهجري">
+      <select
+        v-model="adjust"
+        :class="field"
+        title="تعديل التقويم الهجري"
+        aria-label="تعديل الهجري"
+      >
         <option :value="-1">هجري −1</option>
         <option :value="0">هجري 0</option>
         <option :value="1">هجري +1</option>
       </select>
-      <select v-model="names" :class="field">
+      <select v-model="names" :class="field" aria-label="أسماء الأشهر">
         <option value="gulf">أسماء الأشهر (الخليج)</option>
         <option value="levant">أسماء الأشهر (الشام)</option>
       </select>
-      <select v-model="cas" :class="field">
+      <select v-model="cas" :class="field" aria-label="حالة الإعراب">
         <option value="nominative">مرفوع</option>
         <option value="accusative">منصوب</option>
         <option value="genitive">مجرور</option>
       </select>
-      <select v-model="spelling" :class="field">
+      <select v-model="spelling" :class="field" aria-label="رسم المئة">
         <option value="ma'a">مائة</option>
         <option value="mi'a">مئة</option>
       </select>

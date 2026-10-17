@@ -57,6 +57,18 @@ class MockEngine(Engine):
             out.append(cached if cached and strip_marks(cached) == w else _mock_word(w))
         return out
 
+    def diacritize_scored(self, words, lookup=None):
+        """Deterministic mock confidence: 1.0 for cached/dictionary words, else 0.95 (0.4 for
+        3-letter words, which the mock treats as ambiguous)."""
+        found = lookup(sorted(set(words))) if lookup is not None else {}
+        outs = self.diacritize(words, lookup)
+        confs = []
+        for w in words:
+            hit = bool(found.get(w)) and strip_marks(found[w]) == w
+            c = 1.0 if hit else (0.4 if len(w) == 3 else 0.95)
+            confs.append((c, c))
+        return outs, confs
+
     def is_ambiguous(self, word: str) -> bool:
         """Mock `minimal` rule: 'ambiguous' iff the bare word has exactly 3 letters."""
         return len(strip_marks(word)) == 3

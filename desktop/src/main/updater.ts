@@ -16,7 +16,7 @@ export interface UpdaterStatus {
   bytesPerSecond?: number
   message?: string
   /** 'not-packaged' when updates are requested from a development run */
-  code?: 'not-packaged'
+  code?: 'not-packaged' | 'portable'
 }
 
 export const UPDATER_STATUS_CHANNEL = 'updater:status'
@@ -43,6 +43,8 @@ export interface LoggerLike {
 export interface UpdaterDeps {
   updater: UpdaterLike
   isPackaged: boolean
+  /** portable build: a self-updating portable exe is impossible, updates are disabled */
+  portable?: boolean
   send: (status: UpdaterStatus) => void
   /** Ask the renderer(s) to flush autosave (resolves after reply or timeout). */
   flushRenderer: () => Promise<void>
@@ -116,7 +118,7 @@ export class UpdaterController {
 
   /** Schedule: first automatic check after 10s, then every 6h (packaged only). */
   start(): void {
-    if (!this.d.isPackaged) return
+    if (!this.d.isPackaged || this.d.portable) return
     const st = this.d.setTimeoutFn ?? setTimeout
     const si = this.d.setIntervalFn ?? setInterval
     this.timers.first = st(() => {
@@ -140,15 +142,15 @@ export class UpdaterController {
   }
 
   private tick(): void {
-    if (this.autoCheck !== true || !this.d.isPackaged) return
+    if (this.autoCheck !== true || !this.d.isPackaged || this.d.portable) return
     this.autoChecked = true
     void this.check(false)
   }
 
   /** Manual checks work regardless of the toggle. */
   async check(manual: boolean): Promise<UpdaterStatus> {
-    if (!this.d.isPackaged) {
-      if (manual) this.set({ state: 'idle', code: 'not-packaged' })
+    if (!this.d.isPackaged || this.d.portable) {
+      if (manual) this.set({ state: 'idle', code: this.d.portable ? 'portable' : 'not-packaged' })
       return this.status
     }
     const busy = this.status.state === 'checking' || this.status.state === 'downloading'

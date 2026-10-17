@@ -1,0 +1,4 @@
+{
+  "_comment": "Bare words that the context-aware 'minimal' level always diacritizes (traditionally ambiguous in unvocalized text). Short, editable; the lexical ambiguity oracle and the engine confidence cover the rest.",
+  "always_diacritize": ["علم", "عقد", "حكم", "كتب", "قدر", "امر", "أمر", "شرط", "وكالة", "حق", "دين", "ملك", "ظن", "جمع", "قسم", "عدل", "فرض", "رهن"]
+}

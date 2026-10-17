@@ -18,6 +18,7 @@ import { applyToAllEdits, diffMarkEdits, editsToSpec, stripEdits } from './markE
 import { applyHarakaSpec, applyToAllSpec } from './inspector'
 import { RunSession, type StreamChunk } from './runSession'
 import { editorPaletteClass } from './fontClass'
+import { paragraphsFor } from './paragraphs'
 
 const mk = (doc: string, anchor = 0, head = anchor) =>
   EditorState.create({
@@ -288,5 +289,26 @@ describe('RunSession performance', () => {
     expect(stripMarks(s.doc.toString())).toBe(text)
     undo({ state: s, dispatch: (tr) => (s = s.update(tr).state) })
     expect(s.doc.toString()).toBe(text)
+  })
+})
+
+describe('paragraph ranges (7.2.2)', () => {
+  const doc = EditorState.create({
+    doc: 'سطر أول\n\nIt is English only\nنص mixed مع English عربي\nآخر سطر'
+  }).doc
+  it('no selection: the paragraph at the cursor; non-Arabic lines are skipped', () => {
+    expect(paragraphsFor(doc, 2, 2)).toEqual([{ from: 0, to: 7, text: 'سطر أول' }])
+    expect(paragraphsFor(doc, 9, 9)).toEqual([]) // blank
+    expect(paragraphsFor(doc, 12, 12)).toEqual([]) // English only
+  })
+  it('mixed bidi paragraphs stay whole', () => {
+    const p = paragraphsFor(doc, 30, 30)
+    expect(p).toHaveLength(1)
+    expect(p[0].text).toBe('نص mixed مع English عربي')
+  })
+  it('selection: every touched Arabic paragraph, clipped to the selection', () => {
+    const r = paragraphsFor(doc, 2, doc.length)
+    expect(r.map((x) => x.text)).toEqual(['ر أول', 'نص mixed مع English عربي', 'آخر سطر'])
+    expect(doc.sliceString(r[0].from, r[0].to)).toBe('ر أول')
   })
 })

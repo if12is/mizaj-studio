@@ -23,10 +23,11 @@ class ArabicSentenceSplitter:
     (unless a single whitespace-free token is longer than `max_chars`). The concatenation of
     all chunks is exactly the input (separators are preserved, attached to the chunk end)."""
 
-    def __init__(self, max_chars: int = MAX_CHARS) -> None:
+    def __init__(self, max_chars: int = MAX_CHARS, line_mode: bool = False) -> None:
         if max_chars < 8:
             raise ValueError("max_chars too small")
         self.max_chars = max_chars
+        self.line_mode = line_mode  # poetry: never merge lines into one chunk
         self.min_fill = max_chars // 4
 
     def _break(self, text: str, pos: int) -> int:
@@ -63,10 +64,27 @@ class ArabicSentenceSplitter:
         return k
 
     def split(self, text: str) -> list[Chunk]:
+        if self.line_mode:
+            return self._split_lines(text)
+        return self._split_free(text, 0, len(text))
+
+    def _split_lines(self, text: str) -> list[Chunk]:
         chunks: list[Chunk] = []
         pos = 0
         while pos < len(text):
-            end = self._break(text, pos)
+            nl = text.find("\n", pos)
+            end = len(text) if nl < 0 else nl + 1
+            for c in self._split_free(text, pos, end):
+                chunks.append(Chunk(len(chunks), c.start, c.end, c.text))
+            pos = end
+        return chunks
+
+    def _split_free(self, text: str, lo: int, hi: int) -> list[Chunk]:
+        chunks: list[Chunk] = []
+        pos = lo
+        while pos < hi:
+            end = min(self._break(text, pos), hi) if hi < len(text) else self._break(text, pos)
+            end = min(end, hi)
             chunks.append(Chunk(len(chunks), pos, end, text[pos:end]))
             pos = end
         return chunks

@@ -114,6 +114,26 @@ class MishkalEngine(Engine):
     def candidates(self, word: str) -> tuple[tuple[str, str, int], ...]:
         return self._candidates(strip_marks(word))
 
+    def diacritize_scored(self, words, lookup=None):
+        """Confidence from the analysis: one candidate vocalization -> high; several distinct
+        internal patterns -> 1/n; unknown word -> low. The case ending is only trusted when the
+        word has a single analysis (mishkal's context handling of i'rab is weak)."""
+        outs = self.diacritize(words, lookup)
+        confs = []
+        for w in words:
+            cands = self.candidates(w)
+            if not cands:
+                confs.append((0.4, 0.4))
+                continue
+            patterns = set()
+            for voc, _, _ in cands:
+                pairs = split_pairs(voc)
+                patterns.add(tuple(m.replace(SHADDA, "") for _, m in pairs[:-1]))
+            wc = 0.95 if len(patterns) == 1 else max(0.2, 1.0 / len(patterns))
+            ic = 0.95 if len(cands) == 1 else 0.4
+            confs.append((wc, ic))
+        return outs, confs
+
     def is_ambiguous(self, word: str) -> bool:
         """>1 common vocalization: among candidates with freq>0 (all, if none has freq>0),
         count distinct internal vowel patterns (last-letter case ending and shadda ignored).
@@ -149,3 +169,42 @@ def _quiet_third_party_del_errors() -> None:
 
 
 _quiet_third_party_del_errors()
+
+
+def _noun_only(self: MishkalEngine, word: str) -> bool:
+    """True if every qalsadi analysis of `word` is a noun (so a case rule may apply)."""
+    cands = self.candidates(word)
+    return bool(cands) and all(pos.startswith("اسم") for _, pos, _ in cands)
+
+
+MishkalEngine.is_noun_only = _noun_only  # type: ignore[attr-defined]
+
+
+def _analyses(self: MishkalEngine, word: str) -> list[dict]:
+    """Full qalsadi analyses of a bare word (vocalized, kind, tags, root, lemma, freq)."""
+    bare = strip_marks(word)
+    cache = self.__dict__.setdefault("_analysis_cache", {})
+    if bare not in cache:
+        result = self._pool.submit(self._analex.check_text, bare).result()
+        out = []
+        for group in result:
+            for sw in group:
+                if not sw.vocalized or strip_marks(sw.vocalized) != bare:
+                    continue
+                out.append(
+                    {
+                        "vocalized": sw.vocalized,
+                        "type": sw.type or "",
+                        "tags": sw.tags or "",
+                        "root": getattr(sw, "root", "") or "",
+                        "lemma": getattr(sw, "original", "") or "",
+                        "freq": int(getattr(sw, "freq", 0) or 0),
+                    }
+                )
+        if len(cache) > 20000:
+            cache.clear()
+        cache[bare] = out
+    return cache[bare]
+
+
+MishkalEngine.analyses = _analyses  # type: ignore[attr-defined]

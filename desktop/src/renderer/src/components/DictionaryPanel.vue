@@ -62,6 +62,7 @@ async function doImport(ev: Event): Promise<void> {
       <input
         v-model="dict.query"
         class="flex-1 rounded border px-2 py-1 dark:border-slate-600 dark:bg-slate-800"
+        aria-label="بحث..."
         placeholder="بحث..."
         data-testid="dict-search"
         @input="dict.load()"
@@ -89,12 +90,14 @@ async function doImport(ev: Event): Promise<void> {
       <input
         v-model="word"
         class="flex-1 rounded border px-2 py-1 dark:border-slate-600 dark:bg-slate-800"
+        aria-label="الكلمة"
         placeholder="الكلمة"
         data-testid="dict-new-word"
       />
       <input
         v-model="form"
         class="flex-1 rounded border px-2 py-1 dark:border-slate-600 dark:bg-slate-800"
+        aria-label="الصيغة المشكولة"
         placeholder="الصيغة المشكولة"
         data-testid="dict-new-form"
       />

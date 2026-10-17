@@ -21,7 +21,7 @@ declare global {
     percent?: number
     bytesPerSecond?: number
     message?: string
-    code?: 'not-packaged'
+    code?: 'not-packaged' | 'portable'
   }
 
   interface MizajAPI {
@@ -36,6 +36,14 @@ declare global {
     windowClose(): Promise<void>
     getPathForFile(file: File): string
     showOpenPackDialog(): Promise<string | null>
+    exportDiagnostics(): Promise<string | null>
+    getAboutInfo(): Promise<{
+      version: string
+      electron: string
+      license: string
+      portable: boolean
+      licenses: string | null
+    }>
     getUpdaterStatus(): Promise<UpdaterStatus>
     checkForUpdates(): Promise<UpdaterStatus>
     downloadUpdate(): Promise<void>

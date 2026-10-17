@@ -3,12 +3,15 @@ import { EventEmitter } from 'node:events'
 import { autoUpdater } from 'electron-updater'
 import { resolve } from 'node:path'
 import { initLogger } from './logger'
+import { isPortable, resolveUserDataDir } from './paths'
+import { registerDiagnostics } from './diagnosticsIpc'
 import { PythonProcessManager, resolveSidecar, STATUS_EVENT } from './pythonManager'
 import { broadcastStatus, createMainWindow, registerIpc, requestFlush } from './window'
 import { UPDATER_STATUS_CHANNEL, UpdaterController, type UpdaterLike } from './updater'
 
 // Tests only: isolate user data (must run before anything reads userData).
-if (process.env.MIZAJ_USER_DATA_DIR) app.setPath('userData', process.env.MIZAJ_USER_DATA_DIR)
+const userDataOverride = resolveUserDataDir(process.env)
+if (userDataOverride) app.setPath('userData', userDataOverride)
 
 const log = initLogger()
 
@@ -53,6 +56,7 @@ if (app.isPackaged && process.env.MIZAJ_UPDATE_FEED_URL) {
 const updater = new UpdaterController({
   updater: (app.isPackaged ? autoUpdater : new StubUpdater()) as unknown as UpdaterLike,
   isPackaged: app.isPackaged,
+  portable: isPortable(process.env),
   logger: log as never,
   send: (s) => {
     for (const w of BrowserWindow.getAllWindows()) {
@@ -92,6 +96,8 @@ Menu.setApplicationMenu(
     ? Menu.buildFromTemplate([{ role: 'appMenu' }, { role: 'editMenu' }])
     : null
 )
+
+registerDiagnostics({ manager, log, portable: isPortable(process.env) })
 
 void app.whenReady().then(() => {
   log.info('Mizaj Studio starting, userData=', app.getPath('userData'))

@@ -119,8 +119,21 @@ jobs:
       - name: Download CATT models (sha256 verified)
         run: python scripts/download_models.py
 
+      - name: Quantize CATT encoder to INT8 (fails if DER regresses > 0.3 pt)
+        env:
+          MIZAJ_ENGINE_MODE: real
+        run: python scripts/quantize_catt.py --guard 0.3
+
+      # Bootloader compiled from source + VERSIONINFO: avoids the prebuilt-bootloader
+      # signatures that trigger antivirus false positives (see desktop/WINDOWS_DEFENDER.md).
       - name: Build frozen engine (PyInstaller)
-        run: python scripts/build_backend.py
+        env:
+          MIZAJ_VERSION: ${{ steps.version.outputs.version }}
+        run: python scripts/build_backend.py --rebuild-bootloader
+
+      - name: Generate SBOM and third-party license report (fails on incompatible licenses)
+        working-directory: desktop
+        run: node scripts/sbom.cjs --python python --out sbom/sbom.json
 
       - name: Smoke-test frozen engine
         run: ./desktop/scripts/smoke-engine.ps1 -DataDir "$env:RUNNER_TEMP\smoke"
@@ -139,6 +152,7 @@ jobs:
           name: mizaj-studio-windows-${{ steps.version.outputs.version }}
           if-no-files-found: error
           path: |
+            desktop/sbom/sbom.json
             desktop/dist/*.exe
             desktop/dist/latest.yml
             desktop/dist/*.blockmap
@@ -146,6 +160,10 @@ jobs:
       - name: Set release notes
         if: steps.mode.outputs.publish == 'true'
         run: gh release edit "v${{ steps.version.outputs.version }}" --repo "${{ github.repository }}" --notes-file "$env:RUNNER_TEMP/release-notes.md"
+
+      - name: Attach SBOM to the release
+        if: steps.mode.outputs.publish == 'true'
+        run: gh release upload "v${{ steps.version.outputs.version }}" desktop/sbom/sbom.json --repo "${{ github.repository }}" --clobber
 
       - name: Verify release assets
         if: steps.mode.outputs.publish == 'true'
@@ -155,6 +173,6 @@ jobs:
           if ($rel.isDraft) { throw "Release v$v is still a draft" }
           $names = $rel.assets | ForEach-Object { $_.name }
           Write-Host "assets: $($names -join ', ')"
-          foreach ($need in @("Mizaj-Studio-Setup-$v.exe", 'latest.yml')) {
+          foreach ($need in @("Mizaj-Studio-Setup-$v.exe", 'latest.yml', 'sbom.json')) {
             if ($names -notcontains $need) { throw "Missing release asset: $need" }
           }

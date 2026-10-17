@@ -27,6 +27,7 @@ async function submitDoc(): Promise<void> {
 <template>
   <aside
     class="flex w-64 shrink-0 flex-col border-l border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-900/60"
+    aria-label="المشاريع والمستندات"
     data-testid="sidebar"
   >
     <div class="flex items-center justify-between px-3 py-2">

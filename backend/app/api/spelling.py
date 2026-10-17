@@ -17,9 +17,12 @@ from pydantic import BaseModel, Field
 from app.core.database import connect, now_iso, write
 from app.core.errors import MizajError, validation_error
 from app.engine.executor import run_blocking
+from app.quran.detect import find_protected_spans
 from app.spelling.engine import get_engine
 from app.spelling.service import ALL_CHECKS, check_text
+from app.spelling.style import analyze
 from app.spelling.text import strip_for_lookup
+from app.spelling.typography import TypographyOptions, propose_edits
 
 router = APIRouter(prefix="/api/spelling", tags=["spelling"])
 
@@ -29,8 +32,19 @@ MAX_WORD_LEN = 64
 
 class CheckIn(BaseModel):
     text: str = Field(max_length=5_000_000)
-    checks: list[Literal["dictionary", "patterns", "punctuation"]] | None = None
+    checks: list[Literal["dictionary", "patterns", "punctuation", "typography"]] | None = None
     max_issues: int = Field(default=1000, ge=1, le=10_000)
+
+
+class NormalizeIn(BaseModel):
+    text: str = Field(max_length=5_000_000)
+    options: TypographyOptions = Field(default_factory=TypographyOptions)
+
+
+class ReadabilityIn(BaseModel):
+    text: str = Field(max_length=5_000_000)
+    max_sentence_words: int = Field(default=30, ge=5, le=500)
+    max_paragraph_words: int = Field(default=150, ge=20, le=5000)
 
 
 class SuggestIn(BaseModel):
@@ -93,7 +107,7 @@ def _normalize_word(word: str) -> str:
     return k
 
 
-def _check(db_path: Path, body: CheckIn) -> dict:
+def _check(db_path: Path, body: CheckIn, data_dir: Path | None = None) -> dict:
     eng = _engine()
     conn = connect(db_path)
     try:
@@ -102,7 +116,13 @@ def _check(db_path: Path, body: CheckIn) -> dict:
     finally:
         conn.close()
     checks = tuple(body.checks) if body.checks is not None else ALL_CHECKS
-    return check_text(body.text, eng, checks, body.max_issues, known, ignored)
+    protected: list[tuple[int, int]] = []
+    if data_dir is not None:  # Quranic verses are never spell-checked or "corrected"
+        try:
+            protected = find_protected_spans(body.text, data_dir)
+        except Exception:  # noqa: BLE001 - protection is best-effort for the checker
+            protected = []
+    return check_text(body.text, eng, checks, body.max_issues, known, ignored, protected)
 
 
 def _ignore_op(db_path: Path, op: str, word: str | None) -> dict:
@@ -144,7 +164,9 @@ def _status() -> dict:
 
 @router.post("/check")
 async def check(body: CheckIn, request: Request) -> dict:
-    return await run_blocking(_check, request.app.state.db_path, body)
+    return await run_blocking(
+        _check, request.app.state.db_path, body, getattr(request.app.state, "data_dir", None)
+    )
 
 
 def _suggest(db_path: Path, body: SuggestIn) -> dict:
@@ -188,3 +210,37 @@ async def remove_ignore(word: str, request: Request) -> dict:
 @router.get("/status")
 async def status() -> dict:
     return await run_blocking(_status)
+
+
+def _normalize(data_dir: Path | None, body: NormalizeIn) -> dict:
+    protected: list[tuple[int, int]] = []
+    if data_dir is not None:
+        try:
+            protected = find_protected_spans(body.text, data_dir)
+        except Exception:  # noqa: BLE001
+            protected = []
+    return propose_edits(body.text, body.options, protected)
+
+
+@router.post("/normalize")
+async def normalize(body: NormalizeIn, request: Request) -> dict:
+    """7.9.6: proposed typography edits (+ a preview string). Never applied or stored."""
+    return await run_blocking(_normalize, getattr(request.app.state, "data_dir", None), body)
+
+
+def _readability(data_dir: Path | None, body: ReadabilityIn) -> dict:
+    protected: list[tuple[int, int]] = []
+    if data_dir is not None:
+        try:
+            protected = find_protected_spans(body.text, data_dir)
+        except Exception:  # noqa: BLE001
+            protected = []
+    return analyze(
+        body.text, body.max_sentence_words, body.max_paragraph_words, protected=protected
+    )
+
+
+@router.post("/readability")
+async def readability(body: ReadabilityIn, request: Request) -> dict:
+    """7.9.7: approximate OSMAN readability + style hints (indicators, not verdicts)."""
+    return await run_blocking(_readability, getattr(request.app.state, "data_dir", None), body)

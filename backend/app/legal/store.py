@@ -10,8 +10,12 @@ from typing import Any
 from app.core.database import connect, now_iso, write
 from app.legal.templates import TemplateError, normalize_vars, validate_template
 
-DATA = Path(__file__).resolve().parent / "data" / "templates.json"
-SEED_KEY = "legal_templates_seeded"
+DATA_DIR = Path(__file__).resolve().parent / "data"
+DATA = DATA_DIR / "templates.json"
+# (data file, seed key): each pack is seeded once, so new packs reach existing databases too.
+SEED_PACKS = [(DATA, "legal_templates_seeded"),
+              (DATA_DIR / "templates_official.json", "legal_templates_official_seeded")]  # fmt: skip
+SEED_KEY = SEED_PACKS[0][1]
 
 
 def row_to_template(r: sqlite3.Row, with_body: bool = True) -> dict[str, Any]:
@@ -53,16 +57,19 @@ def save_template(
 
 
 def seed_templates(db_path: Path) -> int:
-    """Insert the starter templates once (users may edit or delete them afterwards)."""
+    """Insert the starter templates once per pack (users may edit or delete them afterwards)."""
     conn = connect(db_path)
+    total = 0
     try:
-        if conn.execute("SELECT 1 FROM legal_meta WHERE key=?", (SEED_KEY,)).fetchone():
-            return 0
-        templates = json.loads(DATA.read_text(encoding="utf-8"))["templates"]
-        with write(conn):
-            for t in templates:
-                save_template(conn, {**t, "is_sample": True})
-            conn.execute("INSERT INTO legal_meta(key, value) VALUES (?, '1')", (SEED_KEY,))
-        return len(templates)
+        for data_file, key in SEED_PACKS:
+            if conn.execute("SELECT 1 FROM legal_meta WHERE key=?", (key,)).fetchone():
+                continue
+            templates = json.loads(data_file.read_text(encoding="utf-8"))["templates"]
+            with write(conn):
+                for t in templates:
+                    save_template(conn, {**t, "is_sample": True})
+                conn.execute("INSERT INTO legal_meta(key, value) VALUES (?, '1')", (key,))
+            total += len(templates)
+        return total
     finally:
         conn.close()

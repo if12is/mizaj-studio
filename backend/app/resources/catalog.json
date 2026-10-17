@@ -1,0 +1,57 @@
+{
+  "version": 1,
+  "resources": [
+    {
+      "id": "tanzil-quran-uthmani",
+      "name": "Tanzil Quran text (Uthmani, verbatim)",
+      "kind": "quran-text",
+      "url": "https://tanzil.net/pub/download/index.php?quranType=uthmani&outType=txt-2&agree=true",
+      "filename": "quran-uthmani.txt",
+      "sha256": null,
+      "size": null,
+      "license": "CC BY 3.0",
+      "license_url": "https://tanzil.net/docs/Text_License",
+      "attribution": "Tanzil Project (tanzil.net). The text must be reproduced verbatim and the Tanzil attribution kept.",
+      "notes": "Checksum could not be verified from the build environment (host unreachable); download the file from tanzil.net yourself and import it with POST /api/resources/{id}/import. Tanzil generates the file through a form, so its hash may change between releases."
+    },
+    {
+      "id": "ayaspell-ar",
+      "name": "ayaspell Arabic Hunspell dictionary (ar.dic)",
+      "kind": "spell-dictionary",
+      "url": "https://raw.githubusercontent.com/LibreOffice/dictionaries/master/ar/ar.dic",
+      "filename": "ar.dic",
+      "sha256": "2a3e5367f61c1583734db9d66734f5603e6be5c2d227cf5c5cd7e4ca586e34fe",
+      "size": null,
+      "license": "GPL-2.0-or-later OR LGPL-2.1-or-later OR MPL-1.1+",
+      "license_url": "https://github.com/linuxscout/ayaspell",
+      "attribution": "ayaspell, Taha Zerrouki et al.",
+      "notes": "Hash is of release 3.5 as bundled in app/spelling/data (README there). A newer upstream version will fail verification until the catalog is updated."
+    },
+    {
+      "id": "tashkeela-sample",
+      "name": "Tashkeela corpus (sample, evaluation only)",
+      "kind": "corpus",
+      "url": "https://sourceforge.net/projects/tashkeela/files/latest/download",
+      "filename": "tashkeela.zip",
+      "sha256": null,
+      "size": null,
+      "license": "GPL-2.0",
+      "license_url": "https://sourceforge.net/projects/tashkeela/",
+      "attribution": "Tashkeela: Zerrouki & Balla, Data in Brief 2017.",
+      "notes": "Evaluation use only; sourceforge is not on the download allowlist, so provide the file yourself via /import."
+    },
+    {
+      "id": "catt-eo-onnx",
+      "name": "CATT encoder-only ONNX models (abjadai/catt v2)",
+      "kind": "models",
+      "url": "https://github.com/abjadai/catt/releases/download/v2/eo_model_onnx.zip",
+      "filename": "eo_model_onnx.zip",
+      "sha256": "5343bfdfda70c981b587811b79348b8dde91f65c0a551ca98f232ea5cb62ceac",
+      "size": 72109998,
+      "license": "Apache-2.0",
+      "license_url": "https://github.com/abjadai/catt/blob/main/LICENSE",
+      "attribution": "abjadai/catt",
+      "notes": "Same archive as scripts/download_models.py."
+    }
+  ]
+}

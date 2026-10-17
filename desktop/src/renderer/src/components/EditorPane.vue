@@ -28,6 +28,21 @@ import { useSpellingStore } from '@renderer/stores/spelling'
 import { createThrottle as throttle2 } from '@renderer/composables/throttle'
 import { insertAtCursorSpec, safeEditSpec } from '@renderer/editor/safeEdit'
 import { goToIssue } from '@renderer/editor/spelling'
+import {
+  findStep,
+  replaceAll as findReplaceAll,
+  replaceCurrent,
+  setFind,
+  findField
+} from '@renderer/editor/find'
+import { acceptAll, addPending, rejectAll, type PendingItem } from '@renderer/editor/pending'
+import { paragraphsFor } from '@renderer/editor/paragraphs'
+import { LONG_LINE_THRESHOLD, longestLine, splitLongLineEdits } from '@renderer/editor/longLines'
+import { richPasteHandler } from '@renderer/editor/paste'
+import { stripMarks } from '@renderer/editor/arabic'
+import { isolateHistory } from '@codemirror/commands'
+import { useTts } from '@renderer/composables/useTts'
+import FindBar from './FindBar.vue'
 
 const props = defineProps<{
   openDocument: (id: number) => Promise<void>
@@ -51,6 +66,8 @@ const flushMarks = throttle2(() => {
   if (pendingMarks) spelling.marks = pendingMarks
 }, 300)
 
+const tts = useTts()
+
 const run = useTashkeelRun(
   () => view,
   () => emit('change')
@@ -65,6 +82,69 @@ function refreshStats(): void {
   const text = view.state.doc.toString()
   editor.wordCount = countWords(text)
   editor.density = computeDensity(text).density
+  let m = 0
+  for (const l of view.state.doc.iterLines()) if (l.length > m) m = l.length
+  editor.longestLine = m
+}
+
+let pendingSeq = 0
+/** 7.2.2: tashkeel the paragraph at the cursor / the selected paragraphs as a PREVIEW. */
+async function paragraphRun(): Promise<void> {
+  const v = view
+  if (!v) return
+  const sel = v.state.selection.main
+  const paras = paragraphsFor(v.state.doc, sel.from, sel.to)
+  if (!paras.length) return notify('لا توجد فقرة عربية لتشكيلها هنا.', { kind: 'info' })
+  if (paras.length > 60)
+    return notify('عدد الفقرات كبير؛ استخدم «تشكيل» لكامل التحديد.', { kind: 'info' })
+  const doc = v.state.doc
+  const api = useApi()
+  const results = await Promise.all(
+    paras.map(async (p) => {
+      try {
+        const r = await api.post<{ text: string }>('/api/tashkeel', {
+          text: p.text,
+          mode: settings.values.engine_mode,
+          level: settings.values.tashkeel_level
+        })
+        return r.text
+      } catch {
+        return null
+      }
+    })
+  )
+  if (view !== v || v.state.doc !== doc)
+    return notify('تغيّر النص أثناء التشكيل؛ أعد المحاولة.', { kind: 'info' })
+  const items: PendingItem[] = []
+  paras.forEach((p, i) => {
+    const out = results[i]
+    // never accept a result that changes base letters
+    if (out && out !== p.text && stripMarks(out) === stripMarks(p.text))
+      items.push({ id: ++pendingSeq, from: p.from, to: p.to, original: p.text, proposed: out })
+  })
+  if (!items.length) return notify('لا تغييرات مقترحة لهذه الفقرة.', { kind: 'info' })
+  v.dispatch({ effects: addPending.of(items) })
+  editor.announce(`${items.length} فقرة جاهزة للمراجعة: اقبل أو ارفض`)
+}
+
+function splitLongLines(): number {
+  if (!view) return 0
+  const lines: { from: number; text: string }[] = []
+  let pos = 0
+  for (const t of view.state.doc.iterLines()) {
+    lines.push({ from: pos, text: t })
+    pos += t.length + 1
+  }
+  const { edits, lines: n } = splitLongLineEdits(lines)
+  if (!edits.length) return 0
+  view.dispatch({
+    changes: edits,
+    userEvent: 'split.long-lines',
+    annotations: [isolateHistory.of('full')]
+  })
+  editor.splitLines += n
+  editor.announce(`تم تقسيم ${n} فقرة طويلة`)
+  return n
 }
 const statsThrottle = createThrottle(refreshStats, 400)
 const scheduleStats = (): void => statsThrottle.trigger()
@@ -115,6 +195,13 @@ function extensions(): Extension[] {
     history(),
     mizajEditorExtensions({
       onDiacritize: () => void run.start(),
+      onParagraphRun: () => void paragraphRun(),
+      find: {
+        onOpen: () => (editor.findOpen = true),
+        onClose: () => (editor.findOpen = false),
+        onChange: (i) => (editor.findInfo = i)
+      },
+      pending: { onChange: (n) => (editor.pendingCount = n) },
       spelling: {
         fetchSuggestions: spell.fetchSuggestions,
         ignore: spell.ignoreWord,
@@ -135,7 +222,14 @@ function extensions(): Extension[] {
     readOnlyCompartment.of(EditorState.readOnly.of(false)),
     EditorView.lineWrapping,
     EditorView.perLineTextDirection.of(true),
-    EditorView.contentAttributes.of({ dir: 'rtl', lang: 'ar', 'data-testid': 'editor-content' }),
+    richPasteHandler(() => true),
+    EditorView.contentAttributes.of({
+      dir: 'rtl',
+      lang: 'ar',
+      'data-testid': 'editor-content',
+      'aria-label': 'محرر النص',
+      'aria-multiline': 'true'
+    }),
     EditorView.updateListener.of((u) => {
       if (u.selectionSet || u.docChanged) {
         editor.cursorLine = u.state.doc.lineAt(u.state.selection.main.head).number
@@ -256,6 +350,33 @@ onMounted(() => {
       })
       view.focus()
     },
+    find: {
+      set: (p) => {
+        if (!view) return
+        view.dispatch({
+          effects: setFind.of({
+            query: p.query ?? view.state.field(findField).query,
+            replacement: p.replacement ?? view.state.field(findField).replacement,
+            stripReplacementMarks: p.stripReplacementMarks ?? false,
+            options: {
+              ignoreMarks: p.ignoreMarks ?? true,
+              foldLetters: p.foldLetters ?? false,
+              wholeWord: p.wholeWord ?? false
+            }
+          })
+        })
+      },
+      step: (d) => view && findStep(view, d),
+      replace: () => view && replaceCurrent(view),
+      replaceAll: () => (view ? findReplaceAll(view) : 0),
+      clear: () => view?.dispatch({ effects: setFind.of({ query: '' }) })
+    },
+    getReadText: () => {
+      if (!view) return ''
+      const s = view.state.selection.main
+      return s.empty ? view.state.doc.toString() : view.state.sliceDoc(s.from, s.to)
+    },
+    splitLongLines,
     spellNav: (dir) => {
       if (view) {
         goToIssue(view, dir)
@@ -280,9 +401,16 @@ const btnCls =
 </script>
 
 <template>
-  <section class="relative flex min-h-0 flex-1 flex-col" data-testid="editor">
+  <section
+    id="editor-region"
+    class="relative flex min-h-0 flex-1 flex-col"
+    aria-label="مساحة التحرير"
+    data-testid="editor"
+  >
     <div
       class="flex flex-wrap items-center gap-2 border-b border-slate-200 px-3 py-1 text-xs dark:border-slate-700"
+      role="toolbar"
+      aria-label="أدوات المحرر"
       data-testid="editor-toolbar"
     >
       <button
@@ -297,6 +425,7 @@ const btnCls =
       <select
         :class="selectCls"
         :value="settings.values.engine_mode"
+        aria-label="وضع المحرك"
         data-testid="toolbar-mode"
         @change="settings.update({ engine_mode: ($event.target as HTMLSelectElement).value })"
       >
@@ -316,6 +445,7 @@ const btnCls =
       <select
         :class="selectCls"
         :value="settings.values.tashkeel_level"
+        aria-label="مستوى التشكيل"
         data-testid="toolbar-level"
         @change="settings.update({ tashkeel_level: ($event.target as HTMLSelectElement).value })"
       >
@@ -337,6 +467,7 @@ const btnCls =
         :class="selectCls"
         :value="settings.values.diacritic_color"
         :disabled="!settings.colored"
+        aria-label="لون الحركات"
         data-testid="color-choice"
         @change="settings.update({ diacritic_color: ($event.target as HTMLSelectElement).value })"
       >
@@ -370,6 +501,30 @@ const btnCls =
       </button>
       <button
         :class="btnCls"
+        data-testid="toolbar-tashkeel-paragraph"
+        title="Ctrl+Alt+T"
+        @click="paragraphRun"
+      >
+        تشكيل الفقرة (مراجعة)
+      </button>
+      <button
+        :class="btnCls"
+        data-testid="toolbar-find"
+        title="Ctrl+F"
+        @click="editor.findOpen = !editor.findOpen"
+      >
+        بحث واستبدال
+      </button>
+      <button
+        :class="[btnCls, tts.speaking.value ? 'border-mizaj-emerald' : '']"
+        data-testid="tts-read"
+        :aria-pressed="tts.speaking.value"
+        @click="tts.toggle(editor.accessor?.getReadText() ?? '')"
+      >
+        {{ tts.speaking.value ? 'إيقاف القراءة' : 'قراءة بصوت عالٍ' }}
+      </button>
+      <button
+        :class="btnCls"
         data-testid="toolbar-spell"
         title="Ctrl+Shift+L"
         @click="spell.checkNow(true)"
@@ -396,6 +551,47 @@ const btnCls =
         @click="loadSample"
       >
         تحميل النص التجريبي
+      </button>
+    </div>
+    <FindBar />
+    <div
+      v-if="editor.pendingCount > 0"
+      class="flex items-center gap-3 border-b border-mizaj-emerald/40 bg-mizaj-emerald/10 px-3 py-1 text-xs"
+      role="status"
+      data-testid="pending-bar"
+    >
+      <span>{{ editor.pendingCount }} فقرة بانتظار المراجعة</span>
+      <button
+        class="rounded bg-mizaj-emerald px-2 py-0.5 text-white"
+        data-testid="pending-accept-all"
+        @click="view && acceptAll(view)"
+      >
+        قبول الكل
+      </button>
+      <button
+        class="rounded border px-2 py-0.5"
+        data-testid="pending-reject-all"
+        @click="view && rejectAll(view)"
+      >
+        رفض الكل
+      </button>
+    </div>
+    <div
+      v-if="editor.longestLine > LONG_LINE_THRESHOLD"
+      class="flex items-center gap-3 border-b border-mizaj-amber/40 bg-mizaj-amber/10 px-3 py-1 text-xs"
+      role="status"
+      data-testid="long-line-banner"
+    >
+      <span
+        >يحتوي المستند فقرة طويلة جداً ({{ editor.longestLine }} حرف) قد تُبطئ التشكيل
+        والتراجع.</span
+      >
+      <button
+        class="rounded bg-mizaj-amber px-2 py-0.5 text-black"
+        data-testid="split-long-lines"
+        @click="splitLongLines"
+      >
+        تقسيم الفقرات الطويلة عند الجمل
       </button>
     </div>
     <StatsPanel v-if="editor.showStats" />

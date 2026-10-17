@@ -21,7 +21,7 @@ from app.engine.executor import run_blocking
 from app.engine.factory import build_pipeline
 from app.engine.manager import manager
 from app.engine.normalize import has_arabic_letters, strip_marks
-from app.engine.pipeline import TashkeelPipeline
+from app.engine.pipeline import TashkeelPipeline, local_spans
 from app.engine.splitter import ArabicSentenceSplitter
 
 log = logging.getLogger("mizaj.api.tashkeel")
@@ -39,6 +39,12 @@ class TashkeelRequest(BaseModel):
     keep_existing: bool = True
     morph_filter: bool | None = None
     use_cache: bool = True  # False: bypass the chunk cache only (dictionary still applies)
+    confidence: bool = False  # add low-confidence words to the response / SSE chunk events
+    confidence_threshold: float | None = Field(default=None, ge=0.0, le=1.0)
+    irab_rules: bool = False  # conservative context rules for case endings (7.1.6)
+    use_names: bool = True  # proper-noun dictionary (7.4.3)
+    protect_quran: bool = True  # leave Quran spans untouched when the detector is available
+    poetry: bool = False  # keep every line as its own chunk (verse structure)
 
 
 class StreamRequest(TashkeelRequest):
@@ -69,30 +75,82 @@ async def _build_pipeline(request: Request, body: TashkeelRequest, document_id=N
     if not doc_ok:
         raise not_found("Document", document_id)
     pipeline = await build_pipeline(
-        body.mode, body.level or level, body.keep_existing, body.morph_filter, body.use_cache
+        body.mode,
+        body.level or level,
+        body.keep_existing,
+        body.morph_filter,
+        body.use_cache,
+        irab_rules=body.irab_rules,
+        use_names=body.use_names,
+        protect_quran=body.protect_quran,
     )
+    if body.poetry:
+        pipeline.splitter = ArabicSentenceSplitter(line_mode=True)
     engine = pipeline.engine
     return engine, pipeline
 
 
-def _run_all(db_path: Path, pipeline: TashkeelPipeline, text: str) -> str:
+def _run_all(db_path: Path, pipeline: TashkeelPipeline, text: str):
     conn = connect(db_path)
     try:
-        return pipeline.run_text(conn, text)
+        return pipeline.run_text_ex(conn, text)
     finally:
         conn.close()
+
+
+def u16_offsets(text: str, positions: list[int]) -> dict[int, int]:
+    """UTF-16 code-unit offset for each code-point position (for JavaScript clients)."""
+    want = set(positions)
+    out: dict[int, int] = {}
+    units = 0
+    for i, ch in enumerate(text):
+        if i in want:
+            out[i] = units
+        units += 2 if ord(ch) > 0xFFFF else 1
+    if len(text) in want:
+        out[len(text)] = units
+    return out
+
+
+def low_conf_words(text: str, words, threshold: float, base: int = 0) -> list[dict[str, Any]]:
+    """Compact list of the words whose confidence is below `threshold` (None = unknown, skipped).
+    `start`/`end` are code points; `u16_start`/`u16_end` UTF-16 units; both relative to `text`
+    (+`base`, the chunk offset in the document, when given)."""
+    flagged = [w for w in words if w[2] is not None and min(w[2], 1.0) < threshold]
+    pos = [p for w in flagged for p in (w[0], w[1])]
+    u16 = u16_offsets(text, pos)
+    return [
+        {
+            "start": s + base,
+            "end": e + base,
+            "u16_start": u16[s] + base,
+            "u16_end": u16[e] + base,
+            "confidence": round(wc, 3),
+            "irab_confidence": None if ic is None else round(ic, 3),
+        }
+        for s, e, wc, ic in flagged
+    ]
 
 
 @router.post("/api/tashkeel")
 async def tashkeel(body: TashkeelRequest, request: Request) -> dict[str, Any]:
     t0 = time.perf_counter()
     engine, pipeline = await _build_pipeline(request, body)
-    out = await run_blocking(_run_all, request.app.state.db_path, pipeline, body.text)
-    return {
+    out, wconf = await run_blocking(_run_all, request.app.state.db_path, pipeline, body.text)
+    resp: dict[str, Any] = {
         "text": out,
         "engine": engine.name,
         "elapsed_ms": int((time.perf_counter() - t0) * 1000),
     }
+    if body.confidence:
+        thr = (
+            body.confidence_threshold
+            if body.confidence_threshold is not None
+            else pipeline.conf_threshold
+        )
+        resp["words"] = low_conf_words(out, wconf, thr)
+        resp["confidence_threshold"] = thr
+    return resp
 
 
 def _sse(data: dict[str, Any], event: str | None = None) -> str:
@@ -104,7 +162,13 @@ def _sse(data: dict[str, Any], event: str | None = None) -> str:
 async def tashkeel_stream(body: StreamRequest, request: Request) -> StreamingResponse:
     engine, pipeline = await _build_pipeline(request, body, body.document_id)
     text = body.text
-    cmap = ChunkMap.build(text, ArabicSentenceSplitter())
+    cmap = ChunkMap.build(text, pipeline.splitter)
+    protected = pipeline.protected_spans(text)
+    thr = (
+        body.confidence_threshold
+        if body.confidence_threshold is not None
+        else pipeline.conf_threshold
+    )
     db_path = request.app.state.db_path
 
     async def gen() -> AsyncIterator[str]:
@@ -118,22 +182,28 @@ async def tashkeel_stream(body: StreamRequest, request: Request) -> StreamingRes
                     err = task_cancelled()
                     log.info("%s: client disconnected after %d chunks", err.error_code, chunk.index)
                     return
-                res = await run_blocking(pipeline.process_chunk, conn, chunk.text)
+                res = await run_blocking(
+                    pipeline.process_chunk,
+                    conn,
+                    chunk.text,
+                    local_spans(protected, chunk.start, chunk.end),
+                )
                 words += res.words
                 cached_chunks += res.cached
                 last = chunk.index == len(cmap.chunks) - 1
                 elapsed = max(time.perf_counter() - t0, 1e-6)
-                yield _sse(
-                    {
-                        "chunk_id": chunk.index + 1,
-                        "start": chunk.start,
-                        "end": chunk.end,
-                        "text": res.text,
-                        "progress": 100 if last else min(99, chunk.end * 100 // total),
-                        "wps": round(words / elapsed, 1),
-                        "cached": res.cached,
-                    }
-                )
+                event = {
+                    "chunk_id": chunk.index + 1,
+                    "start": chunk.start,
+                    "end": chunk.end,
+                    "text": res.text,
+                    "progress": 100 if last else min(99, chunk.end * 100 // total),
+                    "wps": round(words / elapsed, 1),
+                    "cached": res.cached,
+                }
+                if body.confidence:  # offsets are relative to this chunk's `text`
+                    event["words"] = low_conf_words(res.text, res.word_conf, thr)
+                yield _sse(event)
             elapsed = time.perf_counter() - t0
             yield _sse(
                 {

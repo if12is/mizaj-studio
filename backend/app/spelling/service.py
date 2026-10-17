@@ -9,8 +9,9 @@ from .engine import SpellEngine
 from .patterns import check_patterns
 from .punct import check_punctuation
 from .text import Masker, OffsetMap, Token, tokenize
+from .typography import check_typography
 
-ALL_CHECKS = ("dictionary", "patterns", "punctuation")
+ALL_CHECKS = ("dictionary", "patterns", "punctuation", "typography")
 MAX_SUGGEST_WORDS = 80  # more are fetched on demand via /suggest
 SUGGEST_BUDGET_S = 1.5
 _EMPHASIS = re.compile(r"(.)\1\1")
@@ -89,17 +90,20 @@ def check_text(
     max_issues: int = 1000,
     known: set[str] | None = None,
     ignored: set[str] | None = None,
+    protected: list[tuple[int, int]] | None = None,
 ) -> dict:
     t0 = time.perf_counter()
     known = known or set()
     ignored = ignored or set()
-    masker = Masker(text)
+    masker = Masker(text, protected)
     tokens = tokenize(text, masker)
     issues: list[dict] = []
     if "patterns" in checks:
         issues += check_patterns(text, tokens, eng, known, ignored)
     if "dictionary" in checks:
         issues += _dictionary_issues(text, tokens, eng, known, ignored)
+    if "typography" in checks:
+        issues += check_typography(text, masker)
     if "punctuation" in checks:
         issues += check_punctuation(text, masker)
     issues = _merge(issues)

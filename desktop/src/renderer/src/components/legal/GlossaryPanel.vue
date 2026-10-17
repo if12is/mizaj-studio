@@ -116,6 +116,7 @@ async function importFile(ev: Event): Promise<void> {
         v-model="q"
         :class="field"
         class="flex-1"
+        aria-label="بحث..."
         placeholder="بحث..."
         data-testid="gloss-search"
         @input="load"
@@ -144,21 +145,40 @@ async function importFile(ev: Event): Promise<void> {
       />
     </div>
     <form class="grid grid-cols-2 gap-2" @submit.prevent="save">
-      <input v-model="draft.term" :class="field" placeholder="المصطلح" data-testid="gloss-term" />
+      <input
+        v-model="draft.term"
+        :class="field"
+        aria-label="المصطلح"
+        placeholder="المصطلح"
+        data-testid="gloss-term"
+      />
       <input
         v-model="draft.diacritized"
         :class="field"
+        aria-label="الصيغة المشكولة"
         placeholder="الصيغة المشكولة"
         data-testid="gloss-diacritized"
       />
-      <input v-model="draft.preferred" :class="field" placeholder="الصيغة المفضلة" />
+      <input
+        v-model="draft.preferred"
+        :class="field"
+        aria-label="الصيغة المفضلة"
+        placeholder="الصيغة المفضلة"
+      />
       <input
         v-model="draft.avoid"
         :class="field"
+        aria-label="صيغ يُنصح بتجنبها (مفصولة بفاصلة)"
         placeholder="صيغ يُنصح بتجنبها (مفصولة بفاصلة)"
         data-testid="gloss-avoid"
       />
-      <input v-model="draft.definition" :class="field" class="col-span-2" placeholder="التعريف" />
+      <input
+        v-model="draft.definition"
+        :class="field"
+        class="col-span-2"
+        aria-label="التعريف"
+        placeholder="التعريف"
+      />
       <button
         class="col-span-2 rounded bg-mizaj-emerald px-3 py-1 text-white"
         data-testid="gloss-save"

@@ -3,12 +3,17 @@ import { computed, onMounted, ref } from 'vue'
 import { useSettingsStore } from '@renderer/stores/settings'
 import DictionaryPanel from './DictionaryPanel.vue'
 import GlossaryPanel from './legal/GlossaryPanel.vue'
+import { useFocusTrap } from '@renderer/composables/useFocusTrap'
+import { notify } from '@renderer/api/toast'
+import { useEditorStore } from '@renderer/stores/editor'
 import { useApi } from '@renderer/api'
 import { useUpdaterStore } from '@renderer/stores/updater'
 import { useSidecarStore } from '@renderer/stores/sidecar'
 import { ApiError } from '@renderer/api/client'
 
 const emit = defineEmits<{ (e: 'close'): void }>()
+const dialog = ref<HTMLElement | null>(null)
+useFocusTrap(dialog, () => emit('close'))
 const settings = useSettingsStore()
 const sidecar = useSidecarStore()
 const tab = ref<'general' | 'dictionary' | 'glossary'>('general')
@@ -24,6 +29,8 @@ const updater = useUpdaterStore()
 const updateText = computed(() => {
   const s = updater.status
   if (s.code === 'not-packaged') return 'التحديثات متاحة فقط في النسخة المثبتة'
+  if (s.code === 'portable')
+    return 'التحديث التلقائي غير متاح في النسخة المحمولة؛ نزّل الإصدار الجديد يدوياً.'
   switch (s.state) {
     case 'checking':
       return 'جاري التحقق من التحديثات...'
@@ -95,6 +102,16 @@ async function applyPack(): Promise<void> {
   }
 }
 
+const editorStore = useEditorStore()
+async function exportDiag(): Promise<void> {
+  try {
+    const path = await window.mizajAPI?.exportDiagnostics()
+    if (path) notify(`تم إنشاء حزمة التشخيص: ${path}`, { kind: 'success', ms: 8000 })
+  } catch {
+    notify('تعذر إنشاء حزمة التشخيص.')
+  }
+}
+
 const field = 'rounded border px-2 py-1 dark:border-slate-600 dark:bg-slate-800'
 </script>
 
@@ -104,12 +121,16 @@ const field = 'rounded border px-2 py-1 dark:border-slate-600 dark:bg-slate-800'
     @click.self="emit('close')"
   >
     <div
-      class="w-[40rem] max-w-[95vw] rounded-lg bg-white p-4 shadow-xl dark:bg-slate-800"
+      class="max-h-[90vh] w-[40rem] max-w-[95vw] overflow-y-auto rounded-lg bg-white p-4 shadow-xl dark:bg-slate-800"
+      ref="dialog"
       role="dialog"
+      aria-modal="true"
       aria-label="الإعدادات"
       data-testid="settings-modal"
     >
-      <div class="mb-3 flex items-center justify-between">
+      <div
+        class="sticky top-0 z-10 mb-3 flex items-center justify-between bg-white dark:bg-slate-800"
+      >
         <h2 class="text-lg font-bold">الإعدادات</h2>
         <button data-testid="settings-close" aria-label="إغلاق" @click="emit('close')">
           &#10005;
@@ -226,6 +247,19 @@ const field = 'rounded border px-2 py-1 dark:border-slate-600 dark:bg-slate-800'
           <option value="dark">ليلي</option>
           <option value="light">نهاري</option>
         </select>
+
+        <label for="s-hc">التباين العالي</label>
+        <select
+          id="s-hc"
+          :class="field"
+          :value="settings.values.high_contrast"
+          data-testid="setting-high-contrast"
+          @change="settings.update({ high_contrast: ($event.target as HTMLSelectElement).value })"
+        >
+          <option value="auto">حسب النظام</option>
+          <option value="true">مفعّل</option>
+          <option value="false">معطّل</option>
+        </select>
       </div>
       <div
         v-if="tab === 'general'"
@@ -292,6 +326,40 @@ const field = 'rounded border px-2 py-1 dark:border-slate-600 dark:bg-slate-800'
           data-testid="pack-result"
         >
           {{ packMsg.text }}
+        </p>
+      </div>
+      <div
+        v-if="tab === 'general'"
+        class="mt-4 border-t pt-3 text-sm dark:border-slate-700"
+        data-testid="help-section"
+      >
+        <h3 class="mb-2 font-semibold">المساعدة</h3>
+        <div class="flex flex-wrap gap-2">
+          <button
+            class="rounded border px-3 py-1 hover:bg-slate-100 dark:border-slate-600 dark:hover:bg-slate-700"
+            data-testid="diag-export"
+            @click="exportDiag"
+          >
+            إنشاء حزمة تشخيص
+          </button>
+          <button
+            class="rounded border px-3 py-1 hover:bg-slate-100 dark:border-slate-600 dark:hover:bg-slate-700"
+            data-testid="open-shortcuts"
+            @click="editorStore.shortcutsOpen = true"
+          >
+            اختصارات لوحة المفاتيح
+          </button>
+          <button
+            class="rounded border px-3 py-1 hover:bg-slate-100 dark:border-slate-600 dark:hover:bg-slate-700"
+            data-testid="open-about"
+            @click="editorStore.aboutOpen = true"
+          >
+            حول مِزَاج والتراخيص
+          </button>
+        </div>
+        <p class="mt-1 text-xs text-slate-500">
+          حزمة التشخيص ملف محلي (سجلات منقّاة وإصدارات وإعدادات، بلا نص مستنداتك)؛ لا يُرسل شيء عبر
+          الشبكة.
         </p>
       </div>
       <div

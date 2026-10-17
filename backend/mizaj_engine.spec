@@ -52,6 +52,9 @@ datas += [
     (os.path.join(BACKEND, "app", "engine", "catt", "NOTICE"), os.path.join("app", "engine", "catt")),
     # 7.9 spelling: ayaspell Hunspell dictionary (ar.aff, ar.dic.gz), confusables.json, licences
     (os.path.join(BACKEND, "app", "spelling", "data"), os.path.join("app", "spelling", "data")),
+    # 7.1 engine data (minimal-level rules, proper nouns) and 7.8 free-resource catalog
+    (os.path.join(BACKEND, "app", "engine", "data"), os.path.join("app", "engine", "data")),
+    (os.path.join(BACKEND, "app", "resources", "catalog.json"), os.path.join("app", "resources")),
 ]
 
 # --- size trimming: drop test suites and dev-only data shipped inside packages ---

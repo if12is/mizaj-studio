@@ -48,6 +48,38 @@
           "word_errors": 917
         }
       },
+      "calibration": {
+        "words": 956,
+        "bins": [
+          {
+            "bin": "0.00-0.50",
+            "words": 142,
+            "word_error_rate": 100.0
+          },
+          {
+            "bin": "0.50-0.70",
+            "words": 0,
+            "word_error_rate": null
+          },
+          {
+            "bin": "0.70-0.90",
+            "words": 0,
+            "word_error_rate": null
+          },
+          {
+            "bin": "0.90-0.97",
+            "words": 814,
+            "word_error_rate": 99.9
+          },
+          {
+            "bin": "0.97-1.00",
+            "words": 0,
+            "word_error_rate": null
+          }
+        ]
+      },
+      "seconds": 0.04,
+      "words_per_second": 25675.3,
       "by_category": {
         "general": {
           "der": 73.643,
@@ -115,6 +147,38 @@
           "word_errors": 145
         }
       },
+      "calibration": {
+        "words": 956,
+        "bins": [
+          {
+            "bin": "0.00-0.50",
+            "words": 328,
+            "word_error_rate": 54.3
+          },
+          {
+            "bin": "0.50-0.70",
+            "words": 222,
+            "word_error_rate": 33.3
+          },
+          {
+            "bin": "0.70-0.90",
+            "words": 0,
+            "word_error_rate": null
+          },
+          {
+            "bin": "0.90-0.97",
+            "words": 406,
+            "word_error_rate": 25.9
+          },
+          {
+            "bin": "0.97-1.00",
+            "words": 0,
+            "word_error_rate": null
+          }
+        ]
+      },
+      "seconds": 5.57,
+      "words_per_second": 171.6,
       "by_category": {
         "general": {
           "der": 11.276,
@@ -139,73 +203,6 @@
       }
     },
     "accurate": {
-      "unaligned_sentences": 0,
-      "with_case_ending": {
-        "all": {
-          "der": 3.585,
-          "wer": 14.121,
-          "letters": 4658,
-          "letter_errors": 167,
-          "words": 956,
-          "word_errors": 135,
-          "internal_der": 2.593,
-          "final_der": 6.59,
-          "shadda_error": 4.792
-        },
-        "gold_only": {
-          "der": 4.537,
-          "wer": 13.912,
-          "letters": 3593,
-          "letter_errors": 163,
-          "words": 956,
-          "word_errors": 133,
-          "internal_der": 3.337,
-          "final_der": 7.692,
-          "shadda_error": 4.792
-        }
-      },
-      "without_case_ending": {
-        "all": {
-          "der": 2.755,
-          "wer": 8.473,
-          "letters": 3702,
-          "letter_errors": 102,
-          "words": 956,
-          "word_errors": 81
-        },
-        "gold_only": {
-          "der": 3.552,
-          "wer": 8.368,
-          "letters": 2787,
-          "letter_errors": 99,
-          "words": 956,
-          "word_errors": 80
-        }
-      },
-      "by_category": {
-        "general": {
-          "der": 3.242,
-          "wer": 12.581,
-          "sentences": 57
-        },
-        "legal": {
-          "der": 3.073,
-          "wer": 11.885,
-          "sentences": 35
-        },
-        "letters": {
-          "der": 4.084,
-          "wer": 17.919,
-          "sentences": 25
-        },
-        "news": {
-          "der": 4.16,
-          "wer": 15.721,
-          "sentences": 35
-        }
-      }
-    },
-    "accurate-nofilter": {
       "unaligned_sentences": 0,
       "with_case_ending": {
         "all": {
@@ -249,6 +246,38 @@
           "word_errors": 68
         }
       },
+      "calibration": {
+        "words": 956,
+        "bins": [
+          {
+            "bin": "0.00-0.50",
+            "words": 11,
+            "word_error_rate": 81.8
+          },
+          {
+            "bin": "0.50-0.70",
+            "words": 74,
+            "word_error_rate": 58.1
+          },
+          {
+            "bin": "0.70-0.90",
+            "words": 125,
+            "word_error_rate": 32.0
+          },
+          {
+            "bin": "0.90-0.97",
+            "words": 122,
+            "word_error_rate": 13.9
+          },
+          {
+            "bin": "0.97-1.00",
+            "words": 624,
+            "word_error_rate": 2.6
+          }
+        ]
+      },
+      "seconds": 1.37,
+      "words_per_second": 695.9,
       "by_category": {
         "general": {
           "der": 3.101,
@@ -268,6 +297,303 @@
         "news": {
           "der": 4.244,
           "wer": 16.157,
+          "sentences": 35
+        }
+      }
+    },
+    "accurate+mf1": {
+      "unaligned_sentences": 0,
+      "with_case_ending": {
+        "all": {
+          "der": 3.585,
+          "wer": 14.121,
+          "letters": 4658,
+          "letter_errors": 167,
+          "words": 956,
+          "word_errors": 135,
+          "internal_der": 2.593,
+          "final_der": 6.59,
+          "shadda_error": 4.792
+        },
+        "gold_only": {
+          "der": 4.537,
+          "wer": 13.912,
+          "letters": 3593,
+          "letter_errors": 163,
+          "words": 956,
+          "word_errors": 133,
+          "internal_der": 3.337,
+          "final_der": 7.692,
+          "shadda_error": 4.792
+        }
+      },
+      "without_case_ending": {
+        "all": {
+          "der": 2.755,
+          "wer": 8.473,
+          "letters": 3702,
+          "letter_errors": 102,
+          "words": 956,
+          "word_errors": 81
+        },
+        "gold_only": {
+          "der": 3.552,
+          "wer": 8.368,
+          "letters": 2787,
+          "letter_errors": 99,
+          "words": 956,
+          "word_errors": 80
+        }
+      },
+      "calibration": {
+        "words": 956,
+        "bins": [
+          {
+            "bin": "0.00-0.50",
+            "words": 11,
+            "word_error_rate": 72.7
+          },
+          {
+            "bin": "0.50-0.70",
+            "words": 74,
+            "word_error_rate": 56.8
+          },
+          {
+            "bin": "0.70-0.90",
+            "words": 125,
+            "word_error_rate": 34.4
+          },
+          {
+            "bin": "0.90-0.97",
+            "words": 122,
+            "word_error_rate": 15.6
+          },
+          {
+            "bin": "0.97-1.00",
+            "words": 624,
+            "word_error_rate": 3.7
+          }
+        ]
+      },
+      "seconds": 4.26,
+      "words_per_second": 224.5,
+      "by_category": {
+        "general": {
+          "der": 3.242,
+          "wer": 12.581,
+          "sentences": 57
+        },
+        "legal": {
+          "der": 3.073,
+          "wer": 11.885,
+          "sentences": 35
+        },
+        "letters": {
+          "der": 4.084,
+          "wer": 17.919,
+          "sentences": 25
+        },
+        "news": {
+          "der": 4.16,
+          "wer": 15.721,
+          "sentences": 35
+        }
+      }
+    },
+    "accurate+mf2": {
+      "unaligned_sentences": 0,
+      "with_case_ending": {
+        "all": {
+          "der": 3.263,
+          "wer": 12.552,
+          "letters": 4658,
+          "letter_errors": 152,
+          "words": 956,
+          "word_errors": 120,
+          "internal_der": 2.188,
+          "final_der": 6.59,
+          "shadda_error": 4.792
+        },
+        "gold_only": {
+          "der": 4.119,
+          "wer": 12.343,
+          "letters": 3593,
+          "letter_errors": 148,
+          "words": 956,
+          "word_errors": 118,
+          "internal_der": 2.799,
+          "final_der": 7.692,
+          "shadda_error": 4.792
+        }
+      },
+      "without_case_ending": {
+        "all": {
+          "der": 2.35,
+          "wer": 6.799,
+          "letters": 3702,
+          "letter_errors": 87,
+          "words": 956,
+          "word_errors": 65
+        },
+        "gold_only": {
+          "der": 3.014,
+          "wer": 6.695,
+          "letters": 2787,
+          "letter_errors": 84,
+          "words": 956,
+          "word_errors": 64
+        }
+      },
+      "calibration": {
+        "words": 956,
+        "bins": [
+          {
+            "bin": "0.00-0.50",
+            "words": 11,
+            "word_error_rate": 63.6
+          },
+          {
+            "bin": "0.50-0.70",
+            "words": 74,
+            "word_error_rate": 54.1
+          },
+          {
+            "bin": "0.70-0.90",
+            "words": 125,
+            "word_error_rate": 32.0
+          },
+          {
+            "bin": "0.90-0.97",
+            "words": 122,
+            "word_error_rate": 13.9
+          },
+          {
+            "bin": "0.97-1.00",
+            "words": 624,
+            "word_error_rate": 2.6
+          }
+        ]
+      },
+      "seconds": 2.41,
+      "words_per_second": 396.2,
+      "by_category": {
+        "general": {
+          "der": 3.03,
+          "wer": 11.613,
+          "sentences": 57
+        },
+        "legal": {
+          "der": 2.824,
+          "wer": 10.656,
+          "sentences": 35
+        },
+        "letters": {
+          "der": 3.267,
+          "wer": 13.873,
+          "sentences": 25
+        },
+        "news": {
+          "der": 3.99,
+          "wer": 14.847,
+          "sentences": 35
+        }
+      }
+    },
+    "accurate-int8+mf2": {
+      "unaligned_sentences": 0,
+      "with_case_ending": {
+        "all": {
+          "der": 3.242,
+          "wer": 12.448,
+          "letters": 4658,
+          "letter_errors": 151,
+          "words": 956,
+          "word_errors": 119,
+          "internal_der": 2.215,
+          "final_der": 6.485,
+          "shadda_error": 4.792
+        },
+        "gold_only": {
+          "der": 4.091,
+          "wer": 12.238,
+          "letters": 3593,
+          "letter_errors": 147,
+          "words": 956,
+          "word_errors": 117,
+          "internal_der": 2.835,
+          "final_der": 7.568,
+          "shadda_error": 4.792
+        }
+      },
+      "without_case_ending": {
+        "all": {
+          "der": 2.377,
+          "wer": 6.904,
+          "letters": 3702,
+          "letter_errors": 88,
+          "words": 956,
+          "word_errors": 66
+        },
+        "gold_only": {
+          "der": 3.05,
+          "wer": 6.799,
+          "letters": 2787,
+          "letter_errors": 85,
+          "words": 956,
+          "word_errors": 65
+        }
+      },
+      "calibration": {
+        "words": 956,
+        "bins": [
+          {
+            "bin": "0.00-0.50",
+            "words": 10,
+            "word_error_rate": 60.0
+          },
+          {
+            "bin": "0.50-0.70",
+            "words": 80,
+            "word_error_rate": 53.8
+          },
+          {
+            "bin": "0.70-0.90",
+            "words": 124,
+            "word_error_rate": 29.8
+          },
+          {
+            "bin": "0.90-0.97",
+            "words": 120,
+            "word_error_rate": 14.2
+          },
+          {
+            "bin": "0.97-1.00",
+            "words": 622,
+            "word_error_rate": 2.6
+          }
+        ]
+      },
+      "seconds": 0.97,
+      "words_per_second": 984.7,
+      "by_category": {
+        "general": {
+          "der": 2.96,
+          "wer": 11.29,
+          "sentences": 57
+        },
+        "legal": {
+          "der": 2.824,
+          "wer": 10.656,
+          "sentences": 35
+        },
+        "letters": {
+          "der": 3.151,
+          "wer": 13.295,
+          "sentences": 25
+        },
+        "news": {
+          "der": 4.075,
+          "wer": 15.284,
           "sentences": 35
         }
       }

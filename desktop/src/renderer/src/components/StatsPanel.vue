@@ -23,5 +23,8 @@ const manual = computed(() => editor.manualEdits[projects.currentDocument?.id ??
       كلمات معدّلة يدوياً: <b data-testid="stat-manual">{{ manual }}</b>
       <span class="text-slate-500">(محفوظة مع المستند)</span>
     </span>
+    <span v-if="editor.splitLines">
+      فقرات طويلة مقسّمة: <b data-testid="stat-split">{{ editor.splitLines }}</b>
+    </span>
   </div>
 </template>

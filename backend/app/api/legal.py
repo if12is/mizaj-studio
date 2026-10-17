@@ -3,13 +3,17 @@ from __future__ import annotations
 import sqlite3
 from typing import Annotated, Any, Literal
 
-from fastapi import APIRouter, Depends, Response
+from fastapi import APIRouter, Depends, Request, Response
 from pydantic import BaseModel, Field
 
 from app.api.deps import get_db
 from app.core.database import write
 from app.core.errors import not_found, validation_error
+from app.legal import citations as cit
+from app.legal import compare as cmp
 from app.legal import glossary as gl
+from app.legal import lint as lnt
+from app.legal import redact as rdc
 from app.legal import store
 from app.legal.amounts import check_amounts
 from app.legal.dates import date_words
@@ -358,3 +362,131 @@ def render_template(tid: int, body: RenderIn, db: Db) -> dict[str, Any]:
         return {**render(t["body"], t["vars"], body.values), "template_id": tid}
     except TemplateError as exc:
         raise validation_error(str(exc), {"field": "body"}) from exc
+
+
+# ------------------------------------------------------------------ linter (7.10.6 / 7.10.12)
+class LintIn(BaseModel):
+    text: str = Field(max_length=MAX_TEXT)
+    rules: list[str] | None = None  # only these rules (default: all)
+    disabled: list[str] = []
+    doc_type: str | None = None  # also run the mandatory-sections checklist
+
+
+@router.get("/lint/rules")
+def lint_rules() -> dict[str, Any]:
+    return {
+        "rules": [{"id": k, **v} for k, v in lnt.RULES.items()],
+        "doc_types": [{"id": k, "title_ar": v["title_ar"]} for k, v in lnt.DOC_TYPES.items()],
+    }
+
+
+@router.post("/lint")
+def lint_text(body: LintIn) -> dict[str, Any]:
+    unknown = [r for r in [*(body.rules or []), *body.disabled] if r not in lnt.RULES]
+    if unknown:
+        raise validation_error("unknown rule: " + ", ".join(unknown), {"field": "rules"})
+    out = lnt.lint(body.text, body.rules, body.disabled)
+    if body.doc_type:
+        if body.doc_type not in lnt.DOC_TYPES:
+            raise validation_error("unknown doc_type", {"field": "doc_type"})
+        out["structure"] = lnt.check_structure(body.text, body.doc_type)
+    return out
+
+
+# ------------------------------------------------------------------ citations (7.10.9)
+def _index_path(request: Request):
+    return request.app.state.data_dir / "legal" / "law_index.json"
+
+
+def _load_index(request: Request) -> dict[str, Any] | None:
+    import json
+
+    p = _index_path(request)
+    try:
+        return json.loads(p.read_text(encoding="utf-8")) if p.exists() else None
+    except (OSError, ValueError):
+        return None
+
+
+class CitationsIn(BaseModel):
+    text: str = Field(max_length=MAX_TEXT)
+    style: Literal["paren", "plain"] = "paren"  # "المادة (5)" or "المادة 5"
+    use_index: bool = True
+
+
+@router.post("/citations")
+def citations(body: CitationsIn, request: Request) -> dict[str, Any]:
+    idx = _load_index(request) if body.use_index else None
+    return cit.analyze_citations(body.text, idx, body.style)
+
+
+@router.get("/law-index")
+def get_law_index(request: Request) -> dict[str, Any]:
+    return _load_index(request) or {"version": 1, "kind": cit.INDEX_KIND, "laws": []}
+
+
+@router.put("/law-index")
+def put_law_index(body: dict[str, Any], request: Request) -> dict[str, Any]:
+    import json
+    import os
+
+    try:
+        idx = cit.validate_index(body)
+    except cit.IndexError_ as exc:
+        raise validation_error(str(exc), {"field": "laws"}) from exc
+    p = _index_path(request)
+    p.parent.mkdir(parents=True, exist_ok=True)
+    tmp = p.with_suffix(".tmp")
+    tmp.write_text(json.dumps(idx, ensure_ascii=False, indent=1), encoding="utf-8")
+    os.replace(tmp, p)
+    return {"count": len(idx["laws"])}
+
+
+@router.delete("/law-index", status_code=204)
+def delete_law_index(request: Request) -> Response:
+    _index_path(request).unlink(missing_ok=True)
+    return Response(status_code=204)
+
+
+# ------------------------------------------------------------------ redaction (7.10.10)
+class RedactIn(BaseModel):
+    text: str = Field(max_length=MAX_TEXT)
+    categories: (
+        list[Literal["id", "phone", "email", "iban", "card", "passport", "name", "party"]] | None
+    ) = None
+    style: Literal["mask", "placeholder", "pseudonym"] = "placeholder"
+    names: list[str] = Field(default=[], max_length=500)  # extra names to find (user list)
+    use_parties: bool = True  # names taken from party definitions (7.10.4)
+
+
+@router.post("/redact")
+def redact_text(body: RedactIn) -> dict[str, Any]:
+    """Proposals only: the text is never changed and nothing is stored."""
+    return rdc.redact(body.text, body.categories, body.style, body.names, body.use_parties)
+
+
+# ------------------------------------------------------------------ compare (7.10.11)
+class CompareIn(BaseModel):
+    a: str | None = Field(default=None, max_length=MAX_TEXT)
+    b: str | None = Field(default=None, max_length=MAX_TEXT)
+    document_a: int | None = None
+    document_b: int | None = None
+
+
+@router.post("/compare")
+def compare(body: CompareIn, db: Db) -> dict[str, Any]:
+    def side(text: str | None, doc: int | None, field: str) -> str:
+        if text is not None:
+            return text
+        if doc is None:
+            raise validation_error("give either text or a document id", {"field": field})
+        row = db.execute(
+            "SELECT raw_content FROM documents WHERE id=? AND is_deleted=0", (doc,)
+        ).fetchone()
+        if row is None:
+            raise not_found("Document", doc)
+        return row["raw_content"]
+
+    a = side(body.a, body.document_a, "a")
+    b = side(body.b, body.document_b, "b")
+    return cmp.compare_texts(a, b)

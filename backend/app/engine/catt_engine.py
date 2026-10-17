@@ -34,5 +34,20 @@ class CattEngine(Engine):
         # normalise mark order per letter
         return ["".join(b + m for b, m in split_pairs(w)) for w in out]
 
+    def diacritize_scored(self, words, lookup=None):
+        if not words:
+            return [], []
+        with self._lock:
+            text, letter_conf = self._model.diacritize_scored(" ".join(words))
+        out = text.split(" ")
+        if len(out) != len(words) or len(letter_conf) != sum(len(w) for w in words):
+            return self.diacritize(words, lookup), [None] * len(words)
+        confs, pos = [], 0
+        for w in words:
+            lc = letter_conf[pos : pos + len(w)]
+            pos += len(w)
+            confs.append((min(lc), lc[-1]))  # weakest letter / the case-ending letter
+        return ["".join(b + m for b, m in split_pairs(w)) for w in out], confs
+
     def is_ambiguous(self, word: str) -> bool:
         raise NotImplementedError("use the mishkal oracle")

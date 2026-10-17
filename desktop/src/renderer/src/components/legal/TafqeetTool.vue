@@ -62,35 +62,42 @@ async function copy(): Promise<void> {
       v-model="amount"
       :class="field"
       class="w-full"
+      aria-label="المبلغ، مثال: 1500.50"
       placeholder="المبلغ، مثال: 1500.50"
       data-testid="tafqeet-amount"
       @keydown.enter="run"
     />
-    <select v-model="currency" :class="field" class="w-full" data-testid="tafqeet-currency">
+    <select
+      v-model="currency"
+      :class="field"
+      class="w-full"
+      data-testid="tafqeet-currency"
+      aria-label="العملة"
+    >
       <option value="">بدون عملة (رقم فقط)</option>
       <option v-for="c in currencies" :key="c.code" :value="c.code">
         {{ c.name }} — {{ c.country }} ({{ c.code }})
       </option>
     </select>
     <div class="grid grid-cols-2 gap-2">
-      <select v-model="cas" :class="field" data-testid="tafqeet-case">
+      <select v-model="cas" :class="field" data-testid="tafqeet-case" aria-label="حالة الإعراب">
         <option value="nominative">مرفوع</option>
         <option value="accusative">منصوب</option>
         <option value="genitive">مجرور</option>
       </select>
-      <select v-model="style" :class="field" data-testid="tafqeet-style">
+      <select v-model="style" :class="field" data-testid="tafqeet-style" aria-label="أسلوب الصياغة">
         <option value="legal">صيغة قانونية (فقط … لا غير)</option>
         <option value="plain">عادي</option>
       </select>
-      <select v-model="spelling" :class="field">
+      <select v-model="spelling" :class="field" aria-label="رسم المئة">
         <option value="ma'a">مائة</option>
         <option value="mi'a">مئة</option>
       </select>
-      <select v-model="minor" :class="field">
+      <select v-model="minor" :class="field" aria-label="الكسور">
         <option value="words">الكسور بالحروف</option>
         <option value="fraction">الكسور كسراً</option>
       </select>
-      <select v-if="!currency" v-model="gender" :class="field">
+      <select v-if="!currency" v-model="gender" :class="field" aria-label="النوع">
         <option value="m">مذكر</option>
         <option value="f">مؤنث</option>
       </select>

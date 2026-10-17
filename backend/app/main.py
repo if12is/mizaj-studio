@@ -15,9 +15,27 @@ import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import dictionary, documents, health, packs, projects, settings, spelling, tashkeel
+from app.api import arud as arud_api
+from app.api import corrections as corrections_api
+from app.api import (
+    dictionary,
+    documents,
+    health,
+    packs,
+    packs2,
+    projects,
+    quran,
+    resources,
+    settings,
+    spelling,
+    tashkeel,
+    tools,
+)
 from app.api import docx as docx_api
+from app.api import io as io_api
+from app.api import irab as irab_api
 from app.api import legal as legal_api
+from app.api import names as names_api
 from app.core.database import DB_NAME
 from app.core.errors import MizajError, install_handlers
 from app.core.logging_setup import setup_logging
@@ -26,6 +44,7 @@ from app.core.watchdog import start_parent_watchdog
 from app.engine import config
 from app.engine.manager import manager
 from app.legal.store import seed_templates
+from app.packs2.backup import apply_pending_restore
 
 log = logging.getLogger("mizaj.main")
 
@@ -37,6 +56,8 @@ def create_app(data_dir: Path, migrations_dir: Path | None = None) -> FastAPI:
     setup_logging(data_dir)
     db_path = data_dir / DB_NAME
     config.set_data_dir(data_dir)
+    # Finish a backup restore that could not swap files while the app was running.
+    apply_pending_restore(data_dir, db_path)
     try:
         run_migrations(db_path, data_dir / "backups", migrations_dir)
     except MigrationError as exc:
@@ -70,6 +91,15 @@ def create_app(data_dir: Path, migrations_dir: Path | None = None) -> FastAPI:
         packs,
         legal_api,
         spelling,
+        arud_api,
+        corrections_api,
+        irab_api,
+        names_api,
+        quran,
+        io_api,
+        packs2,
+        resources,
+        tools,
     ):
         app.include_router(mod.router)
     return app

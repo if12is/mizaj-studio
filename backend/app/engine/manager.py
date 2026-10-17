@@ -145,6 +145,10 @@ class EngineManager:
 
         analyzer = self.get_sync("mishkal")
         assert isinstance(analyzer, MishkalEngine)
+        if config.morph_version() == 2:
+            from app.engine.morph_filter import MorphFilterV2
+
+            return MorphFilterV2(analyzer, config.morph_threshold())
         return MorphFilter(analyzer)
 
 

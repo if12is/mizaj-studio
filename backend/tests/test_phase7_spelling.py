@@ -58,7 +58,7 @@ def test_hunspell_lite_accepts_inflected_and_rejects_garbage():
 
 
 def test_marks_and_tatweel_are_ignored_for_lookup(sp):
-    res = chk(sp, "الْكِتَابُ جَمِيلٌ والكتـــاب مفيد")
+    res = chk(sp, "الْكِتَابُ جَمِيلٌ والكتـــاب مفيد", checks=["dictionary", "patterns"])
     assert res["issues"] == []
 
 

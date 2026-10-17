@@ -21,13 +21,14 @@ class FakeUpdater extends EventEmitter implements UpdaterLike {
   quitAndInstall = vi.fn()
 }
 
-function make(opts: { isPackaged?: boolean; order?: string[] } = {}) {
+function make(opts: { isPackaged?: boolean; portable?: boolean; order?: string[] } = {}) {
   const updater = new FakeUpdater()
   const sent: UpdaterStatus[] = []
   const order = opts.order ?? []
   const ctl = new UpdaterController({
     updater,
     isPackaged: opts.isPackaged ?? true,
+    portable: opts.portable,
     send: (s) => sent.push(s),
     flushRenderer: async () => {
       order.push('flush')
@@ -152,5 +153,18 @@ describe('install sequence', () => {
     await ctl.installNow()
     expect(order).toEqual(['flush', 'stop', 'quitAndInstall'])
     expect(updater.quitAndInstall).toHaveBeenCalledWith(true, true)
+  })
+})
+
+describe('portable build', () => {
+  it('never checks automatically and explains why on a manual check', async () => {
+    const { updater, ctl, sent } = make({ portable: true })
+    ctl.setAutoCheck(true)
+    ctl.start()
+    await vi.advanceTimersByTimeAsync(CHECK_INTERVAL_MS * 2)
+    expect(updater.checkForUpdates).not.toHaveBeenCalled()
+    await ctl.check(true)
+    expect(updater.checkForUpdates).not.toHaveBeenCalled()
+    expect(sent.at(-1)).toEqual({ state: 'idle', code: 'portable' })
   })
 })

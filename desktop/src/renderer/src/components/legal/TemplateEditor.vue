@@ -62,12 +62,18 @@ async function save(): Promise<void> {
       v-model="name"
       :class="field"
       class="w-full"
+      aria-label="اسم القالب"
       placeholder="اسم القالب"
       data-testid="tpl-edit-name"
     />
     <div class="grid grid-cols-2 gap-2">
-      <input v-model="category" :class="field" placeholder="التصنيف" />
-      <input v-model="jurisdiction" :class="field" placeholder="الاختصاص القضائي" />
+      <input v-model="category" :class="field" aria-label="التصنيف" placeholder="التصنيف" />
+      <input
+        v-model="jurisdiction"
+        :class="field"
+        aria-label="الاختصاص القضائي"
+        placeholder="الاختصاص القضائي"
+      />
     </div>
     <textarea
       v-model="body"
@@ -75,6 +81,7 @@ async function save(): Promise<void> {
       :class="field"
       class="w-full font-mono"
       dir="rtl"
+      aria-label="نص القالب. مثال: {{ party.name }} ، {{ amount:rent }} ، {{ date:start }}"
       placeholder="نص القالب. مثال: {{ party.name }} ، {{ amount:rent }} ، {{ date:start }}"
       data-testid="tpl-edit-body"
     />
@@ -85,17 +92,30 @@ async function save(): Promise<void> {
       class="grid grid-cols-6 items-center gap-1"
       data-testid="tpl-var-row"
     >
-      <input v-model="r.name" :class="field" class="col-span-2" placeholder="الاسم" />
-      <select v-model="r.type" :class="field">
+      <input
+        v-model="r.name"
+        :class="field"
+        class="col-span-2"
+        aria-label="الاسم"
+        placeholder="الاسم"
+      />
+      <select v-model="r.type" :class="field" aria-label="نوع المتغير">
         <option v-for="ty in types" :key="ty" :value="ty">{{ ty }}</option>
       </select>
-      <input v-model="r.label" :class="field" class="col-span-2" placeholder="التسمية" />
+      <input
+        v-model="r.label"
+        :class="field"
+        class="col-span-2"
+        aria-label="التسمية"
+        placeholder="التسمية"
+      />
       <button class="text-red-500" @click="rows.splice(i, 1)">حذف</button>
       <input
         v-if="r.type === 'choice'"
         v-model="r.choices"
         :class="field"
         class="col-span-6"
+        aria-label="الخيارات مفصولة بفاصلة"
         placeholder="الخيارات مفصولة بفاصلة"
       />
       <input
@@ -103,12 +123,14 @@ async function save(): Promise<void> {
         v-model="r.currency"
         :class="field"
         class="col-span-3"
+        aria-label="العملة (SAR)"
         placeholder="العملة (SAR)"
       />
       <input
         v-model="r.default"
         :class="field"
         class="col-span-3"
+        aria-label="القيمة الافتراضية"
         placeholder="القيمة الافتراضية"
       />
       <label class="col-span-6 flex items-center gap-1"

@@ -84,16 +84,15 @@ export class RunSession {
     const edits = diffMarkEdits(current, chunk.text, from)
     if (!edits || edits.length === 0) return null
     const origFrom = this.baseFrom + this.toUtf16(chunk.start)
-    const shift = origFrom - from
-    let delta = 0
-    for (const e of edits) {
-      this.origEdits.push({ from: e.from + shift, to: e.to + shift, insert: e.insert })
-      delta += e.insert.length - (e.to - e.from)
-    }
+    // One replacement per chunk (not one change per mark): applying tens of thousands of
+    // tiny changes inside a huge single line is quadratic in CodeMirror's Text tree.
+    // Marks-only edits are still used to map the selection exactly.
+    this.origEdits.push({ from: origFrom, to: origFrom + current.length, insert: chunk.text })
+    const delta = chunk.text.length - current.length
     this.regions.push({ from: origFrom, to: this.baseFrom + this.toUtf16(chunk.end), delta })
     this.applied++
     return {
-      changes: edits,
+      changes: { from, to, insert: chunk.text },
       selection: mapSelection(state.selection, edits),
       annotations: Transaction.addToHistory.of(false)
     }

@@ -61,8 +61,23 @@ def catt_dir() -> Path:
     return resolve_model_dir()[1]
 
 
+def catt_precision() -> str:
+    """'auto' (default: INT8 encoder if present, else float), 'float' or 'int8'."""
+    return os.environ.get("MIZAJ_CATT_PRECISION", "auto").lower()
+
+
+def int8_available() -> bool:
+    return (catt_dir() / "encoder_int8.onnx").exists()
+
+
 def catt_encoder_path() -> Path:
-    return catt_dir() / "encoder.onnx"
+    d = catt_dir()
+    pref = catt_precision()
+    if pref in ("int8", "auto") and (d / "encoder_int8.onnx").exists():
+        return d / "encoder_int8.onnx"
+    if pref == "int8-attn" and (d / "encoder_int8_attn.onnx").exists():
+        return d / "encoder_int8_attn.onnx"
+    return d / "encoder.onnx"
 
 
 def catt_decoder_path() -> Path:
@@ -84,3 +99,30 @@ def is_mock() -> bool:
 
 def morph_filter_default() -> bool:
     return os.environ.get("MIZAJ_MORPH_FILTER", "1").lower() not in ("0", "false", "off", "no")
+
+
+def morph_version() -> int:
+    """1 = original conservative filter, 2 = confidence-gated re-ranking."""
+    return 2 if os.environ.get("MIZAJ_MORPH_VERSION", "2") == "2" else 1
+
+
+def confidence_threshold() -> float:
+    try:
+        return float(os.environ.get("MIZAJ_CONF_THRESHOLD", "0.9"))
+    except ValueError:
+        return 0.9
+
+
+def morph_threshold() -> float:
+    """Word-confidence below which the v2 morph filter may re-rank (tuned on the gold set)."""
+    try:
+        return float(os.environ.get("MIZAJ_MORPH_THRESHOLD", "0.75"))
+    except ValueError:
+        return 0.75
+
+
+def irab_threshold() -> float:
+    try:
+        return float(os.environ.get("MIZAJ_IRAB_THRESHOLD", "0.75"))
+    except ValueError:
+        return 0.75

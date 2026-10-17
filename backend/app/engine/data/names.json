@@ -1,0 +1,776 @@
+{
+"_comment": "Common Arabic given names, places and countries (internal vowels and shadda only; the case ending is left to the engine). Written for Mizaj Studio, GPL-3.0-or-later. Names that are also very common words with different vowels (عمر، قطر، هدى، منى، ورد، سلمى، نور...) are deliberately omitted.",
+"version": 1,
+"entries": [
+{
+"term": "محمد",
+"diacritized": "مُحَمَّد",
+"kind": "person"
+},
+{
+"term": "أحمد",
+"diacritized": "أَحْمَد",
+"kind": "person"
+},
+{
+"term": "محمود",
+"diacritized": "مَحْمُود",
+"kind": "person"
+},
+{
+"term": "مصطفى",
+"diacritized": "مُصْطَفَى",
+"kind": "person"
+},
+{
+"term": "علي",
+"diacritized": "عَلِي",
+"kind": "person"
+},
+{
+"term": "عثمان",
+"diacritized": "عُثْمَان",
+"kind": "person"
+},
+{
+"term": "خالد",
+"diacritized": "خَالِد",
+"kind": "person"
+},
+{
+"term": "يوسف",
+"diacritized": "يُوسُف",
+"kind": "person"
+},
+{
+"term": "إبراهيم",
+"diacritized": "إِبْرَاهِيم",
+"kind": "person"
+},
+{
+"term": "إسماعيل",
+"diacritized": "إِسْمَاعِيل",
+"kind": "person"
+},
+{
+"term": "يعقوب",
+"diacritized": "يَعْقُوب",
+"kind": "person"
+},
+{
+"term": "سليمان",
+"diacritized": "سُلَيْمَان",
+"kind": "person"
+},
+{
+"term": "داود",
+"diacritized": "دَاوُد",
+"kind": "person"
+},
+{
+"term": "موسى",
+"diacritized": "مُوسَى",
+"kind": "person"
+},
+{
+"term": "عيسى",
+"diacritized": "عِيسَى",
+"kind": "person"
+},
+{
+"term": "حسن",
+"diacritized": "حَسَن",
+"kind": "person"
+},
+{
+"term": "حسين",
+"diacritized": "حُسَيْن",
+"kind": "person"
+},
+{
+"term": "هشام",
+"diacritized": "هِشَام",
+"kind": "person"
+},
+{
+"term": "ياسر",
+"diacritized": "يَاسِر",
+"kind": "person"
+},
+{
+"term": "سمير",
+"diacritized": "سَمِير",
+"kind": "person"
+},
+{
+"term": "كريم",
+"diacritized": "كَرِيم",
+"kind": "person"
+},
+{
+"term": "طارق",
+"diacritized": "طَارِق",
+"kind": "person"
+},
+{
+"term": "زياد",
+"diacritized": "زِيَاد",
+"kind": "person"
+},
+{
+"term": "بلال",
+"diacritized": "بِلَال",
+"kind": "person"
+},
+{
+"term": "عادل",
+"diacritized": "عَادِل",
+"kind": "person"
+},
+{
+"term": "ماجد",
+"diacritized": "مَاجِد",
+"kind": "person"
+},
+{
+"term": "رشيد",
+"diacritized": "رَشِيد",
+"kind": "person"
+},
+{
+"term": "حمزة",
+"diacritized": "حَمْزَة",
+"kind": "person"
+},
+{
+"term": "أسامة",
+"diacritized": "أُسَامَة",
+"kind": "person"
+},
+{
+"term": "أنس",
+"diacritized": "أَنَس",
+"kind": "person"
+},
+{
+"term": "سعد",
+"diacritized": "سَعْد",
+"kind": "person"
+},
+{
+"term": "سعيد",
+"diacritized": "سَعِيد",
+"kind": "person"
+},
+{
+"term": "صالح",
+"diacritized": "صَالِح",
+"kind": "person"
+},
+{
+"term": "طلال",
+"diacritized": "طَلَال",
+"kind": "person"
+},
+{
+"term": "فهد",
+"diacritized": "فَهْد",
+"kind": "person"
+},
+{
+"term": "فيصل",
+"diacritized": "فَيْصَل",
+"kind": "person"
+},
+{
+"term": "ناصر",
+"diacritized": "نَاصِر",
+"kind": "person"
+},
+{
+"term": "منصور",
+"diacritized": "مَنْصُور",
+"kind": "person"
+},
+{
+"term": "وليد",
+"diacritized": "وَلِيد",
+"kind": "person"
+},
+{
+"term": "هاني",
+"diacritized": "هَانِي",
+"kind": "person"
+},
+{
+"term": "جمال",
+"diacritized": "جَمَال",
+"kind": "person"
+},
+{
+"term": "جلال",
+"diacritized": "جَلَال",
+"kind": "person"
+},
+{
+"term": "حامد",
+"diacritized": "حَامِد",
+"kind": "person"
+},
+{
+"term": "حازم",
+"diacritized": "حَازِم",
+"kind": "person"
+},
+{
+"term": "رامي",
+"diacritized": "رَامِي",
+"kind": "person"
+},
+{
+"term": "سامي",
+"diacritized": "سَامِي",
+"kind": "person"
+},
+{
+"term": "سامر",
+"diacritized": "سَامِر",
+"kind": "person"
+},
+{
+"term": "شادي",
+"diacritized": "شَادِي",
+"kind": "person"
+},
+{
+"term": "عبد الله",
+"diacritized": "عَبْد اللَّه",
+"kind": "person"
+},
+{
+"term": "عبد الرحمن",
+"diacritized": "عَبْد الرَّحْمَن",
+"kind": "person"
+},
+{
+"term": "عبد العزيز",
+"diacritized": "عَبْد الْعَزِيز",
+"kind": "person"
+},
+{
+"term": "فاطمة",
+"diacritized": "فَاطِمَة",
+"kind": "person"
+},
+{
+"term": "عائشة",
+"diacritized": "عَائِشَة",
+"kind": "person"
+},
+{
+"term": "خديجة",
+"diacritized": "خَدِيجَة",
+"kind": "person"
+},
+{
+"term": "مريم",
+"diacritized": "مَرْيَم",
+"kind": "person"
+},
+{
+"term": "زينب",
+"diacritized": "زَيْنَب",
+"kind": "person"
+},
+{
+"term": "أسماء",
+"diacritized": "أَسْمَاء",
+"kind": "person"
+},
+{
+"term": "ليلى",
+"diacritized": "لَيْلَى",
+"kind": "person"
+},
+{
+"term": "دعاء",
+"diacritized": "دُعَاء",
+"kind": "person"
+},
+{
+"term": "إيمان",
+"diacritized": "إِيمَان",
+"kind": "person"
+},
+{
+"term": "آمنة",
+"diacritized": "آمِنَة",
+"kind": "person"
+},
+{
+"term": "حفصة",
+"diacritized": "حَفْصَة",
+"kind": "person"
+},
+{
+"term": "رقية",
+"diacritized": "رُقَيَّة",
+"kind": "person"
+},
+{
+"term": "سارة",
+"diacritized": "سَارَة",
+"kind": "person"
+},
+{
+"term": "هاجر",
+"diacritized": "هَاجَر",
+"kind": "person"
+},
+{
+"term": "القاهرة",
+"diacritized": "الْقَاهِرَة",
+"kind": "place"
+},
+{
+"term": "الإسكندرية",
+"diacritized": "الْإِسْكَنْدَرِيَّة",
+"kind": "place"
+},
+{
+"term": "الجيزة",
+"diacritized": "الْجِيزَة",
+"kind": "place"
+},
+{
+"term": "أسوان",
+"diacritized": "أَسْوَان",
+"kind": "place"
+},
+{
+"term": "الأقصر",
+"diacritized": "الْأُقْصُر",
+"kind": "place"
+},
+{
+"term": "بغداد",
+"diacritized": "بَغْدَاد",
+"kind": "place"
+},
+{
+"term": "البصرة",
+"diacritized": "الْبَصْرَة",
+"kind": "place"
+},
+{
+"term": "الموصل",
+"diacritized": "الْمَوْصِل",
+"kind": "place"
+},
+{
+"term": "دمشق",
+"diacritized": "دِمَشْق",
+"kind": "place"
+},
+{
+"term": "حلب",
+"diacritized": "حَلَب",
+"kind": "place"
+},
+{
+"term": "حمص",
+"diacritized": "حِمْص",
+"kind": "place"
+},
+{
+"term": "اللاذقية",
+"diacritized": "اللَّاذِقِيَّة",
+"kind": "place"
+},
+{
+"term": "بيروت",
+"diacritized": "بَيْرُوت",
+"kind": "place"
+},
+{
+"term": "صيدا",
+"diacritized": "صَيْدَا",
+"kind": "place"
+},
+{
+"term": "القدس",
+"diacritized": "الْقُدْس",
+"kind": "place"
+},
+{
+"term": "غزة",
+"diacritized": "غَزَّة",
+"kind": "place"
+},
+{
+"term": "رام الله",
+"diacritized": "رَام اللَّه",
+"kind": "place"
+},
+{
+"term": "الخليل",
+"diacritized": "الْخَلِيل",
+"kind": "place"
+},
+{
+"term": "الرياض",
+"diacritized": "الرِّيَاض",
+"kind": "place"
+},
+{
+"term": "جدة",
+"diacritized": "جُدَّة",
+"kind": "place"
+},
+{
+"term": "مكة",
+"diacritized": "مَكَّة",
+"kind": "place"
+},
+{
+"term": "مكة المكرمة",
+"diacritized": "مَكَّة الْمُكَرَّمَة",
+"kind": "place"
+},
+{
+"term": "المدينة المنورة",
+"diacritized": "الْمَدِينَة الْمُنَوَّرَة",
+"kind": "place"
+},
+{
+"term": "الدمام",
+"diacritized": "الدَّمَّام",
+"kind": "place"
+},
+{
+"term": "الطائف",
+"diacritized": "الطَّائِف",
+"kind": "place"
+},
+{
+"term": "الدوحة",
+"diacritized": "الدَّوْحَة",
+"kind": "place"
+},
+{
+"term": "الكويت",
+"diacritized": "الْكُوَيْت",
+"kind": "place"
+},
+{
+"term": "المنامة",
+"diacritized": "الْمَنَامَة",
+"kind": "place"
+},
+{
+"term": "مسقط",
+"diacritized": "مَسْقَط",
+"kind": "place"
+},
+{
+"term": "صنعاء",
+"diacritized": "صَنْعَاء",
+"kind": "place"
+},
+{
+"term": "عدن",
+"diacritized": "عَدَن",
+"kind": "place"
+},
+{
+"term": "أبوظبي",
+"diacritized": "أَبُوظَبْي",
+"kind": "place"
+},
+{
+"term": "أبو ظبي",
+"diacritized": "أَبُو ظَبْي",
+"kind": "place"
+},
+{
+"term": "دبي",
+"diacritized": "دُبَيّ",
+"kind": "place"
+},
+{
+"term": "الشارقة",
+"diacritized": "الشَّارِقَة",
+"kind": "place"
+},
+{
+"term": "تونس",
+"diacritized": "تُونِس",
+"kind": "place"
+},
+{
+"term": "صفاقس",
+"diacritized": "صَفَاقِس",
+"kind": "place"
+},
+{
+"term": "الجزائر",
+"diacritized": "الْجَزَائِر",
+"kind": "place"
+},
+{
+"term": "وهران",
+"diacritized": "وَهْرَان",
+"kind": "place"
+},
+{
+"term": "الرباط",
+"diacritized": "الرِّبَاط",
+"kind": "place"
+},
+{
+"term": "الدار البيضاء",
+"diacritized": "الدَّار الْبَيْضَاء",
+"kind": "place"
+},
+{
+"term": "مراكش",
+"diacritized": "مَرَّاكُش",
+"kind": "place"
+},
+{
+"term": "فاس",
+"diacritized": "فَاس",
+"kind": "place"
+},
+{
+"term": "طرابلس",
+"diacritized": "طَرَابُلُس",
+"kind": "place"
+},
+{
+"term": "بنغازي",
+"diacritized": "بَنْغَازِي",
+"kind": "place"
+},
+{
+"term": "الخرطوم",
+"diacritized": "الْخَرْطُوم",
+"kind": "place"
+},
+{
+"term": "مصر",
+"diacritized": "مِصْر",
+"kind": "place"
+},
+{
+"term": "السعودية",
+"diacritized": "السُّعُودِيَّة",
+"kind": "place"
+},
+{
+"term": "الأردن",
+"diacritized": "الْأُرْدُن",
+"kind": "place"
+},
+{
+"term": "العراق",
+"diacritized": "الْعِرَاق",
+"kind": "place"
+},
+{
+"term": "سوريا",
+"diacritized": "سُورِيَا",
+"kind": "place"
+},
+{
+"term": "لبنان",
+"diacritized": "لُبْنَان",
+"kind": "place"
+},
+{
+"term": "فلسطين",
+"diacritized": "فِلَسْطِين",
+"kind": "place"
+},
+{
+"term": "الإمارات",
+"diacritized": "الْإِمَارَات",
+"kind": "place"
+},
+{
+"term": "البحرين",
+"diacritized": "الْبَحْرَيْن",
+"kind": "place"
+},
+{
+"term": "اليمن",
+"diacritized": "الْيَمَن",
+"kind": "place"
+},
+{
+"term": "السودان",
+"diacritized": "السُّودَان",
+"kind": "place"
+},
+{
+"term": "ليبيا",
+"diacritized": "لِيبِيَا",
+"kind": "place"
+},
+{
+"term": "المغرب",
+"diacritized": "الْمَغْرِب",
+"kind": "place"
+},
+{
+"term": "موريتانيا",
+"diacritized": "مُورِيتَانِيَا",
+"kind": "place"
+},
+{
+"term": "الصومال",
+"diacritized": "الصُّومَال",
+"kind": "place"
+},
+{
+"term": "جيبوتي",
+"diacritized": "جِيبُوتِي",
+"kind": "place"
+},
+{
+"term": "تركيا",
+"diacritized": "تُرْكِيَا",
+"kind": "place"
+},
+{
+"term": "إيران",
+"diacritized": "إِيرَان",
+"kind": "place"
+},
+{
+"term": "باكستان",
+"diacritized": "بَاكِسْتَان",
+"kind": "place"
+},
+{
+"term": "أفغانستان",
+"diacritized": "أَفْغَانِسْتَان",
+"kind": "place"
+},
+{
+"term": "الهند",
+"diacritized": "الْهِنْد",
+"kind": "place"
+},
+{
+"term": "الصين",
+"diacritized": "الصِّين",
+"kind": "place"
+},
+{
+"term": "اليابان",
+"diacritized": "الْيَابَان",
+"kind": "place"
+},
+{
+"term": "روسيا",
+"diacritized": "رُوسِيَا",
+"kind": "place"
+},
+{
+"term": "ألمانيا",
+"diacritized": "أَلْمَانِيَا",
+"kind": "place"
+},
+{
+"term": "فرنسا",
+"diacritized": "فَرَنْسَا",
+"kind": "place"
+},
+{
+"term": "إيطاليا",
+"diacritized": "إِيطَالِيَا",
+"kind": "place"
+},
+{
+"term": "إسبانيا",
+"diacritized": "إِسْبَانِيَا",
+"kind": "place"
+},
+{
+"term": "بريطانيا",
+"diacritized": "بَرِيطَانِيَا",
+"kind": "place"
+},
+{
+"term": "أمريكا",
+"diacritized": "أَمْرِيكَا",
+"kind": "place"
+},
+{
+"term": "كندا",
+"diacritized": "كَنَدَا",
+"kind": "place"
+},
+{
+"term": "أستراليا",
+"diacritized": "أُسْتُرَالِيَا",
+"kind": "place"
+},
+{
+"term": "أوروبا",
+"diacritized": "أُورُوبَّا",
+"kind": "place"
+},
+{
+"term": "آسيا",
+"diacritized": "آسِيَا",
+"kind": "place"
+},
+{
+"term": "أفريقيا",
+"diacritized": "أَفْرِيقِيَا",
+"kind": "place"
+},
+{
+"term": "النيل",
+"diacritized": "النِّيل",
+"kind": "place"
+},
+{
+"term": "دجلة",
+"diacritized": "دِجْلَة",
+"kind": "place"
+},
+{
+"term": "الفرات",
+"diacritized": "الْفُرَات",
+"kind": "place"
+},
+{
+"term": "الأندلس",
+"diacritized": "الْأَنْدَلُس",
+"kind": "place"
+},
+{
+"term": "الشام",
+"diacritized": "الشَّام",
+"kind": "place"
+},
+{
+"term": "الحجاز",
+"diacritized": "الْحِجَاز",
+"kind": "place"
+},
+{
+"term": "نجد",
+"diacritized": "نَجْد",
+"kind": "place"
+},
+{
+"term": "الخليج",
+"diacritized": "الْخَلِيج",
+"kind": "place"
+}
+]
+}

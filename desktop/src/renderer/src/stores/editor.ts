@@ -21,6 +21,26 @@ export interface EditorAccessor {
   applyEdit(from: number, to: number, expected: string, insert: string): boolean
   jumpTo(from: number, to: number): void
   spellNav(dir: 1 | -1): void
+  find: {
+    set(p: Partial<FindUiState>): void
+    step(dir: 1 | -1): void
+    replace(): void
+    replaceAll(): number
+    clear(): void
+  }
+  /** selection text, or the whole document when nothing is selected */
+  getReadText(): string
+  /** soft-split paragraphs longer than the threshold; returns how many were split */
+  splitLongLines(): number
+}
+
+export interface FindUiState {
+  query: string
+  replacement: string
+  ignoreMarks: boolean
+  foldLetters: boolean
+  wholeWord: boolean
+  stripReplacementMarks: boolean
 }
 
 export type RunState = 'idle' | 'waiting' | 'running' | 'paused' | 'done'
@@ -40,6 +60,14 @@ export const useEditorStore = defineStore('editor', () => {
   const diffBase = ref<string | null>(null)
   const showDiff = ref(false)
   const rightPanel = ref<'spelling' | 'legal' | null>(null)
+  const findOpen = ref(false)
+  const findInfo = ref({ count: 0, current: -1 })
+  const pendingCount = ref(0)
+  const longestLine = ref(0)
+  const splitLines = ref(0)
+  const announcement = ref('')
+  const shortcutsOpen = ref(false)
+  const aboutOpen = ref(false)
   const showStats = ref(false)
   /** Documents whose autosave must also send diacritized_content. */
   const diacritizedDocs = ref<Record<number, boolean>>({})
@@ -47,6 +75,11 @@ export const useEditorStore = defineStore('editor', () => {
    *  table under `manual_edits:<document_id>` (JSON {count, words}). */
   const manualEdits = ref<Record<number, ManualEdits>>({})
 
+  /** Polite screen-reader announcement (aria-live region in App.vue). */
+  function announce(text: string): void {
+    announcement.value = ''
+    queueMicrotask(() => (announcement.value = text))
+  }
   function register(a: EditorAccessor | null): void {
     accessor.value = a
   }
@@ -79,10 +112,19 @@ export const useEditorStore = defineStore('editor', () => {
     diffBase,
     showDiff,
     rightPanel,
+    findOpen,
+    findInfo,
+    pendingCount,
+    longestLine,
+    splitLines,
+    announcement,
+    shortcutsOpen,
+    aboutOpen,
     showStats,
     diacritizedDocs,
     manualEdits,
     register,
+    announce,
     addManualEdits,
     loadManualEdits,
     countWords

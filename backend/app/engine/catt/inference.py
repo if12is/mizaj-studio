@@ -39,8 +39,7 @@ class CATTEncoderOnly:
         keep = ids != self.pad_idx
         return keep[:, None, None, :] & keep[:, None, :, None]
 
-    def diacritize_batch(self, texts: list[str]) -> list[str]:
-        """`texts` must contain only Arabic letters and single spaces."""
+    def _run(self, texts: list[str], want_conf: bool):
         encoded = [self.tokenizer.encode(t, test_match=False)[0] for t in texts]
         max_len = max(len(e) for e in encoded)
         ids = np.full((len(encoded), max_len), self.pad_idx, dtype=np.int64)
@@ -51,8 +50,26 @@ class CATTEncoderOnly:
         logits = self.decoder.run(None, {"enc_src": enc})[0]
         preds = np.argmax(logits, axis=-1)
         space = inner == self.tokenizer.letters_map[" "]
+        conf = None
+        if want_conf:
+            # softmax probability of the chosen class, per input position
+            z = logits - logits.max(axis=-1, keepdims=True)
+            e = np.exp(z)
+            conf = e.max(axis=-1) / e.sum(axis=-1)
         preds[space] = self.tokenizer.tashkeel_map[self.tokenizer.no_tashkeel_tag]
+        return inner, preds, space, conf
+
+    def diacritize_batch(self, texts: list[str]) -> list[str]:
+        """`texts` must contain only Arabic letters and single spaces."""
+        inner, preds, _, _ = self._run(texts, False)
         return self.tokenizer.decode(inner, preds)
+
+    def diacritize_scored(self, text: str) -> tuple[str, list[float]]:
+        """Diacritized text and, per non-space input letter, the model's softmax confidence."""
+        inner, preds, space, conf = self._run([text], True)
+        out = self.tokenizer.decode(inner, preds)[0]
+        keep = ~space[0] & (inner[0] != self.pad_idx)
+        return out, [float(c) for c in conf[0][keep]]
 
     def diacritize(self, text: str) -> str:
         return self.diacritize_batch([text])[0]

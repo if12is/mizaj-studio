@@ -13,5 +13,5 @@ module.exports = {
     'vue/multi-word-component-names': 'off',
     '@typescript-eslint/no-explicit-any': 'warn'
   },
-  ignorePatterns: ['out', 'dist', 'test-results', 'node_modules', 'package-lock.json']
+  ignorePatterns: ['out', 'dist', 'test-results', 'sbom', 'node_modules', 'package-lock.json']
 }

@@ -18,11 +18,18 @@ extraResources:
     to: models/catt_eo
     filter:
       - '**/*.onnx'
+  - from: build/THIRD_PARTY_LICENSES.txt
+    to: THIRD_PARTY_LICENSES.txt
+  - from: ../LICENSE
+    to: LICENSE.txt
 win:
   target: nsis
   icon: build/icon.png
+  requestedExecutionLevel: asInvoker
 nsis:
   oneClick: false
+  # Optional, unchecked-by-default Defender exclusion page (see WINDOWS_DEFENDER.md)
+  include: build/installer.nsh
   allowToChangeInstallationDirectory: true
   createDesktopShortcut: true
   differentialPackage: true
@@ -30,6 +37,9 @@ nsis:
   installerLanguages:
     - ar_SA
     - en_US
+portable:
+  artifactName: Mizaj-Studio-Portable-${version}.${ext}
+  requestExecutionLevel: user
 mac:
   target: dmg
   category: public.app-category.productivity

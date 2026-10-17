@@ -167,12 +167,14 @@ const setStr = (name: string, v: string): void => {
             v-model="party(v.name)[f]"
             :class="field"
             class="w-full"
+            :aria-label="`${v.label || v.name} - ${PARTY_LABELS[f]}`"
             :placeholder="PARTY_LABELS[f]"
             :data-testid="`tpl-field-${v.name}-${f}`"
           />
         </template>
         <select
           v-else-if="v.type === 'choice'"
+          :aria-label="v.label || v.name"
           :class="field"
           class="w-full"
           :value="str(v.name)"
@@ -184,6 +186,7 @@ const setStr = (name: string, v: string): void => {
         </select>
         <input
           v-else
+          :aria-label="v.label || v.name"
           :type="v.type === 'date' ? 'date' : 'text'"
           :inputmode="v.type === 'money' || v.type === 'number' ? 'decimal' : undefined"
           :class="field"
@@ -214,7 +217,12 @@ const setStr = (name: string, v: string): void => {
     </div>
     <div v-else class="space-y-2 p-3 text-sm">
       <div class="flex flex-wrap gap-2">
-        <select v-model="category" :class="field" data-testid="tpl-category">
+        <select
+          v-model="category"
+          :class="field"
+          data-testid="tpl-category"
+          aria-label="تصنيف القوالب"
+        >
           <option value="">كل التصنيفات</option>
           <option v-for="c in categories" :key="c" :value="c">{{ c }}</option>
         </select>

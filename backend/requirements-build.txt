@@ -1,1 +1,3 @@
 pyinstaller==6.5.0
+# 7.1.2: only needed to produce the INT8 CATT encoder (scripts/quantize_catt.py)
+onnx==1.16.2
