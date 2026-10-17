@@ -26,7 +26,7 @@ import StatsPanel from './StatsPanel.vue'
 import { useSpellCheck } from '@renderer/composables/useSpellCheck'
 import { useSpellingStore } from '@renderer/stores/spelling'
 import { createThrottle as throttle2 } from '@renderer/composables/throttle'
-import { insertAtCursorSpec, safeEditSpec } from '@renderer/editor/safeEdit'
+import { insertAtCursorSpec, safeEditSpec, safeEditsSpec } from '@renderer/editor/safeEdit'
 import { goToIssue } from '@renderer/editor/spelling'
 import {
   findStep,
@@ -43,6 +43,14 @@ import { stripMarks } from '@renderer/editor/arabic'
 import { isolateHistory } from '@codemirror/commands'
 import { useTts } from '@renderer/composables/useTts'
 import FindBar from './FindBar.vue'
+import NormalizeDialog from './NormalizeDialog.vue'
+import { useEditorQuality } from '@renderer/composables/useEditorQuality'
+import { useQuranDetect } from '@renderer/composables/useQuranDetect'
+import { useQualityStore } from '@renderer/stores/quality'
+import { reviewKeep, reviewStep, type ConfWord } from '@renderer/editor/confidence'
+import { openInspectorAt } from '@renderer/editor/inspector'
+import ReviewBar from './ReviewBar.vue'
+import { normalizeSpec } from '@renderer/editor/normalizeEdits'
 
 const props = defineProps<{
   openDocument: (id: number) => Promise<void>
@@ -59,6 +67,9 @@ const host = ref<HTMLDivElement | null>(null)
 let view: EditorView | null = null
 let silent = false
 
+const quality = useQualityStore()
+const quranDetect = useQuranDetect(() => view)
+const quals = useEditorQuality(() => view)
 const spell = useSpellCheck(() => view)
 const spelling = useSpellingStore()
 let pendingMarks: import('@renderer/editor/spellModel').SpellMark[] | null = null
@@ -102,12 +113,16 @@ async function paragraphRun(): Promise<void> {
   const results = await Promise.all(
     paras.map(async (p) => {
       try {
-        const r = await api.post<{ text: string }>('/api/tashkeel', {
+        const r = await api.post<{ text: string; words?: ConfWord[] }>('/api/tashkeel', {
           text: p.text,
           mode: settings.values.engine_mode,
-          level: settings.values.tashkeel_level
+          level: settings.values.tashkeel_level,
+          confidence: quality.confidenceShow,
+          confidence_threshold: quality.confidenceThreshold,
+          protect_quran: quality.quranProtect,
+          ...(quality.poetryOn ? { poetry: true } : {})
         })
-        return r.text
+        return r
       } catch {
         return null
       }
@@ -117,14 +132,38 @@ async function paragraphRun(): Promise<void> {
     return notify('تغيّر النص أثناء التشكيل؛ أعد المحاولة.', { kind: 'info' })
   const items: PendingItem[] = []
   paras.forEach((p, i) => {
-    const out = results[i]
+    const res = results[i]
+    const out = res?.text
     // never accept a result that changes base letters
     if (out && out !== p.text && stripMarks(out) === stripMarks(p.text))
-      items.push({ id: ++pendingSeq, from: p.from, to: p.to, original: p.text, proposed: out })
+      items.push({
+        id: ++pendingSeq,
+        from: p.from,
+        to: p.to,
+        original: p.text,
+        proposed: out,
+        words: res?.words
+      })
   })
   if (!items.length) return notify('لا تغييرات مقترحة لهذه الفقرة.', { kind: 'info' })
   v.dispatch({ effects: addPending.of(items) })
   editor.announce(`${items.length} فقرة جاهزة للمراجعة: اقبل أو ارفض`)
+}
+
+const quranHintHidden = ref(false)
+function dismissQuranHint(): void {
+  quranHintHidden.value = true
+  void settings.update({ quran_hint_dismissed: 'true' })
+}
+function toggleReview(): void {
+  if (!view) return
+  if (quality.review.active) {
+    quality.review.active = false
+    return
+  }
+  quality.review.active = true
+  if (!reviewStep(quals.confidence, view, 1))
+    notify('لا توجد كلمات منخفضة الثقة للمراجعة. شكّل النص أولاً.', { kind: 'info' })
 }
 
 function splitLongLines(): number {
@@ -212,10 +251,13 @@ function extensions(): Extension[] {
         },
         onFullCheck: () => void spell.checkNow(true)
       },
+      confidence: quals.confidence,
+      quran: quals.quran,
       inspector: {
         fetchSuggestions,
         saveToDictionary,
-        onManualEdit: (n, w) => editor.addManualEdits(projects.currentDocument?.id ?? 0, n, w)
+        onManualEdit: (n, w) => editor.addManualEdits(projects.currentDocument?.id ?? 0, n, w),
+        ...quals.inspector
       }
     }),
     keymap.of([...defaultKeymap, ...historyKeymap]),
@@ -238,7 +280,10 @@ function extensions(): Extension[] {
         scheduleStats()
         if (!silent) emit('change')
       }
-      if (u.docChanged || u.viewportChanged) spell.schedule()
+      if (u.docChanged || u.viewportChanged) {
+        spell.schedule()
+        quranDetect.schedule()
+      }
     })
   ]
 }
@@ -253,6 +298,8 @@ function setText(text: string, notifyChange = false): void {
   editor.cursorLine = 1
   spelling.marks = []
   spell.schedule()
+  quranDetect.schedule()
+  quality.review = { active: false, total: 0, reviewed: 0, remaining: 0 }
   editor.diffBase = null
   editor.showDiff = false
   refreshStats()
@@ -341,6 +388,13 @@ onMounted(() => {
       view.dispatch(spec)
       return true
     },
+    applyEdits: (edits) => {
+      if (!view) return false
+      const spec = safeEditsSpec(view.state, edits, 'edit.batch')
+      if (!spec) return false
+      view.dispatch(spec)
+      return true
+    },
     jumpTo: (from, to) => {
       if (!view) return
       const len = view.state.doc.length
@@ -371,6 +425,20 @@ onMounted(() => {
       replaceAll: () => (view ? findReplaceAll(view) : 0),
       clear: () => view?.dispatch({ effects: setFind.of({ query: '' }) })
     },
+    selectionInfo: () => {
+      if (!view) return { from: 0, to: 0, text: '' }
+      const s = view.state.selection.main
+      return s.empty
+        ? { from: 0, to: view.state.doc.length, text: view.state.doc.toString() }
+        : { from: s.from, to: s.to, text: view.state.sliceDoc(s.from, s.to) }
+    },
+    currentLine: () => (view ? view.state.doc.lineAt(view.state.selection.main.head).text : ''),
+    applyNormalize: (base, edits, selected) => {
+      if (!view) return { applied: 0, skipped: 0 }
+      const r = normalizeSpec(view.state, base, edits, selected)
+      if (r.spec) view.dispatch(r.spec)
+      return { applied: r.applied, skipped: r.skipped }
+    },
     getReadText: () => {
       if (!view) return ''
       const s = view.state.selection.main
@@ -389,6 +457,7 @@ onMounted(() => {
 onBeforeUnmount(() => {
   statsThrottle.cancel()
   spell.dispose()
+  quranDetect.dispose()
   run.reset()
   editor.register(null)
   view?.destroy()
@@ -524,6 +593,41 @@ const btnCls =
         {{ tts.speaking.value ? 'إيقاف القراءة' : 'قراءة بصوت عالٍ' }}
       </button>
       <button
+        :class="[btnCls, quality.review.active ? 'border-mizaj-amber' : '']"
+        data-testid="toolbar-review"
+        title="F7"
+        :aria-pressed="quality.review.active"
+        @click="toggleReview"
+      >
+        وضع المراجعة
+      </button>
+      <button :class="btnCls" data-testid="toolbar-normalize" @click="quality.normalizeOpen = true">
+        توحيد النص
+      </button>
+      <button
+        :class="[btnCls, quality.poetryOn ? 'border-mizaj-emerald' : '']"
+        data-testid="poetry-toggle"
+        :aria-pressed="quality.poetryOn"
+        :disabled="!projects.currentDocument"
+        @click="quality.setPoetry(!quality.poetryOn)"
+      >
+        وضع الشعر
+      </button>
+      <button
+        :class="[btnCls, editor.rightPanel === 'quality' ? 'border-mizaj-emerald' : '']"
+        data-testid="toggle-quality-panel"
+        @click="editor.rightPanel = editor.rightPanel === 'quality' ? null : 'quality'"
+      >
+        جودة التحرير
+      </button>
+      <button
+        :class="[btnCls, editor.rightPanel === 'poetry' ? 'border-mizaj-emerald' : '']"
+        data-testid="toggle-poetry-panel"
+        @click="editor.rightPanel = editor.rightPanel === 'poetry' ? null : 'poetry'"
+      >
+        تحليل البحر
+      </button>
+      <button
         :class="btnCls"
         data-testid="toolbar-spell"
         title="Ctrl+Shift+L"
@@ -551,6 +655,36 @@ const btnCls =
         @click="loadSample"
       >
         تحميل النص التجريبي
+      </button>
+    </div>
+    <ReviewBar
+      @step="(d) => view && reviewStep(quals.confidence, view, d)"
+      @keep="view && reviewKeep(quals.confidence, view)"
+      @inspect="view && openInspectorAt(view)"
+    />
+    <div
+      v-if="quality.quranInstalled === false && !quality.quranHintDismissed && !quranHintHidden"
+      class="flex items-center gap-3 border-b border-blue-400/40 bg-blue-500/10 px-3 py-1 text-xs"
+      role="status"
+      data-testid="quran-hint"
+    >
+      <span
+        >نص القرآن غير مثبّت، لذلك لا تُحمى الآيات من التعديل ولا تُكتشف. يمكنك تثبيته من
+        الإعدادات.</span
+      >
+      <button
+        class="rounded bg-blue-600 px-2 py-0.5 text-white"
+        data-testid="quran-hint-open"
+        @click="quality.openSettings('quran')"
+      >
+        فتح الإعدادات
+      </button>
+      <button
+        class="rounded border px-2 py-0.5"
+        data-testid="quran-hint-dismiss"
+        @click="dismissQuranHint"
+      >
+        لا تُظهر مرة أخرى
       </button>
     </div>
     <FindBar />
@@ -601,9 +735,10 @@ const btnCls =
       v-show="!(editor.showDiff && editor.diffBase !== null)"
       ref="host"
       class="mizaj-editor min-h-0 flex-1"
-      :class="paletteClass"
+      :class="[paletteClass, quality.confidenceShow ? '' : 'conf-off']"
       data-testid="editor-host"
     />
+    <NormalizeDialog v-if="quality.normalizeOpen" />
     <DropOverlay @open="openAndMaybeDiacritize" />
   </section>
 </template>

@@ -6,6 +6,7 @@ import { clearSpellMarks, setSpellMarks } from '@renderer/editor/spelling'
 import { issuesToMarks, type SpellIssueRaw } from '@renderer/editor/spellModel'
 import { useEditorStore } from '@renderer/stores/editor'
 import { useSettingsStore } from '@renderer/stores/settings'
+import { useQualityStore } from '@renderer/stores/quality'
 
 export const SPELL_DEBOUNCE_MS = 1500
 export const LARGE_DOC_CHARS = 30_000
@@ -38,6 +39,7 @@ export function rangesToCheck(
 export function useSpellCheck(getView: () => EditorView | null) {
   const settings = useSettingsStore()
   const editor = useEditorStore()
+  const quality = useQualityStore()
   let timer: ReturnType<typeof setTimeout> | null = null
   let warnedMissing = false
 
@@ -47,15 +49,20 @@ export function useSpellCheck(getView: () => EditorView | null) {
     if (settings.values.spell_cat_spelling !== 'false') c.push('spelling')
     if (settings.values.spell_cat_pattern !== 'false') c.push('pattern')
     if (settings.values.spell_cat_punctuation !== 'false') c.push('punctuation')
+    if (settings.values.spell_cat_typography !== 'false') c.push('typography')
+    if (settings.values.spell_cat_grammar !== 'false' && quality.ltOn) c.push('grammar')
     return c
   }
   const apiChecks = (): string[] => {
     const m: Record<string, string> = {
       spelling: 'dictionary',
       pattern: 'patterns',
-      punctuation: 'punctuation'
+      punctuation: 'punctuation',
+      typography: 'typography'
     }
-    return cats().map((c) => m[c])
+    return cats()
+      .map((c) => m[c])
+      .filter(Boolean)
   }
 
   function clear(): void {
@@ -89,15 +96,33 @@ export function useSpellCheck(getView: () => EditorView | null) {
       }
     }
     try {
+      const checks = apiChecks()
+      const useLt = quality.ltOn && cats().includes('grammar')
       const results = await Promise.all(
-        pieces.map((p) =>
-          useApi().request<{ issues: SpellIssueRaw[] }>(
-            'POST',
-            '/api/spelling/check',
-            { text: doc.sliceString(p.from, p.to), checks: apiChecks(), max_issues: 2000 },
-            true
-          )
-        )
+        pieces.map(async (p) => {
+          const text = doc.sliceString(p.from, p.to)
+          const base = checks.length
+            ? await useApi().request<{ issues: SpellIssueRaw[] }>(
+                'POST',
+                '/api/spelling/check',
+                { text, checks, max_issues: 2000 },
+                true
+              )
+            : { issues: [] as SpellIssueRaw[] }
+          if (!useLt) return base
+          // 7.9.4: optional local LanguageTool grammar issues (only when enabled and detected)
+          try {
+            const lt = await useApi().request<{ issues: SpellIssueRaw[] }>(
+              'POST',
+              '/api/tools/languagetool/check',
+              { text, language: 'ar' },
+              true
+            )
+            return { issues: [...base.issues, ...lt.issues] }
+          } catch {
+            return base
+          }
+        })
       )
       const v = getView()
       if (!v) return

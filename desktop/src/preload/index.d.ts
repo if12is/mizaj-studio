@@ -51,6 +51,16 @@ declare global {
     setAutoUpdateCheck(enabled: boolean): Promise<void>
     onUpdaterStatus(cb: (s: UpdaterStatus) => void): () => void
     showSaveDialog(defaultName: string): Promise<string | null>
+    showSaveFileDialog(o: {
+      defaultName: string
+      extensions: string[]
+      filterName?: string
+    }): Promise<string | null>
+    showOpenFileDialog(o: { extensions: string[]; filterName?: string }): Promise<string | null>
+    showOpenDirectoryDialog(title?: string): Promise<string | null>
+    openPath(p: string): Promise<string>
+    openExternal(url: string): Promise<boolean>
+    relaunchApp(): Promise<void>
     onBeforeQuitFlush(cb: () => Promise<void>): () => void
   }
 

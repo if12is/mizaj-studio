@@ -9,6 +9,8 @@ import {
 import { Decoration, EditorView, WidgetType, keymap, type DecorationSet } from '@codemirror/view'
 import { isolateHistory } from '@codemirror/commands'
 import { diffMarkEdits, mapSelection } from './markEdits'
+import { addConfidence, type ConfMark, type ConfWord } from './confidence'
+import { allowQuranChange } from './quran'
 
 /** A proposed (not yet applied) tashkeel result for one paragraph (7.2.2). */
 export interface PendingItem {
@@ -17,6 +19,8 @@ export interface PendingItem {
   to: number
   original: string
   proposed: string
+  /** low-confidence words of `proposed` (offsets relative to it) */
+  words?: ConfWord[]
 }
 
 export const addPending = StateEffect.define<PendingItem[]>()
@@ -53,12 +57,32 @@ export function acceptSpec(state: EditorState, items: PendingItem[]): Transactio
   const ok = items.filter((i) => state.doc.sliceString(i.from, i.to) === i.original)
   if (!ok.length) return null
   const fine = ok.flatMap((i) => diffMarkEdits(i.original, i.proposed, i.from) ?? [])
+  // low-confidence marks at their positions in the NEW document
+  const marks: ConfMark[] = []
+  let shift = 0
+  for (const i of [...ok].sort((a, b) => a.from - b.from)) {
+    const nf = i.from + shift
+    for (const w of i.words ?? []) {
+      if (w.u16_end > i.proposed.length) continue
+      marks.push({
+        from: nf + w.u16_start,
+        to: nf + w.u16_end,
+        word: i.proposed.slice(w.u16_start, w.u16_end),
+        confidence: w.confidence,
+        irab: w.irab_confidence,
+        reviewed: false
+      })
+    }
+    shift += i.proposed.length - (i.to - i.from)
+  }
   return {
     changes: ok.map((i) => ({ from: i.from, to: i.to, insert: i.proposed })),
     selection: mapSelection(state.selection, fine),
-    effects: removePending.of(ok.map((i) => i.id)),
+    effects: marks.length
+      ? [removePending.of(ok.map((i) => i.id)), addConfidence.of(marks)]
+      : removePending.of(ok.map((i) => i.id)),
     userEvent: 'tashkeel.accept',
-    annotations: [isolateHistory.of('full')]
+    annotations: [isolateHistory.of('full'), allowQuranChange.of(true)]
   }
 }
 

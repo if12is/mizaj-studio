@@ -19,6 +19,7 @@ import { applyHarakaSpec, applyToAllSpec } from './inspector'
 import { RunSession, type StreamChunk } from './runSession'
 import { editorPaletteClass } from './fontClass'
 import { paragraphsFor } from './paragraphs'
+import { safeEditsSpec } from './safeEdit'
 
 const mk = (doc: string, anchor = 0, head = anchor) =>
   EditorState.create({
@@ -310,5 +311,36 @@ describe('paragraph ranges (7.2.2)', () => {
     const r = paragraphsFor(doc, 2, doc.length)
     expect(r.map((x) => x.text)).toEqual(['ر أول', 'نص mixed مع English عربي', 'آخر سطر'])
     expect(doc.sliceString(r[0].from, r[0].to)).toBe('ر أول')
+  })
+})
+
+describe('safeEditsSpec (multi-edit, one undo step)', () => {
+  const mk = (doc: string) => EditorState.create({ doc, extensions: [history()] })
+  it('applies verified edits as ONE transaction', () => {
+    const s = mk('أ ب ج د')
+    const spec = safeEditsSpec(
+      s,
+      [
+        { from: 4, to: 5, expected: 'ج', insert: 'جـ' },
+        { from: 0, to: 1, expected: 'أ', insert: 'ألف' }
+      ],
+      'edit.batch'
+    )!
+    const n = s.update(spec).state
+    expect(n.doc.toString()).toBe('ألف ب جـ د')
+    expect(undoDepth(n)).toBe(1)
+    let st = n
+    undo({ state: st, dispatch: (t) => (st = st.update(t).state) })
+    expect(st.doc.toString()).toBe('أ ب ج د')
+  })
+  it('is all-or-nothing: a stale, out-of-range or overlapping edit rejects the batch', () => {
+    const s = mk('أ ب ج')
+    const ok = { from: 0, to: 1, expected: 'أ', insert: 'x' }
+    expect(safeEditsSpec(s, [ok, { from: 2, to: 3, expected: 'ز', insert: 'y' }], 'e')).toBeNull()
+    expect(
+      safeEditsSpec(s, [ok, { from: 2, to: 99, expected: 'ب ج', insert: 'y' }], 'e')
+    ).toBeNull()
+    expect(safeEditsSpec(s, [ok, { from: 0, to: 3, expected: 'أ ب', insert: 'y' }], 'e')).toBeNull()
+    expect(safeEditsSpec(s, [], 'e')).toBeNull()
   })
 })

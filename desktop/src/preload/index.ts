@@ -66,6 +66,18 @@ const mizajAPI = {
   showSaveDialog: (defaultName: string): Promise<string | null> =>
     ipcRenderer.invoke('dialog:save-docx', defaultName),
   windowClose: (): Promise<void> => ipcRenderer.invoke('window:close'),
+  showSaveFileDialog: (o: {
+    defaultName: string
+    extensions: string[]
+    filterName?: string
+  }): Promise<string | null> => ipcRenderer.invoke('dialog:save-file', o),
+  showOpenFileDialog: (o: { extensions: string[]; filterName?: string }): Promise<string | null> =>
+    ipcRenderer.invoke('dialog:open-file', o),
+  showOpenDirectoryDialog: (title?: string): Promise<string | null> =>
+    ipcRenderer.invoke('dialog:open-directory', title),
+  openPath: (p: string): Promise<string> => ipcRenderer.invoke('shell:open-path', p),
+  openExternal: (url: string): Promise<boolean> => ipcRenderer.invoke('shell:open-external', url),
+  relaunchApp: (): Promise<void> => ipcRenderer.invoke('app:relaunch'),
   onBeforeQuitFlush: (cb: () => Promise<void>): (() => void) => {
     const handler = async (): Promise<void> => {
       try {

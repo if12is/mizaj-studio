@@ -9,6 +9,11 @@ import RightPanel from './components/RightPanel.vue'
 import SettingsModal from './components/SettingsModal.vue'
 import ShortcutsDialog from './components/ShortcutsDialog.vue'
 import AboutDialog from './components/AboutDialog.vue'
+import FileMenu from './components/files/FileMenu.vue'
+import BatchDialog from './components/files/BatchDialog.vue'
+import ImportPreviewDialog from './components/files/ImportPreviewDialog.vue'
+import OcrFailureDialog from './components/files/OcrFailureDialog.vue'
+import { useFileStore } from './stores/fileio'
 import { zoomAction } from './a11y/zoom'
 import { toastClass, toasts } from './api/toast'
 import { createAutosave } from './composables/autosave'
@@ -23,7 +28,7 @@ const sidecar = useSidecarStore()
 const projects = useProjectsStore()
 const settings = useSettingsStore()
 const editor = useEditorStore()
-const showSettings = ref(false)
+const files = useFileStore()
 const pane = ref<InstanceType<typeof EditorPane> | null>(null)
 
 const autosave = createAutosave({
@@ -89,6 +94,7 @@ onMounted(async () => {
   window.addEventListener('blur', flushNow)
   window.addEventListener('beforeunload', flushNow)
   offFlush = window.mizajAPI?.onBeforeQuitFlush(() => autosave.flush())
+  files.registerHooks({ flush: () => autosave.flush(), openDocument: selectDocument })
   await sidecar.init()
   void useUpdaterStore().init()
   if (sidecar.isReady) void bootstrap()
@@ -104,6 +110,7 @@ onBeforeUnmount(() => {
   window.removeEventListener('blur', flushNow)
   window.removeEventListener('beforeunload', flushNow)
   offFlush?.()
+  files.registerHooks(null)
   autosave.dispose()
 })
 </script>
@@ -144,13 +151,16 @@ onBeforeUnmount(() => {
         <div
           class="flex items-center justify-between border-b border-slate-200 px-3 py-1 dark:border-slate-700"
         >
-          <span class="text-sm font-semibold" data-testid="doc-title">
-            {{ projects.currentDocument?.title ?? 'لم يتم اختيار مستند' }}
-          </span>
+          <div class="flex items-center gap-2">
+            <FileMenu />
+            <span class="text-sm font-semibold" data-testid="doc-title">
+              {{ projects.currentDocument?.title ?? 'لم يتم اختيار مستند' }}
+            </span>
+          </div>
           <button
             class="rounded px-2 py-1 text-sm hover:bg-slate-200 dark:hover:bg-slate-700"
             data-testid="open-settings"
-            @click="showSettings = true"
+            @click="settings.openSettings()"
           >
             الإعدادات
           </button>
@@ -165,7 +175,10 @@ onBeforeUnmount(() => {
       <RightPanel :open-document="selectDocument" />
     </div>
     <StatusBar />
-    <SettingsModal v-if="showSettings" @close="showSettings = false" />
+    <SettingsModal v-if="settings.settingsOpen" @close="settings.closeSettings()" />
+    <BatchDialog v-if="files.batchOpen" />
+    <ImportPreviewDialog v-if="files.preview" :preview="files.preview" />
+    <OcrFailureDialog />
     <ShortcutsDialog v-if="editor.shortcutsOpen" />
     <AboutDialog v-if="editor.aboutOpen" />
     <div

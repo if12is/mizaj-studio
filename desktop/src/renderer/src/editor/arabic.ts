@@ -154,3 +154,21 @@ export function setLetterMarks(word: string, letterIdx: number, marks: string): 
   if (!slot) return word
   return word.slice(0, slot.index + 1) + marks + word.slice(slot.index + 1 + slot.marks.length)
 }
+
+/** Sentence around `pos` inside its line (split at . ! ? ؟ ؛ ; and Arabic full stops). */
+export function sentenceBounds(
+  doc: { lineAt(pos: number): { from: number; to: number; text: string } },
+  pos: number
+): { from: number; to: number } {
+  const line = doc.lineAt(pos)
+  const i = pos - line.from
+  const text = line.text
+  const isEnd = (c: string): boolean => /[.!?؟؛;…]/.test(c)
+  let a = i
+  while (a > 0 && !isEnd(text[a - 1])) a--
+  let b = i
+  while (b < text.length && !isEnd(text[b])) b++
+  if (b < text.length) b++ // include the terminator
+  while (a < b && /\s/.test(text[a])) a++
+  return { from: line.from + a, to: line.from + b }
+}

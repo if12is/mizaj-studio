@@ -5,12 +5,16 @@ import { inspectorExtension, type InspectorConfig } from './inspector'
 import { spellingExtension, type SpellConfig } from './spelling'
 import { findExtension, type FindConfig } from './find'
 import { pendingExtension, type PendingConfig } from './pending'
+import { confidenceExtension, type ConfConfig } from './confidence'
+import { quranExtension, type QuranConfig } from './quran'
 
 export interface MizajEditorConfig {
   inspector: InspectorConfig
   spelling: SpellConfig
   find: FindConfig
   pending: PendingConfig
+  confidence: ConfConfig
+  quran: QuranConfig
   onParagraphRun: () => void
   onDiacritize: () => void
 }
@@ -23,6 +27,8 @@ export function mizajEditorExtensions(cfg: MizajEditorConfig): Extension[] {
     spellingExtension(cfg.spelling),
     findExtension(cfg.find),
     pendingExtension(cfg.pending),
+    confidenceExtension(cfg.confidence),
+    quranExtension(cfg.quran),
     Prec.high(
       keymap.of([
         {

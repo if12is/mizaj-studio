@@ -1,6 +1,7 @@
 import { BrowserWindow, dialog, ipcMain } from 'electron'
 import { join } from 'node:path'
 import type { SidecarStatus } from './pythonManager'
+import { registerFileIpc } from './fileIpc'
 
 export const FLUSH_TIMEOUT_MS = 2000
 
@@ -65,6 +66,7 @@ function attachFlushOnClose(win: BrowserWindow): void {
 }
 
 export function registerIpc(getStatus: () => SidecarStatus): void {
+  registerFileIpc()
   const winOf = (e: Electron.IpcMainInvokeEvent): BrowserWindow | null =>
     BrowserWindow.fromWebContents(e.sender)
   ipcMain.handle('backend:get-config', () => {

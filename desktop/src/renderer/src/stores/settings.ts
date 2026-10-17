@@ -17,12 +17,35 @@ export const DEFAULT_SETTINGS: SettingsMap = {
   spell_cat_spelling: 'true',
   spell_cat_pattern: 'true',
   spell_cat_punctuation: 'true',
-  theme: 'dark'
+  spell_cat_typography: 'true',
+  spell_cat_grammar: 'true',
+  confidence_show: 'true',
+  confidence_threshold: '0.75',
+  quran_protect: 'true',
+  theme: 'dark',
+  // opt-in online features (AGENTS.md section 5): always off until the user turns them on
+  online_resources: 'false',
+  online_ollama: 'false',
+  online_languagetool: 'false'
 }
+
+export const SETTINGS_SECTIONS = [
+  'general',
+  'dictionary',
+  'glossary',
+  'quran',
+  'online',
+  'packs',
+  'backup',
+  'editor-quality'
+] as const
+export type SettingsSection = (typeof SETTINGS_SECTIONS)[number]
 
 export const useSettingsStore = defineStore('settings', () => {
   const values = ref<SettingsMap>({ ...DEFAULT_SETTINGS })
   const prefersContrast = ref(false)
+  const settingsOpen = ref(false)
+  const settingsSection = ref<SettingsSection>('general')
   const highContrast = computed(() =>
     values.value.high_contrast === 'auto'
       ? prefersContrast.value
@@ -62,17 +85,20 @@ export const useSettingsStore = defineStore('settings', () => {
   }
 
   /** Applies immediately (optimistic), then persists; rolls back on failure. */
+  let updateSeq = 0
   async function update(patch: SettingsMap): Promise<void> {
+    const seq = ++updateSeq
     const prev = values.value
     values.value = { ...prev, ...patch }
     applyToDom()
     try {
-      values.value = {
-        ...DEFAULT_SETTINGS,
-        ...(await useApi().put<SettingsMap>('/api/settings', patch))
-      }
+      const echo = await useApi().put<SettingsMap>('/api/settings', patch)
+      // Only the newest request may overwrite local state: an older response would flip back a
+      // control the user already changed again (rapid toggles). The newest echo contains
+      // every earlier patch because the server applies requests in order.
+      if (seq === updateSeq) values.value = { ...DEFAULT_SETTINGS, ...echo }
     } catch {
-      values.value = prev
+      if (seq === updateSeq) values.value = prev
     }
     applyToDom()
     pushUpdateSetting()
@@ -84,5 +110,30 @@ export const useSettingsStore = defineStore('settings', () => {
     if (next !== fontSize.value) await update({ editor_font_size: String(next) })
   }
 
-  return { values, isDark, highContrast, fontSize, colored, load, update, applyToDom, zoom }
+  /** Open the settings dialog, optionally on a given section (used by other panels). */
+  function openSettings(section: SettingsSection = 'general'): void {
+    settingsSection.value = (SETTINGS_SECTIONS as readonly string[]).includes(section)
+      ? section
+      : 'general'
+    settingsOpen.value = true
+  }
+  function closeSettings(): void {
+    settingsOpen.value = false
+  }
+
+  return {
+    settingsOpen,
+    settingsSection,
+    openSettings,
+    closeSettings,
+    values,
+    isDark,
+    highContrast,
+    fontSize,
+    colored,
+    load,
+    update,
+    applyToDom,
+    zoom
+  }
 })

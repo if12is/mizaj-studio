@@ -1,8 +1,13 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, defineAsyncComponent, onMounted, ref } from 'vue'
 import { useSettingsStore } from '@renderer/stores/settings'
 import DictionaryPanel from './DictionaryPanel.vue'
 import GlossaryPanel from './legal/GlossaryPanel.vue'
+import QuranSettings from './settings/QuranSettings.vue'
+import OnlineSettings from './settings/OnlineSettings.vue'
+import PacksSettings from './settings/PacksSettings.vue'
+import BackupSettings from './settings/BackupSettings.vue'
+import type { SettingsSection } from '@renderer/stores/settings'
 import { useFocusTrap } from '@renderer/composables/useFocusTrap'
 import { notify } from '@renderer/api/toast'
 import { useEditorStore } from '@renderer/stores/editor'
@@ -16,7 +21,26 @@ const dialog = ref<HTMLElement | null>(null)
 useFocusTrap(dialog, () => emit('close'))
 const settings = useSettingsStore()
 const sidecar = useSidecarStore()
-const tab = ref<'general' | 'dictionary' | 'glossary'>('general')
+const tab = ref<SettingsSection>(settings.settingsSection)
+
+// EditorQualitySettings.vue is owned by another slice; glob keeps the build working while it is absent.
+const optional = import.meta.glob('./settings/EditorQualitySettings.vue')
+const EditorQuality = optional['./settings/EditorQualitySettings.vue']
+  ? defineAsyncComponent(optional['./settings/EditorQualitySettings.vue'] as never)
+  : null
+const tabs = computed<[SettingsSection, string][]>(() => {
+  const list: [SettingsSection, string][] = [
+    ['general', 'عام'],
+    ['dictionary', 'القاموس الشخصي'],
+    ['glossary', 'المعجم القانوني'],
+    ['quran', 'القرآن الكريم'],
+    ['online', 'الاتصال والموارد المجانية'],
+    ['packs', 'الحزم والمشاركة'],
+    ['backup', 'النسخ الاحتياطي']
+  ]
+  if (EditorQuality) list.push(['editor-quality', 'جودة التحرير'])
+  return list
+})
 const fontSize = ref(settings.fontSize)
 
 interface PackStatus {
@@ -121,7 +145,7 @@ const field = 'rounded border px-2 py-1 dark:border-slate-600 dark:bg-slate-800'
     @click.self="emit('close')"
   >
     <div
-      class="max-h-[90vh] w-[40rem] max-w-[95vw] overflow-y-auto rounded-lg bg-white p-4 shadow-xl dark:bg-slate-800"
+      class="max-h-[90vh] w-[48rem] max-w-[95vw] overflow-y-auto rounded-lg bg-white p-4 shadow-xl dark:bg-slate-800"
       ref="dialog"
       role="dialog"
       aria-modal="true"
@@ -136,30 +160,18 @@ const field = 'rounded border px-2 py-1 dark:border-slate-600 dark:bg-slate-800'
           &#10005;
         </button>
       </div>
-      <div class="mb-3 flex gap-2 border-b dark:border-slate-700">
+      <div class="mb-3 flex flex-wrap gap-x-2 border-b dark:border-slate-700" role="tablist">
         <button
+          v-for="[k, label] in tabs"
+          :key="k"
           class="px-3 py-1"
-          :class="tab === 'general' ? 'border-b-2 border-mizaj-emerald font-semibold' : ''"
-          data-testid="tab-general"
-          @click="tab = 'general'"
+          role="tab"
+          :aria-selected="tab === k"
+          :class="tab === k ? 'border-b-2 border-mizaj-emerald font-semibold' : ''"
+          :data-testid="`tab-${k}`"
+          @click="tab = k"
         >
-          عام
-        </button>
-        <button
-          class="px-3 py-1"
-          :class="tab === 'dictionary' ? 'border-b-2 border-mizaj-emerald font-semibold' : ''"
-          data-testid="tab-dictionary"
-          @click="tab = 'dictionary'"
-        >
-          القاموس الشخصي
-        </button>
-        <button
-          class="px-3 py-1"
-          :class="tab === 'glossary' ? 'border-b-2 border-mizaj-emerald font-semibold' : ''"
-          data-testid="tab-glossary"
-          @click="tab = 'glossary'"
-        >
-          المعجم القانوني
+          {{ label }}
         </button>
       </div>
 
@@ -394,7 +406,12 @@ const field = 'rounded border px-2 py-1 dark:border-slate-600 dark:bg-slate-800'
         <p v-if="updateText" class="mt-2" data-testid="update-status">{{ updateText }}</p>
       </div>
       <DictionaryPanel v-else-if="tab === 'dictionary'" />
-      <GlossaryPanel v-else />
+      <GlossaryPanel v-else-if="tab === 'glossary'" />
+      <QuranSettings v-else-if="tab === 'quran'" />
+      <OnlineSettings v-else-if="tab === 'online'" />
+      <PacksSettings v-else-if="tab === 'packs'" />
+      <BackupSettings v-else-if="tab === 'backup'" />
+      <component :is="EditorQuality" v-else-if="tab === 'editor-quality' && EditorQuality" />
     </div>
   </div>
 </template>
