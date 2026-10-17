@@ -1,0 +1,80 @@
+@import '@fontsource/cairo/arabic-400.css';
+@import '@fontsource/cairo/arabic-600.css';
+@import '@fontsource/cairo/arabic-700.css';
+@import '@fontsource/amiri/arabic-400.css';
+@import '@fontsource/amiri/arabic-700.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Colored-diacritics font. The woff2 is generated separately (see fonts/README.md);
+   until it exists the browser falls back to bundled Amiri. */
+@font-face {
+  font-family: 'Amiri Mizaj Colr';
+  src: url('./fonts/Amiri-Mizaj-Colr.woff2') format('woff2');
+  font-display: swap;
+}
+
+@font-palette-values --mizaj-colored {
+  font-family: 'Amiri Mizaj Colr';
+  override-colors:
+    0 #10b981,
+    1 #f59e0b;
+}
+
+:root {
+  --editor-font: 'Amiri';
+  --editor-size: 20px;
+}
+
+html,
+body,
+#app {
+  height: 100%;
+  margin: 0;
+  font-family: 'Cairo', system-ui, sans-serif;
+}
+
+.drag-region {
+  -webkit-app-region: drag;
+}
+.no-drag {
+  -webkit-app-region: no-drag;
+}
+
+/* Editor: pure CSS toggle, zero DOM spans. */
+.mizaj-editor {
+  font-family: var(--editor-font), 'Amiri', serif;
+  font-size: var(--editor-size);
+  font-palette: normal;
+}
+.mizaj-editor.colored {
+  font-family: 'Amiri Mizaj Colr', var(--editor-font), 'Amiri', serif;
+  font-palette: --mizaj-colored;
+}
+.mizaj-editor .cm-editor {
+  height: 100%;
+  background: transparent;
+  color: inherit;
+}
+.mizaj-editor .cm-editor.cm-focused {
+  outline: none;
+}
+.mizaj-editor .cm-scroller {
+  font-family: inherit;
+  line-height: 2;
+  overflow: auto;
+}
+.mizaj-editor .cm-content {
+  padding: 24px 32px;
+  max-width: 60rem;
+  margin: 0 auto;
+}
+.mizaj-editor .cm-cursor {
+  border-left-color: #10b981;
+}
+.mizaj-editor .cm-selectionBackground,
+.mizaj-editor .cm-focused .cm-selectionBackground {
+  background: rgba(16, 185, 129, 0.3) !important;
+}
