@@ -18,6 +18,7 @@ env/
 .ruff_cache/
 build/
 *.spec
+!backend/mizaj_engine.spec
 
 # Models & Weights (Downloaded via scripts/download_models.py)
 backend/models/*.onnx

@@ -1,3 +1,5 @@
 models/catt_eo/
 *.zip
 *.onnx
+dist/
+build/

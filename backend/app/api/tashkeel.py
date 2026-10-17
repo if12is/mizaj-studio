@@ -38,6 +38,7 @@ class TashkeelRequest(BaseModel):
     level: Level | None = None
     keep_existing: bool = True
     morph_filter: bool | None = None
+    use_cache: bool = True  # False: bypass the chunk cache only (dictionary still applies)
 
 
 class StreamRequest(TashkeelRequest):
@@ -68,7 +69,7 @@ async def _build_pipeline(request: Request, body: TashkeelRequest, document_id=N
     if not doc_ok:
         raise not_found("Document", document_id)
     pipeline = await build_pipeline(
-        body.mode, body.level or level, body.keep_existing, body.morph_filter
+        body.mode, body.level or level, body.keep_existing, body.morph_filter, body.use_cache
     )
     engine = pipeline.engine
     return engine, pipeline

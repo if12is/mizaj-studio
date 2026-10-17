@@ -43,6 +43,7 @@ class TashkeelPipeline:
         keep_existing: bool = True,
         morph: MorphFilter | None = None,
         ambiguity: Callable[[str], bool] | None = None,
+        use_cache: bool = True,
         splitter: ArabicSentenceSplitter | None = None,
     ) -> None:
         self.engine = engine
@@ -50,6 +51,7 @@ class TashkeelPipeline:
         self.keep_existing = keep_existing
         self.morph = morph
         self.ambiguity = ambiguity
+        self.use_cache = use_cache
         self.splitter = splitter or ArabicSentenceSplitter()
         self.cache_tag = engine.cache_tag + ("+mf" if morph is not None else "")
 
@@ -64,11 +66,12 @@ class TashkeelPipeline:
             return ChunkResult(chunk_text, True, 0)
 
         cache = TashkeelCache(conn)
-        raw = cache.get_chunk(self.cache_tag, stripped)
+        raw = cache.get_chunk(self.cache_tag, stripped) if self.use_cache else None
         cached = raw is not None
         if raw is None:
             raw = self._run_engine(cache, stripped, spans)
-            cache.put_chunk(self.cache_tag, stripped, raw)
+            if self.use_cache:
+                cache.put_chunk(self.cache_tag, stripped, raw)
 
         out = self._apply_level(raw, spans)
         out = self._apply_dictionary(cache, out, stripped, spans)

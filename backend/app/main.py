@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import ipaddress
 import logging
+import os
 import socket
 import sys
 from pathlib import Path
@@ -13,12 +14,14 @@ import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import dictionary, documents, health, projects, settings, tashkeel
+from app.api import dictionary, documents, health, packs, projects, settings, tashkeel
 from app.api import docx as docx_api
 from app.core.database import DB_NAME
 from app.core.errors import MizajError, install_handlers
 from app.core.logging_setup import setup_logging
 from app.core.migrations import MigrationError, run_migrations
+from app.core.watchdog import start_parent_watchdog
+from app.engine import config
 
 log = logging.getLogger("mizaj.main")
 
@@ -29,6 +32,7 @@ def create_app(data_dir: Path, migrations_dir: Path | None = None) -> FastAPI:
     data_dir.mkdir(parents=True, exist_ok=True)
     setup_logging(data_dir)
     db_path = data_dir / DB_NAME
+    config.set_data_dir(data_dir)
     try:
         run_migrations(db_path, data_dir / "backups", migrations_dir)
     except MigrationError as exc:
@@ -50,7 +54,7 @@ def create_app(data_dir: Path, migrations_dir: Path | None = None) -> FastAPI:
         allow_headers=["*"],
     )
     install_handlers(app)
-    for mod in (health, projects, documents, settings, dictionary, tashkeel, docx_api):
+    for mod in (health, projects, documents, settings, dictionary, tashkeel, docx_api, packs):
         app.include_router(mod.router)
     return app
 
@@ -81,7 +85,15 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=0)
     parser.add_argument("--data-dir", type=Path, default=Path.home() / ".mizaj-studio")
+    parser.add_argument(
+        "--parent-pid",
+        type=int,
+        default=None,
+        help="exit when this process dies (default: env MIZAJ_PARENT_PID)",
+    )
     args = parser.parse_args(argv)
+    if args.parent_pid is None and os.environ.get("MIZAJ_PARENT_PID", "").isdigit():
+        args.parent_pid = int(os.environ["MIZAJ_PARENT_PID"])
     if not _is_loopback(args.host):
         parser.error("refusing to bind to non-loopback host (only 127.0.0.1 is allowed)")
     if not 0 <= args.port <= 65535:
@@ -100,6 +112,12 @@ def main(argv: list[str] | None = None) -> int:
     config = uvicorn.Config(app, log_config=None, access_log=False, lifespan="off")
     server = _Server(config)
     log.info("starting on 127.0.0.1:%d", sock.getsockname()[1])
+    if args.parent_pid:
+
+        def _stop() -> None:
+            server.should_exit = True
+
+        start_parent_watchdog(args.parent_pid, _stop)
     server.run(sockets=[sock])
     return 0
 

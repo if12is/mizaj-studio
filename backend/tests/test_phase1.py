@@ -3,6 +3,7 @@ import os
 import sqlite3
 import subprocess
 import sys
+import time
 import urllib.request
 from pathlib import Path
 
@@ -32,7 +33,10 @@ def mk_doc(client, pid, **kw):
 def test_health(client):
     r = client.get("/health")
     assert r.status_code == 200
-    assert r.json() == {
+    j = r.json()
+    models_dir = j.pop("models_dir")
+    assert isinstance(models_dir, str) and models_dir.endswith("catt_eo")
+    assert j == {
         "status": "ok",
         "version": "0.1.0",
         "engine_mode": "mock",
@@ -379,3 +383,62 @@ def test_cors_allows_local_renderer_origins(client):
         assert r.headers.get("access-control-allow-origin") == origin
     r = client.get("/health", headers={"Origin": "https://evil.example"})
     assert "access-control-allow-origin" not in r.headers
+
+
+def _start_sidecar(tmp_path, *extra, env_extra=None):
+    env = {**os.environ, "MIZAJ_ENGINE_MODE": "mock", **(env_extra or {})}
+    proc = subprocess.Popen(
+        [
+            sys.executable,
+            "-m",
+            "app.main",
+            "--port",
+            "0",
+            "--data-dir",
+            str(tmp_path / "d"),
+            *extra,
+        ],
+        cwd=BACKEND,
+        env=env,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.DEVNULL,
+        text=True,
+    )
+    assert proc.stdout.readline().startswith("MIZAJ_PORT=")
+    assert proc.stdout.readline().strip() == "MIZAJ_STATUS=READY"
+    return proc
+
+
+def _dummy_parent():
+    return subprocess.Popen([sys.executable, "-c", "import time; time.sleep(600)"])
+
+
+@pytest.mark.parametrize("via_env", [False, True])
+def test_sidecar_exits_when_parent_dies(tmp_path, via_env):
+    dummy = _dummy_parent()
+    if via_env:
+        proc = _start_sidecar(tmp_path, env_extra={"MIZAJ_PARENT_PID": str(dummy.pid)})
+    else:
+        proc = _start_sidecar(tmp_path, "--parent-pid", str(dummy.pid))
+    try:
+        time.sleep(1.5)
+        assert proc.poll() is None  # parent alive -> keeps running
+        dummy.kill()
+        dummy.wait()
+        t0 = time.time()
+        proc.wait(timeout=8)
+        assert time.time() - t0 < 6
+    finally:
+        for p in (dummy, proc):
+            if p.poll() is None:
+                p.kill()
+
+
+def test_sidecar_without_parent_pid_keeps_running(tmp_path):
+    proc = _start_sidecar(tmp_path)
+    try:
+        time.sleep(2)
+        assert proc.poll() is None
+    finally:
+        proc.terminate()
+        proc.wait(timeout=10)
