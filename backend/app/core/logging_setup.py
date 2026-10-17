@@ -34,3 +34,12 @@ def setup_logging(data_dir: Path, level: str | None = None) -> Path:
         root.addHandler(h)
     root.setLevel(lvl)
     return log_path
+
+
+def shutdown_logging() -> None:
+    """Close Mizaj's handlers so the log file can be deleted (Windows keeps open files locked)."""
+    root = logging.getLogger()
+    for h in list(root.handlers):
+        if getattr(h, _TAG, False):
+            root.removeHandler(h)
+            h.close()

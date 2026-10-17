@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import contextlib
 import json
 import logging
 import os
@@ -71,6 +72,7 @@ async def _run_engine(name: str, sentences: list[str], data_dir: Path) -> tuple[
 def evaluate(
     engines: list[str], items: list[tuple[str, str]], progress: bool = True
 ) -> dict[str, Any]:
+    from app.core.logging_setup import shutdown_logging
     from app.main import create_app
 
     logging.getLogger().setLevel(logging.WARNING)
@@ -80,9 +82,12 @@ def evaluate(
         "corpus": {"sentences": len(sentences), "words": n_words},
         "engines": {},
     }
-    with tempfile.TemporaryDirectory() as td:
+    # ExitStack unwinds before TemporaryDirectory cleans up.
+    with tempfile.TemporaryDirectory() as td, contextlib.ExitStack() as stack:
         data_dir = Path(td)
         create_app(data_dir)  # runs migrations
+        # The app's log file lives in td; release it before cleanup (required on Windows).
+        stack.callback(shutdown_logging)
         logging.getLogger().setLevel(logging.WARNING)
         for name in engines:
             try:
