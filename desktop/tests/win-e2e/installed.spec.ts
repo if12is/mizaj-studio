@@ -132,7 +132,9 @@ test.afterAll(async () => {
   // Keep the logs for the workflow's failure annotations; the directory is in RUNNER_TEMP.
 })
 
-test.afterEach(async (_fixtures, info) => {
+// Playwright requires a destructuring pattern for the fixtures argument.
+// eslint-disable-next-line no-empty-pattern
+test.afterEach(async ({}, info) => {
   if (info.status !== info.expectedStatus) {
     note(`FAILED "${info.title}": ${(info.error?.message ?? '').split('\n')[0]}`)
     if (page) {
