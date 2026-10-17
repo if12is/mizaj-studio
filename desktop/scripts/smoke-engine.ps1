@@ -26,7 +26,8 @@ try {
   while ((Get-Date) -lt $deadline) {
     if ($p.HasExited) { throw "Engine exited early with code $($p.ExitCode)`n$(Get-Content $err -Raw)" }
     if (Test-Path $out) {
-      $txt = Get-Content $out -Raw
+      # -Raw returns $null while the file is still empty.
+      $txt = [string](Get-Content $out -Raw)
       # Capture the port first: a second -match would overwrite $Matches.
       $m = [regex]::Match($txt, 'MIZAJ_PORT=(\d+)')
       if ($m.Success -and $txt.Contains('MIZAJ_STATUS=READY')) { $port = $m.Groups[1].Value; break }
