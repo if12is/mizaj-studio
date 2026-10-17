@@ -10,6 +10,7 @@ export const DEFAULT_SETTINGS: SettingsMap = {
   editor_font_size: '20',
   colored_diacritics: 'true',
   diacritic_color: 'emerald',
+  auto_update_check: 'true',
   theme: 'dark'
 }
 
@@ -18,6 +19,11 @@ export const useSettingsStore = defineStore('settings', () => {
   const isDark = computed(() => values.value.theme !== 'light')
   const fontSize = computed(() => Number(values.value.editor_font_size) || 20)
   const colored = computed(() => values.value.colored_diacritics === 'true')
+
+  /** Tell the main process whether automatic update checks are allowed. */
+  function pushUpdateSetting(): void {
+    void window.mizajAPI?.setAutoUpdateCheck(values.value.auto_update_check !== 'false')
+  }
 
   function applyToDom(): void {
     const root = document.documentElement
@@ -33,6 +39,7 @@ export const useSettingsStore = defineStore('settings', () => {
       /* keep defaults */
     }
     applyToDom()
+    pushUpdateSetting()
   }
 
   /** Applies immediately (optimistic), then persists; rolls back on failure. */
@@ -49,6 +56,7 @@ export const useSettingsStore = defineStore('settings', () => {
       values.value = prev
     }
     applyToDom()
+    pushUpdateSetting()
   }
 
   return { values, isDark, fontSize, colored, load, update, applyToDom }

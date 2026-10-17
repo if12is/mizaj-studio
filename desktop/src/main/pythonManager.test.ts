@@ -67,6 +67,7 @@ describe('PythonProcessManager', () => {
     ])
     expect(opts.windowsHide).toBe(true)
     expect(opts.cwd).toBe('/b')
+    expect((opts.env as Record<string, string>).MIZAJ_PARENT_PID).toBe(String(process.pid))
     expect((opts.env as Record<string, string>).PYTHONUNBUFFERED).toBe('1')
     ready(children[0])
     expect(mgr.getStatus()).toMatchObject({ state: 'ready', port: 54321, retry: 0 })
@@ -149,5 +150,22 @@ describe('resolvePythonExe', () => {
     expect(resolvePythonExe({}, '/b', 'linux', () => true)).toBe('/b/.venv/bin/python')
     expect(resolvePythonExe({}, '/b', 'linux', () => false)).toBe('python3')
     expect(resolvePythonExe({}, 'C:\\b', 'win32', () => false)).toBe('python')
+  })
+})
+
+describe('PythonProcessManager launch options', () => {
+  it('packaged mode: prefixArgs empty, extraEnv passed, pid exposed', () => {
+    const { mgr, spawn, children } = setup({ prefixArgs: [], extraEnv: { MIZAJ_MODELS_DIR: '/m' } })
+    mgr.start()
+    const [, args, opts] = spawn.mock.calls[0] as unknown as [
+      string,
+      string[],
+      Record<string, unknown>
+    ]
+    expect(args).toEqual(['--host', '127.0.0.1', '--port', '0', '--data-dir', '/d'])
+    expect((opts.env as Record<string, string>).MIZAJ_MODELS_DIR).toBe('/m')
+    expect(opts.windowsHide).toBe(true)
+    expect(mgr.getPid()).toBe(4242)
+    children[0].emit('exit', 1, null)
   })
 })
