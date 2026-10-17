@@ -1,0 +1,105 @@
+name: Update E2E
+
+# End-to-end test of the in-app auto-updater on real Windows:
+# install an OLD published release, let it discover the LATEST GitHub release,
+# download it, restart & install, then verify the installed version changed.
+on:
+  workflow_dispatch:
+    inputs:
+      from_version:
+        description: 'Old version to install first (e.g. 0.1.0)'
+        required: true
+        type: string
+        default: '0.1.0'
+
+permissions:
+  contents: read
+
+jobs:
+  update:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20.11.0'
+          cache: npm
+          cache-dependency-path: desktop/package-lock.json
+
+      - name: Install Playwright driver (no browsers needed for Electron)
+        working-directory: desktop
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+        run: npm ci
+
+      - name: Resolve versions
+        id: v
+        shell: pwsh
+        run: |
+          $latest = (gh release view --repo ${{ github.repository }} --json tagName | ConvertFrom-Json).tagName.TrimStart('v')
+          $from = '${{ inputs.from_version }}'
+          if ([version]$latest -le [version]$from) { throw "Latest release $latest is not newer than $from" }
+          "from=$from" >> $env:GITHUB_OUTPUT
+          "latest=$latest" >> $env:GITHUB_OUTPUT
+          Write-Host "Updating $from -> $latest"
+
+      - name: Download and silently install the old version
+        shell: pwsh
+        run: |
+          $from = '${{ steps.v.outputs.from }}'
+          gh release download "v$from" --repo ${{ github.repository }} --pattern "Mizaj-Studio-Setup-$from.exe" --dir "$env:RUNNER_TEMP\old"
+          $p = Start-Process -FilePath "$env:RUNNER_TEMP\old\Mizaj-Studio-Setup-$from.exe" -ArgumentList '/S' -Wait -PassThru
+          if ($p.ExitCode -ne 0) { throw "installer exit code $($p.ExitCode)" }
+
+      - name: Locate installed app and check its version
+        id: app
+        shell: pwsh
+        run: |
+          $roots = @("$env:LOCALAPPDATA\Programs", "$env:ProgramFiles")
+          $exe = Get-ChildItem -Path $roots -Recurse -Filter *.exe -ErrorAction SilentlyContinue |
+            Where-Object { $_.Name -notmatch 'Uninstall|mizaj-engine|elevate' -and $_.DirectoryName -match 'Mizaj' } |
+            Select-Object -First 1
+          if (-not $exe) { throw 'installed Mizaj Studio executable not found' }
+          $ver = $exe.VersionInfo.ProductVersion
+          Write-Host "installed: $($exe.FullName) version $ver"
+          if (-not $ver.StartsWith('${{ steps.v.outputs.from }}')) { throw "expected ${{ steps.v.outputs.from }}, got $ver" }
+          "exe=$($exe.FullName)" >> $env:GITHUB_OUTPUT
+
+      - name: Drive the updater UI (banner -> download -> restart & install)
+        working-directory: desktop
+        shell: pwsh
+        run: node scripts/update-e2e.mjs "${{ steps.app.outputs.exe }}" "${{ steps.v.outputs.latest }}" "$env:RUNNER_TEMP\userdata"
+
+      - name: Verify the new version is installed and relaunched
+        shell: pwsh
+        run: |
+          $exe = '${{ steps.app.outputs.exe }}'
+          $want = '${{ steps.v.outputs.latest }}'
+          $deadline = (Get-Date).AddMinutes(5)
+          do {
+            Start-Sleep -Seconds 5
+            $ver = if (Test-Path $exe) { (Get-Item $exe).VersionInfo.ProductVersion } else { '(missing)' }
+            Write-Host "installed version now: $ver"
+          } until ($ver.StartsWith($want) -or (Get-Date) -gt $deadline)
+          if (-not $ver.StartsWith($want)) {
+            Write-Host "::error title=Update E2E::installed version is $ver, expected $want"
+            throw 'update was not installed'
+          }
+          $running = Get-Process | Where-Object { $_.Path -eq $exe }
+          Write-Host "relaunched processes: $($running.Count)"
+          if (-not $running) { Write-Host "::warning title=Update E2E::app was not relaunched after install" }
+          $running | Stop-Process -Force -ErrorAction SilentlyContinue
+          Get-Process mizaj-engine -ErrorAction SilentlyContinue | Stop-Process -Force
+          Write-Host "::notice title=Update E2E::updated ${{ steps.v.outputs.from }} -> $ver successfully"
+
+      - name: Upload failure screenshot
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: update-e2e-failure
+          path: desktop/update-e2e-failure.png
+          if-no-files-found: ignore
