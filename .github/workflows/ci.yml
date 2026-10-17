@@ -33,6 +33,24 @@ jobs:
         run: |
           if [ -d tests ]; then pytest -v; fi
 
+  backend-windows:
+    runs-on: windows-latest
+    env:
+      MIZAJ_ENGINE_MODE: mock
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11.7'
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - name: Install Backend Dependencies
+        working-directory: ./backend
+        run: pip install -r requirements.txt
+      - name: Run Pytest Suite (Mock Mode, Windows)
+        working-directory: ./backend
+        run: pytest -q
+
   desktop-ci:
     runs-on: ubuntu-latest
     steps:

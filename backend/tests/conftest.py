@@ -31,3 +31,13 @@ def _reset_engines(monkeypatch):
     manager.reset()
     yield
     manager.reset()
+
+
+def pytest_runtest_logreport(report):
+    """On GitHub Actions, surface each failing test as an annotation (logs may be hard to reach)."""
+    if os.environ.get("GITHUB_ACTIONS") != "true" or not report.failed:
+        return
+    tail = "\n".join(str(report.longrepr).splitlines()[-15:])
+    msg = f"{report.nodeid} ({report.when})\n{tail}"
+    msg = msg.replace("%", "%25").replace("\r", "").replace("\n", "%0A")
+    print(f"\n::error title=pytest failure::{msg}", flush=True)
