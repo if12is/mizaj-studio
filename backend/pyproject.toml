@@ -6,7 +6,7 @@ requires-python = ">=3.11"
 [tool.ruff]
 line-length = 100
 target-version = "py311"
-extend-exclude = [".venv"]
+extend-exclude = [".venv", "app/engine/catt/bw2ar.py", "app/engine/catt/tokenizer.py", "app/engine/catt/utils.py"]
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "B", "UP"]

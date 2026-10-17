@@ -1,0 +1,15 @@
+Mizaj Studio vendors a trimmed copy of the encoder-only inference code of
+catt-tashkeel 1.0.2 (https://github.com/abjadai/catt, PyPI: catt-tashkeel).
+
+  Copyright Faris Alasmary / Abjad AI
+  Licensed under the Apache License, Version 2.0
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Vendored files: bw2ar.py, tokenizer.py, utils.py (trimmed; download and tqdm
+code removed), and inference.py (derived from CATTEncoderOnly in models.py).
+bw2ar.py additionally derives from Arabeyes "arabic.py" tables
+(C) 2003 Mohammed Elzubeir, (C) 2019 Faris Abdullah Alasmary, BSD License.
+
+The ONNX model weights (abjadai/catt release v2, eo_model_onnx.zip) are
+downloaded separately by scripts/download_models.py and are not redistributed
+in this repository.
