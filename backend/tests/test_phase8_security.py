@@ -454,7 +454,7 @@ def _xxe_body(tmp_path):
     secret.write_text("TOPSECRET-LOCAL-FILE")
     with zipfile.ZipFile(FIX / "sample_ar.docx") as z:
         doc = z.read("word/document.xml").decode("utf-8")
-    dtd = f'<!DOCTYPE d [<!ENTITY xxe SYSTEM "file://{secret}">]>'
+    dtd = f'<!DOCTYPE d [<!ENTITY xxe SYSTEM "{Path(secret).as_uri()}">]>'
     head, rest = doc.split("?>", 1)
     doc = head + "?>" + dtd + rest
     doc = doc.replace("<w:t>", "<w:t>&xxe;", 1) if "<w:t>" in doc else doc.replace("<w:t ", "<w:t>&xxe;</w:t><w:t ", 1)
@@ -490,7 +490,7 @@ def test_python_docx_parser_does_not_expand_entities_lock():
 
     secret = Path(__file__).parent / "fixtures" / "quran_mini.txt"
     xml = (
-        f'<!DOCTYPE d [<!ENTITY x SYSTEM "file://{secret}"><!ENTITY y "EXPANDED">]>'
+        f'<!DOCTYPE d [<!ENTITY x SYSTEM "{Path(secret).as_uri()}"><!ENTITY y "EXPANDED">]>'
         '<w:t xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">&x;&y;</w:t>'
     )
     el = parse_xml(xml)
