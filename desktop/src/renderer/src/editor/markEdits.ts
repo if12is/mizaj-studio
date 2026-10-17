@@ -93,13 +93,16 @@ export function stripEdits(text: string, from: number): MarkEdit[] {
 export function applyToAllEdits(
   lines: Iterable<{ from: number; text: string }>,
   bare: string,
-  newForm: string
+  newForm: string,
+  skip?: (from: number, to: number) => boolean
 ): { edits: MarkEdit[]; words: number } {
   const edits: MarkEdit[] = []
   let words = 0
   for (const line of lines) {
     for (const m of line.text.matchAll(WORD_RE)) {
       if (stripMarks(m[0]) !== bare || m[0] === newForm) continue
+      const abs = line.from + (m.index ?? 0)
+      if (skip?.(abs, abs + m[0].length)) continue
       const e = diffMarkEdits(m[0], newForm, line.from + (m.index ?? 0))
       if (e && e.length) {
         edits.push(...e)

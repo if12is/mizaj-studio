@@ -1,5 +1,7 @@
 import { ChangeSet, EditorState, Text, Transaction, type TransactionSpec } from '@codemirror/state'
 import type { MarkEdit } from './markEdits'
+import { allowQuranChange } from './quran'
+import type { ConfWord } from './confidence'
 import { isolateHistory } from '@codemirror/commands'
 import { stripMarks } from './arabic'
 import { diffMarkEdits, mapSelection } from './markEdits'
@@ -12,6 +14,13 @@ export interface StreamChunk {
   progress: number
   wps: number
   cached: number
+  /** low-confidence words (offsets relative to `text`) when requested */
+  words?: ConfWord[]
+}
+
+export interface RunOptions {
+  /** true if [from,to) overlaps protected (Quran) text in the CURRENT document */
+  isProtected?: (from: number, to: number) => boolean
 }
 
 /**
@@ -33,10 +42,14 @@ export class RunSession {
   skipped = 0
   applied = 0
 
+  /** low-confidence words in current-document coordinates (start/end as u16_*) */
+  private conf: ConfWord[] = []
+
   constructor(
     state: EditorState,
     readonly baseFrom: number,
-    readonly sentText: string
+    readonly sentText: string,
+    private readonly opts: RunOptions = {}
   ) {
     this.origDoc = state.doc
     // Python offsets are code points; convert when astral characters exist.
@@ -83,6 +96,11 @@ export class RunSession {
     }
     const edits = diffMarkEdits(current, chunk.text, from)
     if (!edits || edits.length === 0) return null
+    const prot = this.opts.isProtected
+    if (prot && edits.some((e) => prot(e.from, Math.max(e.to, e.from + 1)))) {
+      this.skipped++
+      return null
+    }
     const origFrom = this.baseFrom + this.toUtf16(chunk.start)
     // One replacement per chunk (not one change per mark): applying tens of thousands of
     // tiny changes inside a huge single line is quadratic in CodeMirror's Text tree.
@@ -91,16 +109,29 @@ export class RunSession {
     const delta = chunk.text.length - current.length
     this.regions.push({ from: origFrom, to: this.baseFrom + this.toUtf16(chunk.end), delta })
     this.applied++
+    for (const c of this.conf) {
+      if (c.u16_start >= to) {
+        c.u16_start += delta
+        c.u16_end += delta
+      }
+    }
+    for (const w of chunk.words ?? [])
+      this.conf.push({ ...w, u16_start: from + w.u16_start, u16_end: from + w.u16_end })
     return {
       changes: { from, to, insert: chunk.text },
       selection: mapSelection(state.selection, edits),
-      annotations: Transaction.addToHistory.of(false)
+      annotations: [Transaction.addToHistory.of(false), allowQuranChange.of(true)]
     }
   }
 
   /** Map a pre-run position to the current document. */
   mapPos(pos: number): number {
     return this.mapOrig(pos)
+  }
+
+  /** Low-confidence words at their final document positions (call after finish()). */
+  takeConfidence(): ConfWord[] {
+    return this.conf
   }
 
   hasChanges(): boolean {
@@ -117,13 +148,13 @@ export class RunSession {
       {
         changes: inv,
         selection: state.selection.map(inv),
-        annotations: Transaction.addToHistory.of(false)
+        annotations: [Transaction.addToHistory.of(false), allowQuranChange.of(true)]
       },
       {
         changes,
         selection: state.selection,
         userEvent: 'tashkeel',
-        annotations: [isolateHistory.of('full')]
+        annotations: [isolateHistory.of('full'), allowQuranChange.of(true)]
       }
     ]
   }

@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { ref, shallowRef } from 'vue'
 import type { SaveState } from '@renderer/composables/autosave'
 import { countWords } from '@renderer/editor/arabic'
+import type { NormEdit } from '@renderer/editor/normalizeEdits'
 import { useApi } from '@renderer/api'
 import {
   addManualEdit,
@@ -19,6 +20,8 @@ export interface EditorAccessor {
   insertText(text: string): void
   /** replace [from,to) only if it still equals `expected`; one transaction. false = stale */
   applyEdit(from: number, to: number, expected: string, insert: string): boolean
+  /** many verified edits as ONE transaction; false (and no change) if any range is stale */
+  applyEdits(edits: { from: number; to: number; expected: string; insert: string }[]): boolean
   jumpTo(from: number, to: number): void
   spellNav(dir: 1 | -1): void
   find: {
@@ -30,6 +33,14 @@ export interface EditorAccessor {
   }
   /** selection text, or the whole document when nothing is selected */
   getReadText(): string
+  /** selection (or whole document when nothing is selected) with its start offset */
+  selectionInfo(): { from: number; to: number; text: string }
+  currentLine(): string
+  applyNormalize(
+    base: number,
+    edits: NormEdit[],
+    selected: Set<number>
+  ): { applied: number; skipped: number }
   /** soft-split paragraphs longer than the threshold; returns how many were split */
   splitLongLines(): number
 }
@@ -59,7 +70,9 @@ export const useEditorStore = defineStore('editor', () => {
   /** Text before the last diacritization run (left side of the diff view). */
   const diffBase = ref<string | null>(null)
   const showDiff = ref(false)
-  const rightPanel = ref<'spelling' | 'legal' | null>(null)
+  const rightPanel = ref<'spelling' | 'legal' | 'poetry' | 'quality' | null>(null)
+  /** The legal panel asks for extra width (side-by-side comparison). */
+  const legalWide = ref(false)
   const findOpen = ref(false)
   const findInfo = ref({ count: 0, current: -1 })
   const pendingCount = ref(0)
@@ -112,6 +125,7 @@ export const useEditorStore = defineStore('editor', () => {
     diffBase,
     showDiff,
     rightPanel,
+    legalWide,
     findOpen,
     findInfo,
     pendingCount,

@@ -8,6 +8,9 @@ import { useProjectsStore } from '@renderer/stores/projects'
 import { useSettingsStore } from '@renderer/stores/settings'
 import { useSidecarStore } from '@renderer/stores/sidecar'
 import { RunSession } from '@renderer/editor/runSession'
+import { addConfidence, buildConfMarks } from '@renderer/editor/confidence'
+import { quranField } from '@renderer/editor/quran'
+import { useQualityStore } from '@renderer/stores/quality'
 
 export const readOnlyCompartment = new Compartment()
 
@@ -27,6 +30,7 @@ export function useTashkeelRun(getView: () => EditorView | null, onApplied: () =
   const settings = useSettingsStore()
   const sidecar = useSidecarStore()
   const projects = useProjectsStore()
+  const quality = useQualityStore()
   let ctrl: AbortController | null = null
   let paused: PausedRange | null = null
   let session: RunSession | null = null
@@ -43,6 +47,8 @@ export function useTashkeelRun(getView: () => EditorView | null, onApplied: () =
       const id = projects.currentDocument?.id
       if (id !== undefined) editor.diacritizedDocs = { ...editor.diacritizedDocs, [id]: true }
       onApplied()
+      const marks = buildConfMarks(view.state, session.takeConfidence(), 0)
+      if (marks.length) view.dispatch({ effects: addConfidence.of(marks) })
     }
   }
 
@@ -55,7 +61,11 @@ export function useTashkeelRun(getView: () => EditorView | null, onApplied: () =
     const to = range.whole ? view.state.doc.length : range.to
     const text = view.state.sliceDoc(from, to)
     if (!text.trim()) return
-    const mine = new RunSession(view.state, from, text)
+    const protect = quality.quranProtect
+    const mine = new RunSession(view.state, from, text, {
+      isProtected: (a, b) =>
+        protect && (view.state.field(quranField, false) ?? []).some((s) => a < s.to && b > s.from)
+    })
     session = mine
     ctrl = new AbortController()
     wantPause = false
@@ -67,8 +77,12 @@ export function useTashkeelRun(getView: () => EditorView | null, onApplied: () =
     const body: Record<string, unknown> = {
       text,
       mode: settings.values.engine_mode,
-      level: settings.values.tashkeel_level
+      level: settings.values.tashkeel_level,
+      confidence: quality.confidenceShow,
+      confidence_threshold: quality.confidenceThreshold,
+      protect_quran: quality.quranProtect
     }
+    if (quality.poetryOn) body.poetry = true
     if (projects.currentDocument) body.document_id = projects.currentDocument.id
     try {
       for await (const msg of streamTashkeel({

@@ -3,13 +3,14 @@ import { redo } from '@codemirror/commands'
 import { stripMarks } from './arabic'
 import { editsToSpec, stripEdits } from './markEdits'
 import { closeInspector, openInspectorAt } from './inspector'
+import { dropProtected, protectedSpans } from './quran'
 
 /** Strip diacritics of the selection (no-op when empty): one transaction. */
 export function stripSelection(view: EditorView): boolean {
   const sel = view.state.selection.main
   if (sel.empty) return true
   const text = view.state.sliceDoc(sel.from, sel.to)
-  const edits = stripEdits(text, sel.from)
+  const edits = dropProtected(stripEdits(text, sel.from), protectedSpans(view.state))
   if (edits.length) view.dispatch(editsToSpec(view.state, edits, 'tashkeel.strip'))
   return true
 }

@@ -39,12 +39,20 @@ const errs = computed(() => errorMap(preview.value?.errors ?? []))
 const editing = ref<null | { template?: TplFull }>(null)
 const fileInput = ref<HTMLInputElement | null>(null)
 const field = 'rounded border px-2 py-1 dark:border-slate-600 dark:bg-slate-800'
-const categories = computed(() => [...new Set(list.value.map((t) => t.category).filter(Boolean))])
+// categories come from the unfiltered list so the filter keeps offering every category
+const allCategories = ref<string[]>([])
+const categories = computed(() => allCategories.value)
 
 async function load(): Promise<void> {
   const q = category.value ? `?category=${encodeURIComponent(category.value)}` : ''
   try {
     list.value = await useApi().get<TplSummary[]>(`/api/legal/templates${q}`, true)
+    if (!category.value) {
+      allCategories.value = [...new Set(list.value.map((t) => t.category).filter(Boolean))]
+    } else if (!allCategories.value.length) {
+      const all = await useApi().get<TplSummary[]>('/api/legal/templates', true)
+      allCategories.value = [...new Set(all.map((t) => t.category).filter(Boolean))]
+    }
   } catch {
     list.value = []
   }

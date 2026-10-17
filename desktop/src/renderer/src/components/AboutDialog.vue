@@ -2,6 +2,8 @@
 import { onMounted, ref } from 'vue'
 import { useFocusTrap } from '@renderer/composables/useFocusTrap'
 import { useEditorStore } from '@renderer/stores/editor'
+import { useApi } from '@renderer/api'
+import { openExternal } from '@renderer/lib/native'
 
 const editor = useEditorStore()
 const el = ref<HTMLElement | null>(null)
@@ -13,8 +15,16 @@ const info = ref<{
   portable: boolean
   licenses: string | null
 } | null>(null)
+const DEFAULT_QURAN_ATTRIBUTION =
+  'نص القرآن الكريم من مشروع تنزيل Tanzil.net — مرخّص بموجب CC BY 3.0 — https://tanzil.net'
+const quran = ref<{ installed: boolean; attribution_ar: string } | null>(null)
 onMounted(async () => {
   info.value = (await window.mizajAPI?.getAboutInfo()) ?? null
+  try {
+    quran.value = await useApi().get('/api/quran/status', true)
+  } catch {
+    quran.value = null
+  }
 })
 </script>
 
@@ -46,6 +56,27 @@ onMounted(async () => {
       <p class="text-xs text-slate-500" dir="ltr">
         Source: github.com/if12is/mizaj-studio/tree/v{{ info?.version ?? '' }}
       </p>
+      <section class="mt-3" data-testid="about-quran">
+        <h3 class="font-semibold">نص القرآن الكريم</h3>
+        <p class="text-sm" data-testid="about-quran-attribution">
+          {{ quran?.attribution_ar ?? DEFAULT_QURAN_ATTRIBUTION }}
+        </p>
+        <p class="text-xs text-slate-500">
+          {{
+            quran?.installed
+              ? 'النص مثبّت على جهازك.'
+              : 'النص غير مثبّت؛ يُثبَّت اختيارياً من الإعدادات.'
+          }}
+          <button
+            class="text-mizaj-emerald underline"
+            dir="ltr"
+            data-testid="about-tanzil-link"
+            @click="openExternal('https://tanzil.net')"
+          >
+            tanzil.net
+          </button>
+        </p>
+      </section>
       <h3 class="mt-3 font-semibold">تراخيص المكونات الخارجية</h3>
       <pre
         class="mt-1 max-h-64 overflow-auto whitespace-pre-wrap rounded border p-2 text-xs dark:border-slate-600"

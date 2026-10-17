@@ -26,7 +26,9 @@ export interface SpellMark {
 export const CATEGORY_LABELS: Record<string, string> = {
   spelling: 'إملائي',
   pattern: 'أخطاء شائعة',
-  punctuation: 'ترقيم'
+  punctuation: 'ترقيم',
+  typography: 'طباعي (تنسيق النص)',
+  grammar: 'نحوي (LanguageTool)'
 }
 
 /** red = error, amber = warning, blue = info */

@@ -39,3 +39,35 @@ export function insertAtCursorSpec(
     annotations: [isolateHistory.of('full')]
   }
 }
+
+export interface VerifiedEdit {
+  from: number
+  to: number
+  expected: string
+  insert: string
+}
+
+/**
+ * Many edits as ONE transaction (one undo step). All-or-nothing: every range must still hold
+ * its `expected` text and ranges must not overlap; otherwise null (nothing is changed).
+ */
+export function safeEditsSpec(
+  state: EditorState,
+  edits: VerifiedEdit[],
+  userEvent: string
+): TransactionSpec | null {
+  if (!edits.length) return null
+  const sorted = [...edits].sort((a, b) => a.from - b.from || a.to - b.to)
+  let prevEnd = -1
+  for (const e of sorted) {
+    if (e.from < 0 || e.to < e.from || e.to > state.doc.length || e.from < prevEnd) return null
+    if (state.doc.sliceString(e.from, e.to) !== e.expected) return null
+    prevEnd = e.to
+  }
+  return {
+    changes: sorted.map((e) => ({ from: e.from, to: e.to, insert: e.insert })),
+    userEvent,
+    scrollIntoView: false,
+    annotations: [isolateHistory.of('full')]
+  }
+}

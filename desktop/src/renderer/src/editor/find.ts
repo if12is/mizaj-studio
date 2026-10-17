@@ -8,6 +8,7 @@ import {
   type ViewUpdate
 } from '@codemirror/view'
 import { isolateHistory } from '@codemirror/commands'
+import { dropProtected, protectedSpans } from './quran'
 import { findAll, nextMatch, replacementText, type FindMatch, type FindOptions } from './findModel'
 
 export interface FindState {
@@ -100,7 +101,11 @@ export function replaceAll(view: EditorView): number {
   if (!s.matches.length) return 0
   const ins = replacementText(s.replacement, s.stripReplacementMarks)
   view.dispatch({
-    changes: s.matches.map((m) => ({ from: m.from, to: m.to, insert: ins })),
+    changes: dropProtected(s.matches, protectedSpans(view.state)).map((m) => ({
+      from: m.from,
+      to: m.to,
+      insert: ins
+    })),
     userEvent: 'find.replaceAll',
     annotations: [isolateHistory.of('full')]
   })

@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import { useEditorStore } from '@renderer/stores/editor'
 import { useSpellingStore } from '@renderer/stores/spelling'
+import { useQualityStore } from '@renderer/stores/quality'
 
 const editor = useEditorStore()
 const spelling = useSpellingStore()
+const quality = useQualityStore()
 const dot: Record<string, string> = {
   error: 'bg-red-500',
   warning: 'bg-mizaj-amber',
@@ -15,6 +17,13 @@ const dot: Record<string, string> = {
   <div class="flex min-h-0 flex-1 flex-col text-sm" data-testid="spell-panel">
     <div class="flex items-center gap-2 border-b px-3 py-2 dark:border-slate-700">
       <span data-testid="spell-count">{{ spelling.marks.length }} ملاحظة</span>
+      <button
+        class="rounded border px-2 dark:border-slate-600"
+        data-testid="spell-normalize"
+        @click="quality.normalizeOpen = true"
+      >
+        توحيد النص…
+      </button>
       <button
         class="rounded border px-2 dark:border-slate-600"
         title="Shift+F8"
