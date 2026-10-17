@@ -11,6 +11,7 @@ from pathlib import Path
 
 import uvicorn
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
 from app.api import dictionary, documents, health, projects, settings
 from app.core.database import DB_NAME
@@ -39,6 +40,14 @@ def create_app(data_dir: Path, migrations_dir: Path | None = None) -> FastAPI:
     app = FastAPI(title="Mizaj Studio Backend", version=health.VERSION)
     app.state.data_dir = data_dir
     app.state.db_path = db_path
+    # Renderer runs from file:// (Origin: null) in production or the vite dev server.
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["null"],
+        allow_origin_regex=r"^http://(localhost|127\.0\.0\.1)(:\d+)?$",
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
     install_handlers(app)
     for mod in (health, projects, documents, settings, dictionary):
         app.include_router(mod.router)

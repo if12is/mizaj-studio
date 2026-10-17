@@ -371,3 +371,11 @@ def test_dictionary_import_export_roundtrip(client):
     r = client.post("/api/dictionary/import", json=exp)
     assert r.json() == {"imported": 2, "updated": 0}
     assert client.get("/api/dictionary/export").json()["entries"] == exp["entries"]
+
+
+def test_cors_allows_local_renderer_origins(client):
+    for origin in ("null", "http://localhost:5173", "http://127.0.0.1:5173"):
+        r = client.get("/health", headers={"Origin": origin})
+        assert r.headers.get("access-control-allow-origin") == origin
+    r = client.get("/health", headers={"Origin": "https://evil.example"})
+    assert "access-control-allow-origin" not in r.headers
