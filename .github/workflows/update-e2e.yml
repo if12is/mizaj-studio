@@ -69,24 +69,34 @@ jobs:
           if (-not $ver.StartsWith('${{ steps.v.outputs.from }}')) { throw "expected ${{ steps.v.outputs.from }}, got $ver" }
           "exe=$($exe.FullName)" >> $env:GITHUB_OUTPUT
 
-      - name: Drive the updater UI (banner -> download -> restart & install)
-        working-directory: desktop
-        shell: pwsh
-        run: node scripts/update-e2e.mjs "${{ steps.app.outputs.exe }}" "${{ steps.v.outputs.latest }}" "$env:RUNNER_TEMP\userdata"
-
-      - name: Verify the new version is installed and relaunched
+      # One step on purpose: Actions kills processes a step started when the step ends,
+      # which would kill the NSIS installer launched by quitAndInstall.
+      - name: Update via the in-app updater and verify the new version
         shell: pwsh
         run: |
           $exe = '${{ steps.app.outputs.exe }}'
           $want = '${{ steps.v.outputs.latest }}'
-          $deadline = (Get-Date).AddMinutes(5)
+          $ud = "$env:RUNNER_TEMP\userdata"
+          Push-Location desktop
+          node scripts/update-e2e.mjs "$exe" "$want" "$ud"
+          $uiExit = $LASTEXITCODE
+          Pop-Location
+          if ($uiExit -ne 0) { throw "updater UI flow failed ($uiExit)" }
+          $deadline = (Get-Date).AddMinutes(6)
           do {
             Start-Sleep -Seconds 5
             $ver = if (Test-Path $exe) { (Get-Item $exe).VersionInfo.ProductVersion } else { '(missing)' }
-            Write-Host "installed version now: $ver"
+            $inst = Get-Process | Where-Object { $_.Path -and $_.Path -match 'Setup|installer|nsis|Un_A' } | Select-Object -ExpandProperty Path
+            Write-Host "installed version: $ver | installer processes: $($inst -join ', ')"
           } until ($ver.StartsWith($want) -or (Get-Date) -gt $deadline)
           if (-not $ver.StartsWith($want)) {
-            Write-Host "::error title=Update E2E::installed version is $ver, expected $want"
+            $diag = @()
+            $upd = Get-ChildItem "$env:LOCALAPPDATA" -Directory -Filter '*updater*' -ErrorAction SilentlyContinue
+            foreach ($d in $upd) { $diag += "updater dir $($d.FullName): " + ((Get-ChildItem $d.FullName -Recurse -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Name) -join ', ') }
+            $mainLog = Join-Path $ud 'logs\mizaj-main.log'
+            if (Test-Path $mainLog) { $diag += (Get-Content $mainLog -Tail 30) }
+            $msg = ("installed version is $ver, expected $want`n" + ($diag -join "`n")).Replace('%','%25').Replace("`r",'').Replace("`n",'%0A')
+            Write-Host "::error title=Update E2E::$msg"
             throw 'update was not installed'
           }
           $running = Get-Process | Where-Object { $_.Path -eq $exe }
@@ -94,7 +104,7 @@ jobs:
           if (-not $running) { Write-Host "::warning title=Update E2E::app was not relaunched after install" }
           $running | Stop-Process -Force -ErrorAction SilentlyContinue
           Get-Process mizaj-engine -ErrorAction SilentlyContinue | Stop-Process -Force
-          Write-Host "::notice title=Update E2E::updated ${{ steps.v.outputs.from }} -> $ver successfully"
+          Write-Host "::notice title=Update E2E::updated ${{ steps.v.outputs.from }} -> $ver successfully (relaunched: $($running.Count -gt 0))"
 
       - name: Upload failure screenshot
         if: failure()
