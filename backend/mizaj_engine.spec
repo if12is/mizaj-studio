@@ -5,7 +5,10 @@
 # Reality vs. the original plan: libtashkeel does not exist on PyPI (not bundled; fast mode is
 # mishkal); the CATT model is NOT baked in (resolved at runtime: $MIZAJ_MODELS_DIR,
 # <data-dir>/models/catt_eo, <exe dir>/models/catt_eo, backend/models/catt_eo).
+import json
 import os
+import re
+import sys
 
 from PyInstaller.utils.hooks import (
     collect_all,
@@ -89,6 +92,49 @@ excludes = [
     "PyInstaller", "docx.tests", "numpy.tests", "numpy.f2py", "numpy.distutils",
 ]
 
+# --- Windows VERSIONINFO resource for mizaj-engine.exe (reduces AV "unknown binary" heuristics) ---
+def _app_version():
+    v = os.environ.get("MIZAJ_VERSION", "").strip().lstrip("v")
+    if not v:
+        try:
+            with open(os.path.join(BACKEND, "..", "desktop", "package.json"), encoding="utf-8") as f:
+                v = json.load(f).get("version", "")
+        except OSError:
+            v = ""
+    return v or "0.0.0"
+
+
+def _write_version_file():
+    """Write a PyInstaller version file (Windows only); returns its path or None."""
+    if sys.platform != "win32":
+        return None
+    ver = _app_version()
+    nums = [int(x) for x in re.findall(r"\d+", ver.split("-")[0].split("+")[0])[:4]]
+    nums += [0] * (4 - len(nums))
+    tup = tuple(nums)
+    text = f"""VSVersionInfo(
+  ffi=FixedFileInfo(filevers={tup}, prodvers={tup}, mask=0x3f, flags=0x0, OS=0x40004,
+                    fileType=0x1, subtype=0x0, date=(0, 0)),
+  kids=[
+    StringFileInfo([StringTable('040904B0', [
+      StringStruct('CompanyName', 'Mizaj Studio'),
+      StringStruct('FileDescription', 'Mizaj Studio engine'),
+      StringStruct('FileVersion', {ver!r}),
+      StringStruct('InternalName', 'mizaj-engine'),
+      StringStruct('LegalCopyright', 'GPL-3.0-or-later'),
+      StringStruct('OriginalFilename', 'mizaj-engine.exe'),
+      StringStruct('ProductName', 'Mizaj Studio'),
+      StringStruct('ProductVersion', {ver!r})])]),
+    VarFileInfo([VarStruct('Translation', [1033, 1200])])
+  ])
+"""
+    path = os.path.join(BACKEND, "build", "mizaj_engine_version.txt")
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(text)
+    return path
+
+
 a = Analysis(  # noqa: F821
     [os.path.join(BACKEND, "engine_entry.py")],
     pathex=[BACKEND],
@@ -109,8 +155,9 @@ exe = EXE(  # noqa: F821
     name="mizaj-engine",   # mizaj-engine.exe on Windows
     debug=False,
     strip=False,
-    upx=False,
+    upx=False,             # never UPX: packed binaries are a classic AV trigger
     console=True,          # stdout carries the MIZAJ_PORT handshake; Electron hides the window
+    version=_write_version_file(),
 )
 coll = COLLECT(  # noqa: F821
     exe,

@@ -1,0 +1,241 @@
+name: Defender Scan
+
+# Measure Windows Defender verdicts for the installer, the frozen engine and the installed files.
+# Build steps mirror release.yml. Findings are emitted as annotations (visible on the run page
+# and via the checks API); the full MpCmdRun output is also uploaded as an artifact.
+# See desktop/WINDOWS_DEFENDER.md.
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to stamp (empty = keep desktop/package.json version)'
+        required: false
+        type: string
+      build:
+        description: 'Build installer from this ref and scan it'
+        required: false
+        type: boolean
+        default: true
+      rebuild_bootloader:
+        description: 'Compile the PyInstaller bootloader from source (build_backend.py --rebuild-bootloader)'
+        required: false
+        type: boolean
+        default: false
+      scan_release:
+        description: 'Also scan the already-published GitHub release installer'
+        required: false
+        type: boolean
+        default: false
+      release_tag:
+        description: 'Release tag to scan (empty = latest)'
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  scan:
+    name: Build and scan with Windows Defender
+    runs-on: windows-latest
+    timeout-minutes: 120
+    defaults:
+      run:
+        shell: pwsh
+    env:
+      RELEASE_VERSION: ${{ inputs.version }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Prepare Defender helpers and report status
+        run: |
+          $helper = @'
+          $ErrorActionPreference = 'Continue'
+          $script:ReportFile = Join-Path $env:RUNNER_TEMP 'defender-report.txt'
+
+          function Get-MpCmdRun {
+            $plat = Get-ChildItem "$env:ProgramData\Microsoft\Windows Defender\Platform" -Directory -ErrorAction SilentlyContinue |
+              Sort-Object Name -Descending | Select-Object -First 1
+            if ($plat) {
+              $p = Join-Path $plat.FullName 'MpCmdRun.exe'
+              if (Test-Path $p) { return $p }
+            }
+            return "$env:ProgramFiles\Windows Defender\MpCmdRun.exe"
+          }
+
+          function Add-Report([string]$line) {
+            Add-Content -Path $script:ReportFile -Value $line -Encoding utf8
+            Write-Host $line
+          }
+
+          function Invoke-DefScan([string]$Label, [string]$Path) {
+            if (-not (Test-Path $Path)) { Add-Report "[SKIP] $Label : not found ($Path)"; return }
+            $mp = Get-MpCmdRun
+            $raw = & $mp -Scan -ScanType 3 -File $Path -DisableRemediation 2>&1 | Out-String
+            $code = $LASTEXITCODE
+            Set-Content -Path (Join-Path $env:RUNNER_TEMP ("mpcmdrun-" + ($Label -replace '[^\w\.-]', '_') + ".log")) -Value $raw -Encoding utf8
+            $hits = ($raw -split "`r?`n") | Where-Object { $_ -match '^\s*(Threat|Resources|file\s*:|containerfile|Scanning .* found|LIST OF DETECTED)' -or $_ -match '\bfound\b.*threat' }
+            if ($code -eq 0) {
+              Add-Report "[CLEAN] $Label (exit 0)"
+            } elseif ($code -eq 2) {
+              $txt = ($hits | ForEach-Object { $_.Trim() }) -join ' | '
+              Add-Report "[THREAT] $Label : $txt"
+              Write-Host "::error title=Defender detection ($Label)::$txt"
+            } else {
+              Add-Report "[ERROR] $Label : MpCmdRun exit $code - $(($raw -split "`r?`n" | Select-Object -Last 3) -join ' / ')"
+              Write-Host "::warning title=Defender scan error ($Label)::MpCmdRun exit code $code"
+            }
+          }
+
+          function Show-Summary {
+            $det = @()
+            try {
+              $det = Get-MpThreatDetection -ErrorAction Stop | ForEach-Object {
+                $name = try { (Get-MpThreat -ThreatID $_.ThreatID -ErrorAction Stop).ThreatName } catch { "id=$($_.ThreatID)" }
+                "$name -> $(($_.Resources) -join ', ')"
+              }
+            } catch { Add-Report "[WARN] Get-MpThreatDetection failed: $($_.Exception.Message)" }
+            if ($det) { Add-Report "Get-MpThreatDetection:"; $det | ForEach-Object { Add-Report "  $_" } }
+            $all = Get-Content $script:ReportFile -Raw
+            $bad = ($all -split "`r?`n") | Where-Object { $_ -match '^\[(THREAT|ERROR)\]' }
+            if ($bad -or $det) {
+              $msg = (($bad + $det) -join ' ## ')
+              if ($msg.Length -gt 3500) { $msg = $msg.Substring(0, 3500) + '...' }
+              Write-Host "::error title=Defender summary: DETECTIONS or errors::$msg"
+            } else {
+              $ok = (($all -split "`r?`n") | Where-Object { $_ -match '^\[CLEAN\]' }) -join ' ## '
+              Write-Host "::notice title=Defender summary: no detections::$ok"
+            }
+          }
+          '@
+          Set-Content -Path "$env:RUNNER_TEMP/defender-helpers.ps1" -Value $helper -Encoding utf8
+
+          . "$env:RUNNER_TEMP/defender-helpers.ps1"
+          try { Set-MpPreference -DisableRealtimeMonitoring $false -ErrorAction Stop } catch { Write-Host "Set-MpPreference: $($_.Exception.Message)" }
+          try { Update-MpSignature -ErrorAction Stop } catch { Write-Host "Update-MpSignature: $($_.Exception.Message)" }
+          $s = Get-MpComputerStatus
+          Add-Report ("Defender: AMServiceEnabled=$($s.AMServiceEnabled) RealTimeProtectionEnabled=$($s.RealTimeProtectionEnabled) " +
+                      "AntivirusSignatureVersion=$($s.AntivirusSignatureVersion) EngineVersion=$($s.AMEngineVersion) SigAge(days)=$($s.AntivirusSignatureAge)")
+          $pref = Get-MpPreference
+          Add-Report "Runner exclusions: paths=[$($pref.ExclusionPath -join ';')] processes=[$($pref.ExclusionProcess -join ';')] ext=[$($pref.ExclusionExtension -join ';')]"
+          # Runner images may exclude workspace/temp paths, which would hide detections: drop them.
+          foreach ($p in @($pref.ExclusionPath)) {
+            if ($p) { try { Remove-MpPreference -ExclusionPath $p -ErrorAction Stop; Add-Report "Removed runner exclusion: $p" } catch { Add-Report "Could not remove exclusion $p" } }
+          }
+          if (-not $s.AMServiceEnabled -or -not $s.RealTimeProtectionEnabled) {
+            Write-Host "::warning title=Defender not fully active::AMServiceEnabled=$($s.AMServiceEnabled) RealTimeProtectionEnabled=$($s.RealTimeProtectionEnabled)"
+          }
+          Write-Host "::notice title=Defender status::AMService=$($s.AMServiceEnabled) RealTime=$($s.RealTimeProtectionEnabled) Signatures=$($s.AntivirusSignatureVersion)"
+
+      # ---------------------------------------------------------------- build (mirrors release.yml)
+      - uses: actions/setup-python@v5
+        if: inputs.build
+        with:
+          python-version: '3.11.7'
+          cache: pip
+          cache-dependency-path: |
+            backend/requirements.txt
+            backend/requirements-build.txt
+
+      - uses: actions/setup-node@v4
+        if: inputs.build
+        with:
+          node-version: '20.11.0'
+          cache: npm
+          cache-dependency-path: desktop/package-lock.json
+
+      - name: Sync version from input
+        if: inputs.build
+        working-directory: desktop
+        run: node scripts/sync-version.cjs
+
+      - name: Install backend dependencies
+        if: inputs.build
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements.txt -r backend/requirements-build.txt
+
+      - name: Download CATT models (sha256 verified)
+        if: inputs.build
+        run: python scripts/download_models.py
+
+      - name: Build frozen engine (PyInstaller)
+        if: inputs.build
+        run: |
+          if ('${{ inputs.rebuild_bootloader }}' -eq 'true') { python scripts/build_backend.py --rebuild-bootloader }
+          else { python scripts/build_backend.py }
+          if ($LASTEXITCODE -ne 0) { throw "build_backend failed" }
+
+      - name: Install desktop dependencies
+        if: inputs.build
+        working-directory: desktop
+        run: npm ci
+
+      - name: Build app
+        if: inputs.build
+        working-directory: desktop
+        run: npm run build
+
+      - name: Package installer (electron-builder, no publish)
+        if: inputs.build
+        working-directory: desktop
+        run: npx electron-builder --win --publish never
+
+      # ---------------------------------------------------------------- scan
+      - name: Scan build outputs
+        if: inputs.build
+        run: |
+          . "$env:RUNNER_TEMP/defender-helpers.ps1"
+          $installer = Get-ChildItem desktop/dist -Filter '*Setup*.exe' | Select-Object -First 1
+          if (-not $installer) { throw 'Installer not found in desktop/dist' }
+          Add-Report "Installer: $($installer.Name) sha256=$((Get-FileHash $installer.FullName).Hash)"
+          Invoke-DefScan 'installer' $installer.FullName
+          Invoke-DefScan 'backend/dist/mizaj-engine' (Resolve-Path backend/dist/mizaj-engine).Path
+          Invoke-DefScan 'desktop/dist/win-unpacked' (Resolve-Path desktop/dist/win-unpacked).Path
+
+          # Silent install (per-user), then scan the installed tree. Also exercises build/installer.nsh.
+          $dir = Join-Path $env:RUNNER_TEMP 'mizaj-install'
+          $p = Start-Process -FilePath $installer.FullName -ArgumentList "/S /D=$dir" -PassThru -Wait
+          Add-Report "Silent install exit code: $($p.ExitCode)"
+          Start-Sleep -Seconds 5
+          Invoke-DefScan 'installed-dir' $dir
+          if (Test-Path "$dir\resources\engine\mizaj-engine.exe") {
+            $vi = (Get-Item "$dir\resources\engine\mizaj-engine.exe").VersionInfo
+            Add-Report "Engine VERSIONINFO: Company='$($vi.CompanyName)' Desc='$($vi.FileDescription)' Product='$($vi.ProductName)' Ver='$($vi.FileVersion)' Copyright='$($vi.LegalCopyright)'"
+          }
+          $exc = (Get-MpPreference).ExclusionPath
+          Add-Report "Exclusions after silent install (must be empty): [$($exc -join ';')]"
+          if ($exc) { Write-Host "::error title=Unexpected exclusion after silent install::$($exc -join ';')" }
+
+      - name: Scan published release installer
+        if: inputs.scan_release
+        run: |
+          . "$env:RUNNER_TEMP/defender-helpers.ps1"
+          $dest = Join-Path $env:RUNNER_TEMP 'release-dl'
+          New-Item -ItemType Directory -Force -Path $dest | Out-Null
+          $tag = '${{ inputs.release_tag }}'
+          if ($tag) { gh release download $tag --repo "${{ github.repository }}" --pattern '*Setup*.exe' --dir $dest --clobber }
+          else { gh release download --repo "${{ github.repository }}" --pattern '*Setup*.exe' --dir $dest --clobber }
+          $f = Get-ChildItem $dest -Filter '*.exe' | Select-Object -First 1
+          if (-not $f) { Write-Host '::warning title=Release scan::no release installer downloaded'; return }
+          Add-Report "Release installer: $($f.Name) sha256=$((Get-FileHash $f.FullName).Hash)"
+          Invoke-DefScan "release-$($f.Name)" $f.FullName
+
+      - name: Summary annotation
+        if: always()
+        run: |
+          . "$env:RUNNER_TEMP/defender-helpers.ps1"
+          if (-not (Test-Path $script:ReportFile)) { Write-Host '::error::no Defender report produced'; exit 0 }
+          Show-Summary
+          Get-Content $script:ReportFile | ForEach-Object { "- $_" } >> $env:GITHUB_STEP_SUMMARY
+
+      - name: Upload Defender report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: defender-report
+          if-no-files-found: ignore
+          path: |
+            ${{ runner.temp }}/defender-report.txt
+            ${{ runner.temp }}/mpcmdrun-*.log
