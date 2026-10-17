@@ -90,7 +90,9 @@ test.describe.configure({ mode: 'serial' })
 test.beforeAll(async () => {
   userData = process.env.MIZAJ_E2E_USERDATA ?? mkdtempSync(join(tmpdir(), 'mizaj-win-e2e-'))
   mkdirSync(userData, { recursive: true })
-  exportPath = join(userData, 'exported.docx')
+  // Exports into the app data folder are refused by design (8.1.3), so write outside it.
+  const outDir = mkdtempSync(join(tmpdir(), 'mizaj-win-e2e-out-'))
+  exportPath = join(outDir, 'exported.docx')
   try {
     expect(existsSync(exe), `installed exe not found: ${exe}`).toBe(true)
     const env: Record<string, string> = {}
