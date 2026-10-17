@@ -10,7 +10,7 @@ import {
   type Page
 } from '@playwright/test'
 import { execFileSync } from 'node:child_process'
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { appendFileSync, existsSync, mkdirSync, mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 
@@ -33,24 +33,34 @@ const docText = () =>
     ).cmView.view.state.doc.toString()
   )
 
-/** Call the sidecar HTTP API from inside the renderer (it knows base URL and token-less loopback). */
+let apiToken: string | undefined
+
+/** Append a line to the notes file the workflow tails on failure (stdout may be swallowed). */
+function note(msg: string): void {
+  try {
+    appendFileSync(join(userData, 'e2e-notes.log'), `${new Date().toISOString()} ${msg}\n`)
+  } catch {
+    /* userData not ready */
+  }
+  console.log(msg)
+}
+
+/** Call the sidecar HTTP API from Node (no CORS), with the per-launch token when there is one. */
 async function api<T>(path: string, init?: { method?: string; body?: unknown }): Promise<T> {
-  return page.evaluate(
-    async ([p, i]) => {
-      const cfg = await (
-        window as unknown as { mizajAPI: { getBackendConfig(): Promise<{ baseUrl: string }> } }
-      ).mizajAPI.getBackendConfig()
-      const init2 = i as { method?: string; body?: unknown } | undefined
-      const r = await fetch(`${cfg.baseUrl}${p as string}`, {
-        method: init2?.method ?? 'GET',
-        headers: { 'content-type': 'application/json' },
-        body: init2?.body === undefined ? undefined : JSON.stringify(init2.body)
-      })
-      if (!r.ok) throw new Error(`${p} -> HTTP ${r.status}: ${await r.text()}`)
-      return await r.json()
-    },
-    [path, init] as const
-  ) as Promise<T>
+  const cfg = await page.evaluate(() =>
+    (
+      window as unknown as { mizajAPI: { getBackendConfig(): Promise<{ baseUrl: string }> } }
+    ).mizajAPI.getBackendConfig()
+  )
+  const headers: Record<string, string> = { 'content-type': 'application/json' }
+  if (apiToken) headers['X-Mizaj-Token'] = apiToken
+  const r = await fetch(`${cfg.baseUrl}${path}`, {
+    method: init?.method ?? 'GET',
+    headers,
+    body: init?.body === undefined ? undefined : JSON.stringify(init.body)
+  })
+  if (!r.ok) throw new Error(`${path} -> HTTP ${r.status}: ${await r.text()}`)
+  return (await r.json()) as T
 }
 
 async function dropDocx(name: string): Promise<void> {
@@ -78,44 +88,57 @@ function docxXml(path: string): string {
 test.describe.configure({ mode: 'serial' })
 
 test.beforeAll(async () => {
-  expect(existsSync(exe), `installed exe not found: ${exe}`).toBe(true)
   userData = process.env.MIZAJ_E2E_USERDATA ?? mkdtempSync(join(tmpdir(), 'mizaj-win-e2e-'))
+  mkdirSync(userData, { recursive: true })
   exportPath = join(userData, 'exported.docx')
-  const env: Record<string, string> = {}
-  for (const [k, v] of Object.entries(process.env)) if (v !== undefined) env[k] = v
-  delete env.MIZAJ_ENGINE_MODE // REAL engine: must never be mock here
-  app = await electron.launch({
-    executablePath: exe,
-    env: {
-      ...env,
-      MIZAJ_USER_DATA_DIR: userData,
-      MIZAJ_E2E_SAVE_PATH: exportPath
-    },
-    timeout: 180_000
-  })
-  page = await app.firstWindow()
+  try {
+    expect(existsSync(exe), `installed exe not found: ${exe}`).toBe(true)
+    const env: Record<string, string> = {}
+    for (const [k, v] of Object.entries(process.env)) if (v !== undefined) env[k] = v
+    delete env.MIZAJ_ENGINE_MODE // REAL engine: must never be mock here
+    note(`launching ${exe}`)
+    app = await electron.launch({
+      executablePath: exe,
+      env: {
+        ...env,
+        MIZAJ_USER_DATA_DIR: userData,
+        MIZAJ_E2E_SAVE_PATH: exportPath,
+        MIZAJ_E2E_EXPOSE_TOKEN: '1'
+      },
+      timeout: 180_000
+    })
+    const out = (d: Buffer) => appendFileSync(join(userData, 'electron-output.log'), d)
+    app.process().stdout?.on('data', out)
+    app.process().stderr?.on('data', out)
+    page = await app.firstWindow()
+    page.on('console', (m) => m.type() === 'error' && note(`renderer error: ${m.text()}`))
+    page.on('pageerror', (e) => note(`renderer exception: ${e.message}`))
+    // Present once the per-launch token feature lands; undefined before that.
+    apiToken = await app
+      .evaluate(() => process.env.MIZAJ_API_TOKEN)
+      .then((t) => t || undefined)
+      .catch(() => undefined)
+    note(`launched; api token ${apiToken ? 'obtained' : 'not in use'}`)
+  } catch (e) {
+    note(`beforeAll failed: ${(e as Error).message}`)
+    throw e
+  }
 })
 
 test.afterAll(async () => {
-  await app?.close()
+  await Promise.race([app?.close(), new Promise((r) => setTimeout(r, 30_000))]).catch(
+    () => undefined
+  )
   // Keep the logs for the workflow's failure annotations; the directory is in RUNNER_TEMP.
 })
 
 test.afterEach(async (_fixtures, info) => {
-  if (info.status !== info.expectedStatus && page) {
-    const shot = join(userData, `fail-${info.title.replace(/\W+/g, '_')}.png`)
-    await page.screenshot({ path: shot }).catch(() => undefined)
-    let tail = ''
-    try {
-      const log = readFileSync(join(userData, 'logs', 'mizaj-main.log'), 'utf8').split('\n')
-      tail = log.slice(-8).join(' | ')
-    } catch {
-      /* no log yet */
+  if (info.status !== info.expectedStatus) {
+    note(`FAILED "${info.title}": ${(info.error?.message ?? '').split('\n')[0]}`)
+    if (page) {
+      const shot = join(userData, `fail-${info.title.replace(/\W+/g, '_')}.png`)
+      await page.screenshot({ path: shot }).catch(() => undefined)
     }
-    // Annotation visible in the run summary even when the logs are not reachable.
-    console.log(
-      `::error title=Windows E2E: ${info.title}::${(info.error?.message ?? '').split('\n')[0]} ${tail}`
-    )
   }
 })
 

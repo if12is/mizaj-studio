@@ -50,6 +50,12 @@ jobs:
           "SOURCE_DATE_EPOCH=$epoch" >> $env:GITHUB_ENV
           'PYTHONHASHSEED=0' >> $env:GITHUB_ENV
 
+      - name: Set an explicit dev version for the E2E build
+        working-directory: desktop
+        env:
+          RELEASE_VERSION: 0.0.0-e2e
+        run: node scripts/sync-version.cjs
+
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
@@ -71,6 +77,9 @@ jobs:
 
       - name: Build app and package the installer (no publish)
         working-directory: desktop
+        env:
+          # Playwright needs --inspect on the packaged exe; release builds keep that fuse OFF (build/afterPack.cjs).
+          MIZAJ_E2E_BUILD: '1'
         run: |
           npm run build
           npx electron-builder --win --publish never
@@ -105,17 +114,33 @@ jobs:
           MIZAJ_INSTALLED_EXE: ${{ steps.inst.outputs.exe }}
           MIZAJ_E2E_USERDATA: ${{ runner.temp }}\win-e2e-userdata
         run: |
+          $ErrorActionPreference = 'Continue'
           Remove-Item Env:MIZAJ_ENGINE_MODE -ErrorAction SilentlyContinue
-          npx playwright test -c playwright.win.config.ts
+          $ud = $env:MIZAJ_E2E_USERDATA
+          New-Item -ItemType Directory -Force -Path $ud | Out-Null
+          $out = Join-Path $env:RUNNER_TEMP 'playwright-output.txt'
+          function Esc([string]$t) { $t.Replace('%','%25').Replace("`r",'').Replace("`n",'%0A') }
+          function Tail([string]$path, [int]$n) {
+            if (Test-Path $path) { Esc ((Get-Content $path -Tail $n) -join "`n") } else { "(file missing: $path)" }
+          }
+          # Everything Playwright prints is captured (stdout + stderr) and echoed to the log.
+          & npx playwright test -c playwright.win.config.ts 2>&1 | ForEach-Object { "$_" } | Tee-Object -FilePath $out
           $code = $LASTEXITCODE
           if ($code -ne 0) {
-            $log = Join-Path $env:MIZAJ_E2E_USERDATA 'logs\mizaj-main.log'
-            if (Test-Path $log) {
-              $tail = ((Get-Content $log -Tail 15) -join "`n").Replace('%','%25').Replace("`r",'').Replace("`n",'%0A')
-              Write-Host "::error title=Windows E2E main log tail::$tail"
+            Write-Host "::error title=Windows E2E failed (exit $code), Playwright output::$(Tail $out 40)"
+            Write-Host "::error title=Windows E2E notes (spec)::$(Tail (Join-Path $ud 'e2e-notes.log') 40)"
+            Write-Host "::error title=Windows E2E Electron stdout/stderr::$(Tail (Join-Path $ud 'electron-output.log') 25)"
+            Write-Host "::error title=Windows E2E app main log::$(Tail (Join-Path $ud 'logs\mizaj-main.log') 25)"
+            Get-ChildItem (Join-Path $ud 'logs') -Filter *.log -ErrorAction SilentlyContinue |
+              Where-Object { $_.Name -ne 'mizaj-main.log' } |
+              ForEach-Object { Write-Host "::error title=Windows E2E backend log $($_.Name)::$(Tail $_.FullName 25)" }
+            if (-not (Test-Path (Join-Path $ud 'e2e-notes.log'))) {
+              Write-Host "::error title=Windows E2E::the spec never started (no notes file); see Playwright output above. userData: $((Get-ChildItem $ud -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Name) -join ', ')"
             }
             exit $code
           }
+          $summary = (Get-Content $out | Where-Object { $_ -match '\d+ passed' } | Select-Object -Last 1)
+          Write-Host "::notice title=Windows E2E passed::$summary"
 
       - name: Stop leftover processes
         if: always()
