@@ -15,6 +15,12 @@ import {
 export interface EditorAccessor {
   getText(): string
   setText(text: string): void
+  /** insert at the cursor (replacing the selection) as one transaction */
+  insertText(text: string): void
+  /** replace [from,to) only if it still equals `expected`; one transaction. false = stale */
+  applyEdit(from: number, to: number, expected: string, insert: string): boolean
+  jumpTo(from: number, to: number): void
+  spellNav(dir: 1 | -1): void
 }
 
 export type RunState = 'idle' | 'waiting' | 'running' | 'paused' | 'done'
@@ -33,6 +39,7 @@ export const useEditorStore = defineStore('editor', () => {
   /** Text before the last diacritization run (left side of the diff view). */
   const diffBase = ref<string | null>(null)
   const showDiff = ref(false)
+  const rightPanel = ref<'spelling' | 'legal' | null>(null)
   const showStats = ref(false)
   /** Documents whose autosave must also send diacritized_content. */
   const diacritizedDocs = ref<Record<number, boolean>>({})
@@ -71,6 +78,7 @@ export const useEditorStore = defineStore('editor', () => {
     wps,
     diffBase,
     showDiff,
+    rightPanel,
     showStats,
     diacritizedDocs,
     manualEdits,

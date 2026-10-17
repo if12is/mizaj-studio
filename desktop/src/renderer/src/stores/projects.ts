@@ -26,11 +26,15 @@ export const useProjectsStore = defineStore('projects', () => {
     currentProjectId.value = p.id
     return p
   }
-  async function createDocument(projectId: number, title: string): Promise<DocumentFull> {
+  async function createDocument(
+    projectId: number,
+    title: string,
+    content = ''
+  ): Promise<DocumentFull> {
     const d = await useApi().post<DocumentFull>('/api/documents', {
       project_id: projectId,
       title,
-      raw_content: ''
+      raw_content: content
     })
     await loadDocuments(projectId)
     return d

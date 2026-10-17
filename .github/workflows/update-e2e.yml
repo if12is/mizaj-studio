@@ -57,13 +57,17 @@ jobs:
         run: |
           function Step($name, [scriptblock]$cmd) {
             Write-Host "== $name"
-            & $cmd
+            $out = & $cmd 2>&1 | Out-String
+            Write-Host $out
             if ($LASTEXITCODE -ne 0) {
-              Write-Host "::error title=Local build::$name failed with exit code $LASTEXITCODE"
+              $tail = (($out -split "`n") | Select-Object -Last 20) -join "`n"
+              $tail = $tail.Replace('%','%25').Replace("`r",'').Replace("`n",'%0A')
+              Write-Host "::error title=Local build::$name failed with exit code $LASTEXITCODE%0A$tail"
               exit 1
             }
           }
           Step 'pip install' { pip install -r backend/requirements.txt -r backend/requirements-build.txt }
+          Step 'download models' { python scripts/download_models.py }
           Step 'freeze engine' { python scripts/build_backend.py }
           Push-Location desktop
           Step 'npm run build' { npm run build }

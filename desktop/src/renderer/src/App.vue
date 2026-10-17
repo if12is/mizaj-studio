@@ -5,9 +5,11 @@ import Sidebar from './components/Sidebar.vue'
 import EditorPane from './components/EditorPane.vue'
 import StatusBar from './components/StatusBar.vue'
 import UpdateBanner from './components/UpdateBanner.vue'
+import RightPanel from './components/RightPanel.vue'
 import SettingsModal from './components/SettingsModal.vue'
 import { toastClass, toasts } from './api/toast'
 import { createAutosave } from './composables/autosave'
+import type { DocumentFull } from './api/client'
 import { useEditorStore } from './stores/editor'
 import { useProjectsStore } from './stores/projects'
 import { useSettingsStore } from './stores/settings'
@@ -30,13 +32,17 @@ const autosave = createAutosave({
 
 let switchSeq = 0
 async function selectDocument(id: number): Promise<void> {
+  if (projects.currentDocument?.id === id) return // already open: keep the editor state/undo history
   const token = ++switchSeq
-  await autosave.flush() // save the outgoing document first
-  const d = await projects.fetchDocument(id)
-  if (token !== switchSeq) return // a newer selection superseded this one
-  // Flush again: edits typed while the fetch was in flight still belong to the old document.
-  await autosave.flush()
-  if (token !== switchSeq) return
+  let d: DocumentFull
+  for (;;) {
+    await autosave.flush() // save the outgoing document first
+    d = await projects.fetchDocument(id)
+    if (token !== switchSeq) return // a newer selection superseded this one
+    // Edits typed while the fetch was in flight belong to the OUTGOING document: save them
+    // and fetch again, so the swap below never shows stale server content.
+    if (!autosave.isDirty()) break
+  }
   // From here on everything is synchronous: swap text, current doc and autosave target together.
   projects.setCurrentDocument(d)
   pane.value?.setText(d.raw_content)
@@ -111,6 +117,7 @@ onBeforeUnmount(() => {
           @change="autosave.markDirty()"
         />
       </main>
+      <RightPanel :open-document="selectDocument" />
     </div>
     <StatusBar />
     <SettingsModal v-if="showSettings" @close="showSettings = false" />

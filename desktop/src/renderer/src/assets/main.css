@@ -158,3 +158,57 @@ body,
   background: transparent;
   color: inherit;
 }
+
+/* Spelling underlines: wavy, red = error, amber = warning, blue = info */
+.cm-spell {
+  text-decoration-line: underline;
+  text-decoration-style: wavy;
+  text-decoration-thickness: 1.5px;
+  text-underline-offset: 4px;
+}
+.cm-spell-error {
+  text-decoration-color: #ef4444;
+}
+.cm-spell-warning {
+  text-decoration-color: #f59e0b;
+}
+.cm-spell-info {
+  text-decoration-color: #3b82f6;
+}
+.mizaj-spell-tip {
+  min-width: 14rem;
+  max-width: 22rem;
+  padding: 8px;
+  font-family: 'Cairo', system-ui, sans-serif;
+  font-size: 14px;
+  background: #ffffff;
+  color: #0f172a;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
+}
+.dark .mizaj-spell-tip {
+  background: #1e293b;
+  color: #f1f5f9;
+  border-color: #475569;
+}
+.mizaj-spell-tip button {
+  cursor: pointer;
+  border-radius: 4px;
+  border: 1px solid #94a3b8;
+  padding: 2px 8px;
+  margin: 2px;
+  background: transparent;
+  color: inherit;
+}
+.mizaj-spell-tip button:hover {
+  background: rgba(16, 185, 129, 0.25);
+  border-color: #10b981;
+}
+.mizaj-spell-tip .mst-sug {
+  font-family: 'Amiri', serif;
+  font-size: 18px;
+}
+.mizaj-spell-tip .mst-msg {
+  margin-bottom: 6px;
+}

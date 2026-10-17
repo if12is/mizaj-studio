@@ -210,6 +210,140 @@ test('settings shows the models version section', async () => {
   await text('settings-close').click()
 })
 
+// ---------------------------------------------------------------- Phase 7 batch 2
+const setDocText = (t: string, cursorAtEnd = true) =>
+  page.evaluate(
+    ([t2, end]) => {
+      const v = (
+        document.querySelector('.cm-content') as unknown as {
+          cmView: {
+            view: { state: { doc: { length: number } }; dispatch(s: unknown): void; focus(): void }
+          }
+        }
+      ).cmView.view
+      v.dispatch({
+        changes: { from: 0, to: v.state.doc.length, insert: t2 },
+        selection: { anchor: end ? (t2 as string).length : 0 }
+      })
+      v.focus()
+    },
+    [t, cursorAtEnd] as const
+  )
+
+test('new document for the phase 7 tools', async () => {
+  await text('new-document').first().click()
+  await text('new-document-input').fill('مستند قانوني')
+  await text('new-document-input').press('Enter')
+  await page.getByTestId('document-item').filter({ hasText: 'مستند قانوني' }).click()
+  await expect(text('doc-title')).toHaveText('مستند قانوني')
+})
+
+test('spelling: underline appears and accepting a suggestion fixes the word', async () => {
+  await setDocText('ذهبت الى المدرسة')
+  const err = page.locator('.cm-spell-error').first()
+  await expect(err).toBeVisible({ timeout: 20_000 })
+  await err.hover()
+  await expect(text('spell-tooltip')).toBeVisible()
+  await page.locator('[data-testid="spell-suggestion"][data-value="إلى"]').click()
+  await expect.poll(docText).toBe('ذهبت إلى المدرسة')
+  await expect(page.locator('.cm-spell-error')).toHaveCount(0)
+  // the panel lists issues as well
+  await setDocText('ذهبت الى المدرسه')
+  await text('toggle-spell-panel').click()
+  await expect(text('spell-issue').first()).toBeVisible({ timeout: 20_000 })
+  await text('right-panel-close').click()
+})
+
+test('legal: tafqeet inserts text at the cursor', async () => {
+  await setDocText('المبلغ: ')
+  await text('toggle-legal-panel').click()
+  await text('tafqeet-amount').fill('1500')
+  await text('tafqeet-currency').selectOption('EGP')
+  await text('tafqeet-run').click()
+  await expect(text('tafqeet-result')).toBeVisible()
+  const words = (await text('tafqeet-result').innerText()).trim()
+  expect(words.length).toBeGreaterThan(5)
+  await text('tafqeet-insert').click()
+  await expect.poll(docText).toBe('المبلغ: ' + words)
+})
+
+test('legal: document check lists a planted amount mismatch and jumps to it', async () => {
+  const planted = '1500 (ألف وستمائة جنيه)'
+  await setDocText(`يدفع المستأجر مبلغ ${planted} شهرياً.`)
+  await text('legal-tab-checks').click()
+  await text('legal-check-run').click()
+  const issue = page.locator('[data-testid="legal-issue"][data-group="amounts"]').first()
+  await expect(issue).toBeVisible()
+  await issue.getByTestId('legal-jump').click()
+  const sel = await page.evaluate(() => {
+    const v = (
+      document.querySelector('.cm-content') as unknown as {
+        cmView: {
+          view: {
+            state: {
+              selection: { main: { from: number; to: number } }
+              sliceDoc(a: number, b: number): string
+            }
+          }
+        }
+      }
+    ).cmView.view
+    const r = v.state.selection.main
+    return v.state.sliceDoc(r.from, r.to)
+  })
+  expect(sel).toBe(planted)
+})
+
+test('legal: template renders live and creates a document', async () => {
+  await text('legal-tab-templates').click()
+  await expect(text('tpl-item').first()).toBeVisible()
+  await text('tpl-open').first().click()
+  await expect(text('tpl-form')).toBeVisible()
+  await expect(text('tpl-sample-notice')).toBeVisible()
+  // required fields empty -> per-field errors and creation disabled
+  await expect(text('tpl-field-error').first()).toBeVisible()
+  await expect(text('tpl-create')).toBeDisabled()
+  const vars = page.locator('[data-testid="tpl-form"] [data-var]')
+  const n = await vars.count()
+  for (let i = 0; i < n; i++) {
+    const v = vars.nth(i)
+    const party = v.locator('input[data-testid$="-name"]')
+    if (await party.count()) {
+      await party.fill('أحمد علي')
+      continue
+    }
+    if (await v.locator('select').count()) continue // choice has a default
+    const input = v.locator('input').first()
+    const type = await input.getAttribute('type')
+    const mode = await input.getAttribute('inputmode')
+    if (type === 'date') await input.fill('2025-03-14')
+    else if (mode === 'decimal') {
+      const label = await v.locator('label').innerText()
+      await input.fill(/أجرة|مبلغ|تأمين/.test(label) ? '1500' : '5')
+    } else await input.fill('القاهرة')
+  }
+  await expect(text('tpl-create')).toBeEnabled({ timeout: 15_000 })
+  await expect(text('tpl-preview')).toContainText('أحمد علي')
+  await text('tpl-create').click()
+  await expect(text('doc-title')).toHaveText('عقد إيجار سكني')
+  await expect.poll(docText).toContain('أحمد علي')
+})
+
+test('settings: glossary manager and legal level', async () => {
+  await text('right-panel-close').click()
+  await text('open-settings').click()
+  await text('tab-glossary').click()
+  await text('gloss-term').fill('الغبن')
+  await text('gloss-avoid').fill('الغبن العادي')
+  await text('gloss-save').click()
+  await expect(text('gloss-row').filter({ hasText: 'الغبن' }).first()).toBeVisible()
+  await text('tab-general').click()
+  await expect(
+    page.locator('[data-testid="setting-tashkeel-level"] option[value="legal"]')
+  ).toHaveCount(1)
+  await text('settings-close').click()
+})
+
 test('crash recovery: killed sidecar restarts and becomes ready again', async () => {
   const pids = sidecarPids()
   const pid = pids[pids.length - 1]

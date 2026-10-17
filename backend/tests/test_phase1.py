@@ -444,3 +444,15 @@ def test_sidecar_without_parent_pid_keeps_running(tmp_path):
     finally:
         proc.terminate()
         proc.wait(timeout=10)
+
+
+def test_db_dependency_survives_thread_hops(client):
+    """Regression: sync dependency and endpoint may run on different threads (500 before)."""
+    from concurrent.futures import ThreadPoolExecutor
+
+    def hit(_):
+        return client.get("/api/settings").status_code, client.get("/health").status_code
+
+    with ThreadPoolExecutor(max_workers=8) as ex:
+        results = list(ex.map(hit, range(200)))
+    assert all(r == (200, 200) for r in results), {r for r in results if r != (200, 200)}

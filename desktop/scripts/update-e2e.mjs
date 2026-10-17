@@ -37,7 +37,13 @@ try {
   log('download started')
   const install = page.getByTestId('update-install')
   await install.waitFor({ timeout: 600_000 })
-  log('downloaded; percent =', await page.getByTestId('update-percent').innerText().catch(() => '?'))
+  log(
+    'downloaded; percent =',
+    await page
+      .getByTestId('update-percent')
+      .innerText()
+      .catch(() => '?')
+  )
   await install.click()
   log('clicked restart & install')
 

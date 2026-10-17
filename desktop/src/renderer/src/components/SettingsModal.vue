@@ -2,6 +2,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { useSettingsStore } from '@renderer/stores/settings'
 import DictionaryPanel from './DictionaryPanel.vue'
+import GlossaryPanel from './legal/GlossaryPanel.vue'
 import { useApi } from '@renderer/api'
 import { useUpdaterStore } from '@renderer/stores/updater'
 import { useSidecarStore } from '@renderer/stores/sidecar'
@@ -10,7 +11,7 @@ import { ApiError } from '@renderer/api/client'
 const emit = defineEmits<{ (e: 'close'): void }>()
 const settings = useSettingsStore()
 const sidecar = useSidecarStore()
-const tab = ref<'general' | 'dictionary'>('general')
+const tab = ref<'general' | 'dictionary' | 'glossary'>('general')
 const fontSize = ref(settings.fontSize)
 
 interface PackStatus {
@@ -131,6 +132,14 @@ const field = 'rounded border px-2 py-1 dark:border-slate-600 dark:bg-slate-800'
         >
           القاموس الشخصي
         </button>
+        <button
+          class="px-3 py-1"
+          :class="tab === 'glossary' ? 'border-b-2 border-mizaj-emerald font-semibold' : ''"
+          data-testid="tab-glossary"
+          @click="tab = 'glossary'"
+        >
+          المعجم القانوني
+        </button>
       </div>
 
       <div v-if="tab === 'general'" class="grid grid-cols-2 items-center gap-3 text-sm">
@@ -167,6 +176,7 @@ const field = 'rounded border px-2 py-1 dark:border-slate-600 dark:bg-slate-800'
           <option value="full">كامل</option>
           <option value="irab_only">أواخر الكلمات (الإعراب)</option>
           <option value="minimal">الحد الأدنى (فك اللبس)</option>
+          <option value="legal">قانوني (حيث يزيل اللبس)</option>
         </select>
 
         <label for="s-font">خط المحرر</label>
@@ -216,6 +226,47 @@ const field = 'rounded border px-2 py-1 dark:border-slate-600 dark:bg-slate-800'
           <option value="dark">ليلي</option>
           <option value="light">نهاري</option>
         </select>
+      </div>
+      <div
+        v-if="tab === 'general'"
+        class="mt-4 border-t pt-3 text-sm dark:border-slate-700"
+        data-testid="spell-settings"
+      >
+        <h3 class="mb-2 font-semibold">التدقيق الإملائي</h3>
+        <label class="flex items-center gap-2">
+          <input
+            type="checkbox"
+            :checked="settings.values.spell_check_enabled !== 'false'"
+            data-testid="setting-spell-enabled"
+            @change="
+              settings.update({
+                spell_check_enabled: String(($event.target as HTMLInputElement).checked)
+              })
+            "
+          />
+          تفعيل التدقيق الإملائي أثناء الكتابة
+        </label>
+        <div class="mt-1 flex flex-wrap gap-4">
+          <label
+            v-for="[key, label] in [
+              ['spell_cat_spelling', 'إملائي (قاموس)'],
+              ['spell_cat_pattern', 'أخطاء شائعة'],
+              ['spell_cat_punctuation', 'ترقيم']
+            ]"
+            :key="key"
+            class="flex items-center gap-1"
+          >
+            <input
+              type="checkbox"
+              :checked="settings.values[key] !== 'false'"
+              :data-testid="`setting-${key.replace(/_/g, '-')}`"
+              @change="
+                settings.update({ [key]: String(($event.target as HTMLInputElement).checked) })
+              "
+            />
+            {{ label }}
+          </label>
+        </div>
       </div>
       <div v-if="tab === 'general'" class="mt-4 border-t pt-3 text-sm dark:border-slate-700">
         <h3 class="mb-2 font-semibold">النماذج</h3>
@@ -274,7 +325,8 @@ const field = 'rounded border px-2 py-1 dark:border-slate-600 dark:bg-slate-800'
         </button>
         <p v-if="updateText" class="mt-2" data-testid="update-status">{{ updateText }}</p>
       </div>
-      <DictionaryPanel v-else />
+      <DictionaryPanel v-else-if="tab === 'dictionary'" />
+      <GlossaryPanel v-else />
     </div>
   </div>
 </template>

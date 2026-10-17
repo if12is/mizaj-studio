@@ -23,6 +23,11 @@ import DiffView from './DiffView.vue'
 import DropOverlay from './DropOverlay.vue'
 import ProgressBar from './ProgressBar.vue'
 import StatsPanel from './StatsPanel.vue'
+import { useSpellCheck } from '@renderer/composables/useSpellCheck'
+import { useSpellingStore } from '@renderer/stores/spelling'
+import { createThrottle as throttle2 } from '@renderer/composables/throttle'
+import { insertAtCursorSpec, safeEditSpec } from '@renderer/editor/safeEdit'
+import { goToIssue } from '@renderer/editor/spelling'
 
 const props = defineProps<{
   openDocument: (id: number) => Promise<void>
@@ -38,6 +43,13 @@ const dictionary = useDictionaryStore()
 const host = ref<HTMLDivElement | null>(null)
 let view: EditorView | null = null
 let silent = false
+
+const spell = useSpellCheck(() => view)
+const spelling = useSpellingStore()
+let pendingMarks: import('@renderer/editor/spellModel').SpellMark[] | null = null
+const flushMarks = throttle2(() => {
+  if (pendingMarks) spelling.marks = pendingMarks
+}, 300)
 
 const run = useTashkeelRun(
   () => view,
@@ -103,6 +115,16 @@ function extensions(): Extension[] {
     history(),
     mizajEditorExtensions({
       onDiacritize: () => void run.start(),
+      spelling: {
+        fetchSuggestions: spell.fetchSuggestions,
+        ignore: spell.ignoreWord,
+        addToDictionary: spell.addToDictionary,
+        onIssues: (m) => {
+          pendingMarks = m
+          flushMarks.trigger()
+        },
+        onFullCheck: () => void spell.checkNow(true)
+      },
       inspector: {
         fetchSuggestions,
         saveToDictionary,
@@ -122,6 +144,7 @@ function extensions(): Extension[] {
         scheduleStats()
         if (!silent) emit('change')
       }
+      if (u.docChanged || u.viewportChanged) spell.schedule()
     })
   ]
 }
@@ -134,6 +157,8 @@ function setText(text: string, notifyChange = false): void {
   view.setState(createDocumentState(text, extensions()))
   silent = false
   editor.cursorLine = 1
+  spelling.marks = []
+  spell.schedule()
   editor.diffBase = null
   editor.showDiff = false
   refreshStats()
@@ -182,15 +207,67 @@ async function exportDocx(): Promise<void> {
   }
 }
 
+// re-check / clear when the spelling settings change, and once a tashkeel run is over
+watch(
+  () => [
+    settings.values.spell_check_enabled,
+    settings.values.spell_cat_spelling,
+    settings.values.spell_cat_pattern,
+    settings.values.spell_cat_punctuation
+  ],
+  () => {
+    if (settings.values.spell_check_enabled === 'false') spell.clear()
+    else void spell.checkNow(false)
+  }
+)
+watch(
+  () => editor.runState,
+  (s) => {
+    if (s === 'idle' || s === 'done') spell.schedule()
+  }
+)
+
 onMounted(() => {
   view = new EditorView({
     state: EditorState.create({ doc: '', extensions: extensions() }),
     parent: host.value as HTMLDivElement
   })
-  editor.register({ getText: () => view?.state.doc.toString() ?? '', setText: (t) => setText(t) })
+  editor.register({
+    getText: () => view?.state.doc.toString() ?? '',
+    setText: (t) => setText(t),
+    insertText: (t) => {
+      if (!view) return
+      view.dispatch(insertAtCursorSpec(view.state, t, 'input.legal'))
+      view.focus()
+    },
+    applyEdit: (from, to, expected, insert) => {
+      if (!view) return false
+      const spec = safeEditSpec(view.state, from, to, expected, insert, 'legal.apply')
+      if (!spec) return false
+      view.dispatch(spec)
+      return true
+    },
+    jumpTo: (from, to) => {
+      if (!view) return
+      const len = view.state.doc.length
+      view.dispatch({
+        selection: { anchor: Math.min(from, len), head: Math.min(to, len) },
+        effects: EditorView.scrollIntoView(Math.min(from, len), { y: 'center' })
+      })
+      view.focus()
+    },
+    spellNav: (dir) => {
+      if (view) {
+        goToIssue(view, dir)
+        view.focus()
+      }
+    }
+  })
+  if (settings.values.spell_check_enabled !== 'false') spell.schedule()
 })
 onBeforeUnmount(() => {
   statsThrottle.cancel()
+  spell.dispose()
   run.reset()
   editor.register(null)
   view?.destroy()
@@ -245,6 +322,7 @@ const btnCls =
         <option value="full">كامل</option>
         <option value="irab_only">إعراب</option>
         <option value="minimal">أدنى</option>
+        <option value="legal">قانوني (حيث يزيل اللبس)</option>
       </select>
 
       <button
@@ -289,6 +367,28 @@ const btnCls =
         @click="exportDocx"
       >
         تصدير DOCX
+      </button>
+      <button
+        :class="btnCls"
+        data-testid="toolbar-spell"
+        title="Ctrl+Shift+L"
+        @click="spell.checkNow(true)"
+      >
+        تدقيق إملائي
+      </button>
+      <button
+        :class="[btnCls, editor.rightPanel === 'spelling' ? 'border-mizaj-emerald' : '']"
+        data-testid="toggle-spell-panel"
+        @click="editor.rightPanel = editor.rightPanel === 'spelling' ? null : 'spelling'"
+      >
+        قائمة الأخطاء
+      </button>
+      <button
+        :class="[btnCls, editor.rightPanel === 'legal' ? 'border-mizaj-emerald' : '']"
+        data-testid="toggle-legal-panel"
+        @click="editor.rightPanel = editor.rightPanel === 'legal' ? null : 'legal'"
+      >
+        أدوات قانونية
       </button>
       <button
         class="rounded bg-mizaj-amber/20 px-2 py-1 text-mizaj-amber hover:bg-mizaj-amber/30"

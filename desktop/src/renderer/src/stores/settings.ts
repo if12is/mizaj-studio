@@ -11,6 +11,10 @@ export const DEFAULT_SETTINGS: SettingsMap = {
   colored_diacritics: 'true',
   diacritic_color: 'emerald',
   auto_update_check: 'true',
+  spell_check_enabled: 'true',
+  spell_cat_spelling: 'true',
+  spell_cat_pattern: 'true',
+  spell_cat_punctuation: 'true',
   theme: 'dark'
 }
 
