@@ -41,3 +41,22 @@ def pytest_runtest_logreport(report):
     msg = f"{report.nodeid} ({report.when})\n{tail}"
     msg = msg.replace("%", "%25").replace("\r", "").replace("\n", "%0A")
     print(f"\n::error title=pytest failure::{msg}", flush=True)
+
+
+def pytest_collectreport(report):
+    """Also surface collection errors (import failures) as annotations on GitHub Actions."""
+    if os.environ.get("GITHUB_ACTIONS") != "true" or not report.failed:
+        return
+    tail = "\n".join(str(report.longrepr).splitlines()[-15:])
+    msg = f"collection error in {report.nodeid}\n{tail}"
+    msg = msg.replace("%", "%25").replace("\r", "").replace("\n", "%0A")
+    print(f"\n::error title=pytest collection::{msg}", flush=True)
+
+
+def pytest_sessionfinish(session, exitstatus):
+    if os.environ.get("GITHUB_ACTIONS") == "true" and exitstatus not in (0, 5):
+        print(
+            f"\n::error title=pytest session::exit status {int(exitstatus)}; "
+            f"failed={session.testsfailed} collected={session.testscollected}",
+            flush=True,
+        )
