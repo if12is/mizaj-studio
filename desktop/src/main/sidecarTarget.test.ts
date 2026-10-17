@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { join } from 'node:path'
+// Cases below pass platform 'linux', so expectations use POSIX paths on every host.
+import { posix } from 'node:path'
+const { join } = posix
 import { resolveSidecar } from './pythonManager'
 
 const base = {
