@@ -93,8 +93,12 @@ jobs:
             $diag = @()
             $upd = Get-ChildItem "$env:LOCALAPPDATA" -Directory -Filter '*updater*' -ErrorAction SilentlyContinue
             foreach ($d in $upd) { $diag += "updater dir $($d.FullName): " + ((Get-ChildItem $d.FullName -Recurse -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Name) -join ', ') }
+            $wins = Get-Process | Where-Object { $_.MainWindowTitle } | ForEach-Object { "$($_.ProcessName) [$($_.Id)] '$($_.MainWindowTitle)' $($_.Path)" }
+            $diag += "windows: " + ($wins -join ' | ')
+            $procs = Get-Process | Where-Object { $_.Path -match 'Mizaj|mizaj|updater' } | ForEach-Object { "$($_.ProcessName) $($_.Path)" }
+            $diag += "mizaj processes: " + ($procs -join ' | ')
             $mainLog = Join-Path $ud 'logs\mizaj-main.log'
-            if (Test-Path $mainLog) { $diag += (Get-Content $mainLog -Tail 30) }
+            if (Test-Path $mainLog) { $diag += (Get-Content $mainLog -Tail 8) }
             $msg = ("installed version is $ver, expected $want`n" + ($diag -join "`n")).Replace('%','%25').Replace("`r",'').Replace("`n",'%0A')
             Write-Host "::error title=Update E2E::$msg"
             throw 'update was not installed'
