@@ -71,8 +71,8 @@ jobs:
           Step 'freeze engine' { python scripts/build_backend.py }
           Push-Location desktop
           Step 'npm run build' { npm run build }
-          Step 'package 99.0.0' { npx electron-builder --win --publish never -c.extraMetadata.version=99.0.0 -c.directories.output=dist-a }
-          Step 'package 99.0.1' { npx electron-builder --win --publish never -c.extraMetadata.version=99.0.1 -c.directories.output=dist-b }
+          Step 'package 99.0.0' { npx electron-builder --win --publish never '--config.extraMetadata.version=99.0.0' '--config.directories.output=dist-a' }
+          Step 'package 99.0.1' { npx electron-builder --win --publish never '--config.extraMetadata.version=99.0.1' '--config.directories.output=dist-b' }
           $files = (Get-ChildItem dist-b -File | ForEach-Object { "$($_.Name) ($($_.Length))" }) -join ', '
           Write-Host "::notice title=Local build::dist-b: $files"
           Pop-Location
