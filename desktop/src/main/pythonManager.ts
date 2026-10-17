@@ -1,7 +1,7 @@
 import { EventEmitter } from 'node:events'
 import { existsSync } from 'node:fs'
 import { spawn as nodeSpawn, type ChildProcess, type SpawnOptions } from 'node:child_process'
-import { join } from 'node:path'
+import { posix, win32 } from 'node:path'
 
 export type SidecarState = 'starting' | 'ready' | 'restarting' | 'crashed' | 'stopped'
 
@@ -47,6 +47,11 @@ export const STATUS_EVENT = 'sidecar:status-changed'
 
 const noopLogger: LoggerLike = { debug() {}, info() {}, warn() {}, error() {} }
 
+/** Path helpers for the target platform (not the host), so resolution is testable anywhere. */
+function pathFor(platform: NodeJS.Platform): typeof posix {
+  return platform === 'win32' ? win32 : posix
+}
+
 export function resolvePythonExe(
   env: NodeJS.ProcessEnv,
   backendDir: string,
@@ -54,6 +59,7 @@ export function resolvePythonExe(
   exists: (p: string) => boolean = existsSync
 ): string {
   if (env.MIZAJ_PYTHON) return env.MIZAJ_PYTHON
+  const { join } = pathFor(platform)
   const venv =
     platform === 'win32'
       ? join(backendDir, '.venv', 'Scripts', 'python.exe')
@@ -97,6 +103,7 @@ export function resolveSidecar(i: ResolveSidecarInput): SidecarTarget {
       extraEnv: {}
     }
   }
+  const { join } = pathFor(platform)
   const engineDir = join(i.resourcesPath, 'engine')
   const exe = join(engineDir, platform === 'win32' ? 'mizaj-engine.exe' : 'mizaj-engine')
   const extraEnv: Record<string, string> = {}
