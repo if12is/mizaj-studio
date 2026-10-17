@@ -87,6 +87,9 @@ describe('isAppUrl', () => {
       platform: 'win32' as const
     }
     expect(isAppUrl('file:///c:/app/out/renderer/index.html', w)).toBe(true)
+    const real = { ...w, indexHtmlPath: 'C:\\Program Files\\Mizaj\\out\\renderer\\index.html' }
+    expect(isAppUrl('file:///C:/Program%20Files/Mizaj/out/renderer/index.html', real)).toBe(true)
+    expect(isAppUrl('file:///C:/Program%20Files/Mizaj/out/renderer/x.html', real)).toBe(false)
   })
 })
 

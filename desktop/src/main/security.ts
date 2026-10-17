@@ -1,4 +1,3 @@
-import { pathToFileURL } from 'node:url'
 import { randomBytes } from 'node:crypto'
 
 /**
@@ -80,9 +79,12 @@ export function isAppUrl(raw: unknown, loc: AppLocation): boolean {
     }
   }
   if (u.protocol !== 'file:' || u.host) return false
-  const want = pathToFileURL(loc.indexHtmlPath).pathname
-  const norm = (p: string): string =>
-    (loc.platform ?? process.platform) === 'win32' ? decodeURI(p).toLowerCase() : decodeURI(p)
+  const win = (loc.platform ?? process.platform) === 'win32'
+  // Convert by the target platform's rules, not the host's (pathToFileURL is host-bound).
+  const wantUrl = new URL('file:///')
+  wantUrl.pathname = win ? loc.indexHtmlPath.replace(/\\/g, '/') : loc.indexHtmlPath
+  const want = wantUrl.pathname
+  const norm = (p: string): string => (win ? decodeURI(p).toLowerCase() : decodeURI(p))
   return norm(u.pathname) === norm(want)
 }
 

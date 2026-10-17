@@ -125,3 +125,18 @@ jobs:
       - name: SBOM and license policy (npm + python)
         working-directory: ./desktop
         run: node scripts/sbom.cjs --python python --out sbom/sbom.json
+
+  desktop-unit-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20.11.0'
+          cache: npm
+          cache-dependency-path: desktop/package-lock.json
+      - name: Unit tests (Windows)
+        working-directory: ./desktop
+        run: |
+          npm ci
+          npm run test:unit
