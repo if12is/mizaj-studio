@@ -166,9 +166,15 @@ jobs:
             Write-Host "::error title=Update E2E::$msg"
             throw 'update was not installed'
           }
-          $running = Get-Process | Where-Object { $_.Path -eq $exe }
-          Write-Host "relaunched processes: $($running.Count)"
-          if (-not $running) { Write-Host "::warning title=Update E2E::app was not relaunched after install" }
+          # The installer replaces files first and launches the app at the very end.
+          $relaunchDeadline = (Get-Date).AddSeconds(90)
+          do {
+            Start-Sleep -Seconds 3
+            $running = Get-Process | Where-Object { $_.Path -and ($_.Path -ieq $exe) }
+          } until ($running -or (Get-Date) -gt $relaunchDeadline)
+          $others = (Get-Process | Where-Object { $_.Path -match 'Mizaj' } | ForEach-Object { $_.Path }) -join ', '
+          Write-Host "relaunched processes: $($running.Count); mizaj-related: $others"
+          if (-not $running) { Write-Host "::warning title=Update E2E::app was not relaunched after install (mizaj processes: $others)" }
           $running | Stop-Process -Force -ErrorAction SilentlyContinue
           Get-Process mizaj-engine -ErrorAction SilentlyContinue | Stop-Process -Force
           Write-Host "::notice title=Update E2E::updated ${{ steps.v.outputs.from }} -> $ver successfully (relaunched: $($running.Count -gt 0))"
