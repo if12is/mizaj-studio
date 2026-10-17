@@ -49,6 +49,11 @@ try {
 catch {
   Write-Host '--- engine stdout ---'; if (Test-Path $out) { Get-Content $out | Write-Host }
   Write-Host '--- engine stderr ---'; if (Test-Path $err) { Get-Content $err | Write-Host }
+  # Surface the cause as a workflow annotation (visible without downloading logs).
+  $tail = if (Test-Path $err) { (Get-Content $err -Tail 25) -join "`n" } else { '' }
+  $msg = "smoke-engine: $($_.Exception.Message)`n$tail"
+  $msg = $msg.Replace('%', '%25').Replace("`r", '').Replace("`n", '%0A')
+  Write-Host "::error title=Engine smoke test::$msg"
   throw
 }
 finally {
