@@ -1,4 +1,4 @@
-import { contextBridge, ipcRenderer } from 'electron'
+import { contextBridge, ipcRenderer, webUtils } from 'electron'
 
 interface SidecarStatus {
   state: 'starting' | 'ready' | 'restarting' | 'crashed' | 'stopped'
@@ -20,6 +20,9 @@ const mizajAPI = {
   },
   windowMinimize: (): Promise<void> => ipcRenderer.invoke('window:minimize'),
   windowToggleMaximize: (): Promise<void> => ipcRenderer.invoke('window:toggle-maximize'),
+  getPathForFile: (file: File): string => webUtils.getPathForFile(file),
+  showSaveDialog: (defaultName: string): Promise<string | null> =>
+    ipcRenderer.invoke('dialog:save-docx', defaultName),
   windowClose: (): Promise<void> => ipcRenderer.invoke('window:close'),
   onBeforeQuitFlush: (cb: () => Promise<void>): (() => void) => {
     const handler = async (): Promise<void> => {

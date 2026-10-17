@@ -9,6 +9,7 @@ export const DEFAULT_SETTINGS: SettingsMap = {
   editor_font: 'Amiri',
   editor_font_size: '20',
   colored_diacritics: 'true',
+  diacritic_color: 'emerald',
   theme: 'dark'
 }
 

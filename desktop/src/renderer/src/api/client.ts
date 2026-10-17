@@ -120,6 +120,7 @@ export interface DocumentSummary {
   updated_at: string
 }
 export interface DocumentFull extends DocumentSummary {
+  source_docx_path: string | null
   raw_content: string
   diacritized_content: string | null
 }

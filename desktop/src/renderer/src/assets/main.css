@@ -16,11 +16,13 @@
   font-display: swap;
 }
 
-@font-palette-values --mizaj-colored {
+@font-palette-values --mizaj-emerald {
   font-family: 'Amiri Mizaj Colr';
-  override-colors:
-    0 #10b981,
-    1 #f59e0b;
+  base-palette: 0;
+}
+@font-palette-values --mizaj-amber {
+  font-family: 'Amiri Mizaj Colr';
+  base-palette: 1;
 }
 
 :root {
@@ -43,16 +45,22 @@ body,
   -webkit-app-region: no-drag;
 }
 
-/* Editor: pure CSS toggle, zero DOM spans. */
+/* Editor: pure CSS toggle, zero DOM spans. OFF = plain Amiri (same metrics as the
+   COLR build; `font-palette: normal` would still paint palette 0 in Chromium).
+   If the COLR font file is missing the stack falls back to Amiri automatically. */
 .mizaj-editor {
   font-family: var(--editor-font), 'Amiri', serif;
   font-size: var(--editor-size);
-  font-palette: normal;
 }
-.mizaj-editor.colored {
-  font-family: 'Amiri Mizaj Colr', var(--editor-font), 'Amiri', serif;
-  font-palette: --mizaj-colored;
+.mizaj-editor.pal-emerald {
+  font-family: 'Amiri Mizaj Colr', 'Amiri', serif;
+  font-palette: --mizaj-emerald;
 }
+.mizaj-editor.pal-amber {
+  font-family: 'Amiri Mizaj Colr', 'Amiri', serif;
+  font-palette: --mizaj-amber;
+}
+
 .mizaj-editor .cm-editor {
   height: 100%;
   background: transparent;
@@ -77,4 +85,76 @@ body,
 .mizaj-editor .cm-selectionBackground,
 .mizaj-editor .cm-focused .cm-selectionBackground {
   background: rgba(16, 185, 129, 0.3) !important;
+}
+
+/* Word inspector tooltip */
+.cm-tooltip.cm-tooltip-above .mizaj-inspector,
+.mizaj-inspector {
+  min-width: 16rem;
+  max-width: 24rem;
+  padding: 8px;
+  font-family: 'Cairo', system-ui, sans-serif;
+  font-size: 14px;
+  background: #ffffff;
+  color: #0f172a;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
+}
+.dark .mizaj-inspector {
+  background: #1e293b;
+  color: #f1f5f9;
+  border-color: #475569;
+}
+.mizaj-inspector button {
+  cursor: pointer;
+  border-radius: 4px;
+  border: 1px solid #94a3b8;
+  padding: 2px 8px;
+  margin: 2px;
+  background: transparent;
+  color: inherit;
+}
+.mizaj-inspector button:hover,
+.mizaj-inspector button.sel {
+  background: rgba(16, 185, 129, 0.25);
+  border-color: #10b981;
+}
+.mizaj-inspector .mi-word {
+  font-family: 'Amiri', serif;
+  font-size: 24px;
+  text-align: center;
+}
+.mizaj-inspector .mi-letters button,
+.mizaj-inspector .mi-h {
+  font-family: 'Amiri', serif;
+  font-size: 18px;
+}
+.mizaj-inspector .mi-suggestions {
+  display: flex;
+  flex-direction: column;
+  margin-top: 6px;
+}
+.mizaj-inspector .mi-sug {
+  text-align: start;
+}
+.mizaj-inspector .mi-actions {
+  margin-top: 6px;
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+.cm-tooltip {
+  border: none !important;
+  background: transparent !important;
+}
+
+/* Merge (diff) view */
+.mizaj-diff .cm-mergeView {
+  height: 100%;
+  overflow: auto;
+}
+.mizaj-diff .cm-editor {
+  background: transparent;
+  color: inherit;
 }

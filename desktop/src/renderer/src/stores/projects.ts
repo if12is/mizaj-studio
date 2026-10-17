@@ -35,6 +35,14 @@ export const useProjectsStore = defineStore('projects', () => {
     await loadDocuments(projectId)
     return d
   }
+  /** Fetch only; does not change the current document. */
+  function fetchDocument(id: number): Promise<DocumentFull> {
+    return useApi().get<DocumentFull>(`/api/documents/${id}`)
+  }
+  function setCurrentDocument(d: DocumentFull): void {
+    currentProjectId.value = d.project_id
+    currentDocument.value = d
+  }
   /** Fetch a document and make it current (caller flushes autosave first). */
   async function selectDocument(id: number): Promise<DocumentFull> {
     const d = await useApi().get<DocumentFull>(`/api/documents/${id}`)
@@ -42,12 +50,10 @@ export const useProjectsStore = defineStore('projects', () => {
     currentDocument.value = d
     return d
   }
-  async function saveContent(id: number, rawContent: string): Promise<void> {
-    const d = await useApi().put<DocumentFull>(
-      `/api/documents/${id}`,
-      { raw_content: rawContent },
-      true
-    )
+  async function saveContent(id: number, rawContent: string, diacritized?: boolean): Promise<void> {
+    const body: Record<string, string> = { raw_content: rawContent }
+    if (diacritized) body.diacritized_content = rawContent
+    const d = await useApi().put<DocumentFull>(`/api/documents/${id}`, body, true)
     const list = documents.value[d.project_id]
     if (list) {
       documents.value = {
@@ -67,6 +73,8 @@ export const useProjectsStore = defineStore('projects', () => {
     createProject,
     createDocument,
     selectDocument,
+    fetchDocument,
+    setCurrentDocument,
     saveContent
   }
 })

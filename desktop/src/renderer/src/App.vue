@@ -22,15 +22,24 @@ const pane = ref<InstanceType<typeof EditorPane> | null>(null)
 const autosave = createAutosave({
   delayMs: 5000,
   getText: () => editor.accessor?.getText() ?? '',
-  save: (id, text) => projects.saveContent(id, text),
+  save: (id, text) => projects.saveContent(id, text, !!editor.diacritizedDocs[id]),
   onState: (s) => (editor.saveState = s)
 })
 
+let switchSeq = 0
 async function selectDocument(id: number): Promise<void> {
+  const token = ++switchSeq
+  await autosave.flush() // save the outgoing document first
+  const d = await projects.fetchDocument(id)
+  if (token !== switchSeq) return // a newer selection superseded this one
+  // Flush again: edits typed while the fetch was in flight still belong to the old document.
   await autosave.flush()
-  const d = await projects.selectDocument(id)
+  if (token !== switchSeq) return
+  // From here on everything is synchronous: swap text, current doc and autosave target together.
+  projects.setCurrentDocument(d)
   pane.value?.setText(d.raw_content)
   autosave.setDocument(id)
+  if (d.diacritized_content) editor.diacritizedDocs = { ...editor.diacritizedDocs, [id]: true }
 }
 
 const flushNow = (): void => void autosave.flush()
@@ -90,7 +99,7 @@ onBeforeUnmount(() => {
             الإعدادات
           </button>
         </div>
-        <EditorPane ref="pane" @change="autosave.markDirty()" />
+        <EditorPane ref="pane" :open-document="selectDocument" @change="autosave.markDirty()" />
       </main>
     </div>
     <StatusBar />

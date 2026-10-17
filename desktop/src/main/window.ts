@@ -1,4 +1,4 @@
-import { BrowserWindow, ipcMain } from 'electron'
+import { BrowserWindow, dialog, ipcMain } from 'electron'
 import { join } from 'node:path'
 import type { SidecarStatus } from './pythonManager'
 
@@ -83,6 +83,17 @@ export function registerIpc(getStatus: () => SidecarStatus): void {
     else w.maximize()
   })
   ipcMain.handle('window:close', (e) => winOf(e)?.close())
+  ipcMain.handle('dialog:save-docx', async (e, defaultName: unknown) => {
+    const w = winOf(e)
+    const name = typeof defaultName === 'string' && defaultName ? defaultName : 'mizaj.docx'
+    const opts = {
+      defaultPath: name.replace(/[\\/:*?"<>|]/g, '_'),
+      filters: [{ name: 'Word', extensions: ['docx'] }]
+    }
+    const r = w ? await dialog.showSaveDialog(w, opts) : await dialog.showSaveDialog(opts)
+    if (r.canceled || !r.filePath) return null
+    return r.filePath.toLowerCase().endsWith('.docx') ? r.filePath : `${r.filePath}.docx`
+  })
 }
 
 export function broadcastStatus(status: SidecarStatus): void {

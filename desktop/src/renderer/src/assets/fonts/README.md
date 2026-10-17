@@ -9,7 +9,7 @@ Amiri (SIL OFL 1.1) with OpenType `COLR` v0 + `CPAL` tables. Family name:
   the text colour (dark/light theme works).
 - CPAL entry 0 = mark colour, entry 1 = shadda (U+0651) colour.
   - palette 0 (emerald): `#10B981`, `#F59E0B`
-  - palette 1 (amber):   `#F59E0B`, `#F59E0B`
+  - palette 1 (amber): `#F59E0B`, `#F59E0B`
 - GSUB / GPOS / GDEF / glyf / cmap / hmtx are untouched: shaping and mark
   positioning are identical to the source. Text width is identical in all palettes.
 - Source: `@fontsource/amiri` 5.0.8 `amiri-arabic-400-normal.woff2`
@@ -24,12 +24,24 @@ are emerald. To switch colouring off with this font you must override the
 entries to the text colour, or use the plain Amiri face:
 
 ```css
-@font-palette-values --mizaj-colored { font-family: "Amiri Mizaj Colr"; base-palette: 0; }
-@font-palette-values --mizaj-amber   { font-family: "Amiri Mizaj Colr"; base-palette: 1; }
+@font-palette-values --mizaj-colored {
+  font-family: 'Amiri Mizaj Colr';
+  base-palette: 0;
+}
+@font-palette-values --mizaj-amber {
+  font-family: 'Amiri Mizaj Colr';
+  base-palette: 1;
+}
 /* "off": explicit colours (currentcolor in override-colors is not honoured) */
-@font-palette-values --mizaj-off     { font-family: "Amiri Mizaj Colr"; base-palette: 0;
-                                       override-colors: 0 #1F2937, 1 #1F2937; }
+@font-palette-values --mizaj-off {
+  font-family: 'Amiri Mizaj Colr';
+  base-palette: 0;
+  override-colors:
+    0 #1f2937,
+    1 #1f2937;
+}
 ```
+
 For dark mode define a second `--mizaj-off-dark` with light colours, or fall back
 to the plain `@fontsource/amiri` family when the toggle is off.
 
