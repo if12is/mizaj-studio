@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <rect width="1024" height="1024" rx="200" fill="#0F172A"/>
+  <!-- ink nib pointing up -->
+  <path d="M512 330 L690 640 Q690 720 600 790 L512 860 L424 790 Q334 720 334 640 Z" fill="#10B981"/>
+  <path d="M512 330 L512 620" stroke="#0F172A" stroke-width="22" stroke-linecap="round"/>
+  <circle cx="512" cy="660" r="38" fill="#0F172A"/>
+  <!-- shadda (three-toothed crown) with a fatha above it -->
+  <path d="M372 270 q35 -95 70 -10 q35 -95 70 0 q35 -95 70 10" fill="none" stroke="#F59E0B" stroke-width="30" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M410 165 L614 110" stroke="#F59E0B" stroke-width="30" stroke-linecap="round"/>
+</svg>

@@ -15,6 +15,9 @@
     "electron.vite.config.ts",
     "vitest.config.ts",
     "src/main/**/*.ts",
-    "src/preload/index.ts"
+    "src/preload/index.ts",
+    "playwright.config.ts",
+    "tests/e2e/**/*.ts",
+    "scripts/**/*.ts"
   ]
 }

@@ -1,5 +1,21 @@
 import { contextBridge, ipcRenderer, webUtils } from 'electron'
 
+interface UpdaterStatus {
+  state:
+    | 'idle'
+    | 'checking'
+    | 'available'
+    | 'not-available'
+    | 'downloading'
+    | 'downloaded'
+    | 'error'
+  version?: string
+  percent?: number
+  bytesPerSecond?: number
+  message?: string
+  code?: 'not-packaged'
+}
+
 interface SidecarStatus {
   state: 'starting' | 'ready' | 'restarting' | 'crashed' | 'stopped'
   port: number | null
@@ -20,7 +36,25 @@ const mizajAPI = {
   },
   windowMinimize: (): Promise<void> => ipcRenderer.invoke('window:minimize'),
   windowToggleMaximize: (): Promise<void> => ipcRenderer.invoke('window:toggle-maximize'),
-  getPathForFile: (file: File): string => webUtils.getPathForFile(file),
+  getPathForFile: (file: File): string => {
+    try {
+      return webUtils.getPathForFile(file)
+    } catch {
+      return ''
+    }
+  },
+  getUpdaterStatus: (): Promise<UpdaterStatus> => ipcRenderer.invoke('updater:get-status'),
+  checkForUpdates: (): Promise<UpdaterStatus> => ipcRenderer.invoke('updater:check'),
+  downloadUpdate: (): Promise<void> => ipcRenderer.invoke('updater:download'),
+  installUpdate: (): Promise<void> => ipcRenderer.invoke('updater:install'),
+  setAutoUpdateCheck: (enabled: boolean): Promise<void> =>
+    ipcRenderer.invoke('updater:set-auto-check', enabled),
+  onUpdaterStatus: (cb: (s: UpdaterStatus) => void): (() => void) => {
+    const handler = (_e: unknown, s: UpdaterStatus): void => cb(s)
+    ipcRenderer.on('updater:status', handler)
+    return () => ipcRenderer.removeListener('updater:status', handler)
+  },
+  showOpenPackDialog: (): Promise<string | null> => ipcRenderer.invoke('dialog:open-pack'),
   showSaveDialog: (defaultName: string): Promise<string | null> =>
     ipcRenderer.invoke('dialog:save-docx', defaultName),
   windowClose: (): Promise<void> => ipcRenderer.invoke('window:close'),

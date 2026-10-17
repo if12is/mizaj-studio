@@ -17,6 +17,7 @@ env/
 .pytest_cache/
 .ruff_cache/
 build/
+!desktop/build/
 *.spec
 !backend/mizaj_engine.spec
 

@@ -1,0 +1,160 @@
+name: Release
+
+# Build the Windows installer (frozen engine + models + Electron) and publish a GitHub Release.
+# Modelled on if12is/MaT3am electron-release.yml. See desktop/RELEASING.md.
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version, e.g. 0.1.1 (empty = keep desktop/package.json version)'
+        required: false
+        type: string
+      publish:
+        description: 'Publish a GitHub Release (false = build + upload artifacts only)'
+        required: false
+        type: boolean
+        default: true
+      runner:
+        description: 'Runner'
+        required: false
+        type: choice
+        options:
+          - github-hosted
+          - self-hosted
+        default: github-hosted
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+jobs:
+  build-windows:
+    name: Build Windows installer
+    runs-on: ${{ inputs.runner == 'self-hosted' && fromJSON('["self-hosted","Windows"]') || 'windows-latest' }}
+    timeout-minutes: 90
+    defaults:
+      run:
+        shell: pwsh
+    env:
+      RELEASE_VERSION: ${{ inputs.version }}
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Decide publish mode
+        id: mode
+        run: |
+          $publish = ('${{ github.event_name }}' -eq 'push') -or ('${{ inputs.publish }}' -eq 'true')
+          $mode = if ($publish) { 'always' } else { 'never' }
+          "publish=$($publish.ToString().ToLower())" >> $env:GITHUB_OUTPUT
+          "mode=$mode" >> $env:GITHUB_OUTPUT
+          Write-Host "publish=$publish mode=$mode"
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11.7'
+          cache: pip
+          cache-dependency-path: |
+            backend/requirements.txt
+            backend/requirements-build.txt
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20.11.0'
+          cache: npm
+          cache-dependency-path: desktop/package-lock.json
+
+      - name: Sync version from tag / input
+        id: version
+        working-directory: desktop
+        run: node scripts/sync-version.cjs
+
+      - name: Preflight
+        run: |
+          if ('${{ steps.mode.outputs.publish }}' -eq 'true' -and [string]::IsNullOrEmpty($env:GH_TOKEN)) {
+            throw 'Publishing requested but GITHUB_TOKEN is not available.'
+          }
+
+      - name: Generate release notes from commits
+        run: |
+          $prev = git describe --tags --abbrev=0 'HEAD^' 2>$null
+          if ($LASTEXITCODE -ne 0 -or -not $prev) { $prev = $null; $global:LASTEXITCODE = 0 }
+          $range = if ($prev) { "$prev..HEAD" } else { 'HEAD' }
+          $log = git log --no-merges --pretty=format:'- %s (%h)' $range
+          $head = "## Mizaj Studio v${{ steps.version.outputs.version }}`n`n"
+          $note = if ($prev) { "Changes since $prev`:`n`n" } else { "Initial release`:`n`n" }
+          Set-Content -Path "$env:RUNNER_TEMP/release-notes.md" -Value ($head + $note + ($log -join "`n")) -Encoding utf8
+          Get-Content "$env:RUNNER_TEMP/release-notes.md"
+
+      - name: Install backend dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements.txt -r backend/requirements-build.txt
+
+      - name: Quality gate - backend tests (mock engine)
+        working-directory: backend
+        env:
+          MIZAJ_ENGINE_MODE: mock
+        run: python -m pytest -q
+
+      - name: Install desktop dependencies
+        working-directory: desktop
+        run: npm ci
+
+      - name: Quality gate - lint, typecheck, unit tests
+        working-directory: desktop
+        run: |
+          npm run lint
+          npm run typecheck
+          npm run test:unit
+
+      - name: Download CATT models (sha256 verified)
+        run: python scripts/download_models.py
+
+      - name: Build frozen engine (PyInstaller)
+        run: python scripts/build_backend.py
+
+      - name: Smoke-test frozen engine
+        run: ./desktop/scripts/smoke-engine.ps1 -DataDir "$env:RUNNER_TEMP\smoke"
+
+      - name: Build app
+        working-directory: desktop
+        run: npm run build
+
+      - name: Package installer (electron-builder)
+        working-directory: desktop
+        run: npx electron-builder --win --publish ${{ steps.mode.outputs.mode }}
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: mizaj-studio-windows-${{ steps.version.outputs.version }}
+          if-no-files-found: error
+          path: |
+            desktop/dist/*.exe
+            desktop/dist/latest.yml
+            desktop/dist/*.blockmap
+
+      - name: Set release notes
+        if: steps.mode.outputs.publish == 'true'
+        run: gh release edit "v${{ steps.version.outputs.version }}" --repo "${{ github.repository }}" --notes-file "$env:RUNNER_TEMP/release-notes.md"
+
+      - name: Verify release assets
+        if: steps.mode.outputs.publish == 'true'
+        run: |
+          $v = '${{ steps.version.outputs.version }}'
+          $rel = gh release view "v$v" --repo "${{ github.repository }}" --json assets,isDraft | ConvertFrom-Json
+          if ($rel.isDraft) { throw "Release v$v is still a draft" }
+          $names = $rel.assets | ForEach-Object { $_.name }
+          Write-Host "assets: $($names -join ', ')"
+          foreach ($need in @("Mizaj-Studio-Setup-$v.exe", 'latest.yml')) {
+            if ($names -notcontains $need) { throw "Missing release asset: $need" }
+          }

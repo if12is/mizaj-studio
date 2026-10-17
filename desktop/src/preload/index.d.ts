@@ -8,6 +8,22 @@ declare global {
     message?: string
   }
 
+  interface UpdaterStatus {
+    state:
+      | 'idle'
+      | 'checking'
+      | 'available'
+      | 'not-available'
+      | 'downloading'
+      | 'downloaded'
+      | 'error'
+    version?: string
+    percent?: number
+    bytesPerSecond?: number
+    message?: string
+    code?: 'not-packaged'
+  }
+
   interface MizajAPI {
     getBackendConfig(): Promise<{
       port: number | null
@@ -19,6 +35,13 @@ declare global {
     windowToggleMaximize(): Promise<void>
     windowClose(): Promise<void>
     getPathForFile(file: File): string
+    showOpenPackDialog(): Promise<string | null>
+    getUpdaterStatus(): Promise<UpdaterStatus>
+    checkForUpdates(): Promise<UpdaterStatus>
+    downloadUpdate(): Promise<void>
+    installUpdate(): Promise<void>
+    setAutoUpdateCheck(enabled: boolean): Promise<void>
+    onUpdaterStatus(cb: (s: UpdaterStatus) => void): () => void
     showSaveDialog(defaultName: string): Promise<string | null>
     onBeforeQuitFlush(cb: () => Promise<void>): () => void
   }

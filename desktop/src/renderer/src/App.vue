@@ -4,6 +4,7 @@ import TitleBar from './components/TitleBar.vue'
 import Sidebar from './components/Sidebar.vue'
 import EditorPane from './components/EditorPane.vue'
 import StatusBar from './components/StatusBar.vue'
+import UpdateBanner from './components/UpdateBanner.vue'
 import SettingsModal from './components/SettingsModal.vue'
 import { toastClass, toasts } from './api/toast'
 import { createAutosave } from './composables/autosave'
@@ -11,6 +12,7 @@ import { useEditorStore } from './stores/editor'
 import { useProjectsStore } from './stores/projects'
 import { useSettingsStore } from './stores/settings'
 import { useSidecarStore } from './stores/sidecar'
+import { useUpdaterStore } from './stores/updater'
 
 const sidecar = useSidecarStore()
 const projects = useProjectsStore()
@@ -60,6 +62,7 @@ onMounted(async () => {
   window.addEventListener('beforeunload', flushNow)
   offFlush = window.mizajAPI?.onBeforeQuitFlush(() => autosave.flush())
   await sidecar.init()
+  void useUpdaterStore().init()
   if (sidecar.isReady) void bootstrap()
 })
 watch(
@@ -82,6 +85,7 @@ onBeforeUnmount(() => {
     data-testid="app-root"
   >
     <TitleBar />
+    <UpdateBanner />
     <div class="flex min-h-0 flex-1">
       <Sidebar @select-document="selectDocument" />
       <main class="flex min-w-0 flex-1 flex-col">

@@ -16,7 +16,12 @@
     "typecheck": "npm run typecheck:node && npm run typecheck:web",
     "lint": "eslint .",
     "format": "prettier --write .",
-    "test:unit": "vitest run"
+    "test:unit": "vitest run",
+    "dist:win": "electron-vite build && electron-builder --win --publish never",
+    "dist:mac": "electron-vite build && electron-builder --mac --publish never",
+    "dist:linux": "electron-vite build && electron-builder --linux --publish never",
+    "release": "electron-vite build && electron-builder --publish always",
+    "test:e2e": "electron-vite build && xvfb-run -a playwright test"
   },
   "dependencies": {
     "@codemirror/commands": "6.5.0",
@@ -26,16 +31,19 @@
     "@fontsource/amiri": "5.0.8",
     "@fontsource/cairo": "5.0.17",
     "electron-log": "5.1.2",
+    "electron-updater": "6.1.8",
     "pinia": "2.1.7",
     "vue": "3.4.27"
   },
   "devDependencies": {
+    "@playwright/test": "1.47.2",
     "@types/node": "20.14.2",
     "@typescript-eslint/eslint-plugin": "7.13.0",
     "@typescript-eslint/parser": "7.13.0",
     "@vitejs/plugin-vue": "5.0.4",
     "autoprefixer": "10.4.19",
     "electron": "31.0.2",
+    "electron-builder": "24.13.3",
     "electron-vite": "2.3.0",
     "eslint": "8.57.0",
     "eslint-config-prettier": "9.1.0",
@@ -53,5 +61,7 @@
     "@volar/language-core": "2.2.4",
     "@volar/source-map": "2.2.4",
     "@volar/typescript": "2.2.4"
-  }
+  },
+  "author": "Mizaj Studio",
+  "homepage": "https://github.com/if12is/mizaj-studio"
 }
