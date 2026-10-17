@@ -24,6 +24,7 @@ from app.engine.normalize import (
 )
 from app.engine.partial_lock import PartialDiacritizationLock
 from app.engine.splitter import ArabicSentenceSplitter, Chunk
+from app.legal.glossary import GlossaryIndex, override_word
 
 log = logging.getLogger("mizaj.pipeline")
 
@@ -45,6 +46,8 @@ class TashkeelPipeline:
         ambiguity: Callable[[str], bool] | None = None,
         use_cache: bool = True,
         splitter: ArabicSentenceSplitter | None = None,
+        passive: Callable[[str, str], bool] | None = None,
+        glossary_loader: Callable[[sqlite3.Connection], GlossaryIndex] | None = None,
     ) -> None:
         self.engine = engine
         self.level = level
@@ -52,6 +55,9 @@ class TashkeelPipeline:
         self.morph = morph
         self.ambiguity = ambiguity
         self.use_cache = use_cache
+        self.passive = passive
+        self.glossary_loader = glossary_loader
+        self._glossary: GlossaryIndex | None = None
         self.splitter = splitter or ArabicSentenceSplitter()
         self.cache_tag = engine.cache_tag + ("+mf" if morph is not None else "")
 
@@ -73,7 +79,7 @@ class TashkeelPipeline:
             if self.use_cache:
                 cache.put_chunk(self.cache_tag, stripped, raw)
 
-        out = self._apply_level(raw, spans)
+        out = self._apply_level(raw, spans, conn)
         out = self._apply_dictionary(cache, out, stripped, spans)
         out = lock.apply(out)
         if strip_marks(out) != strip_marks(chunk_text):  # safety net: never alter base text
@@ -81,7 +87,38 @@ class TashkeelPipeline:
             return ChunkResult(chunk_text, cached, len(spans))
         return ChunkResult(out, cached, len(spans))
 
-    def _apply_level(self, raw: str, spans) -> str:
+    def _legal(self, raw: str, spans, conn: sqlite3.Connection) -> str:
+        """`legal` level: marks only where they disambiguate.
+
+        Kept: (1) glossary terms (internal vowels + shadda from the glossary), (2) words the
+        ambiguity oracle flags (the whole word keeps the engine's marks, incl. case ending),
+        (3) passive-voice verbs, (4) shadda and tanween everywhere. Everything else is bare."""
+        if self.ambiguity is None:
+            raise RuntimeError("level 'legal' needs an ambiguity oracle")
+        if self._glossary is None and self.glossary_loader is not None:
+            self._glossary = self.glossary_loader(conn)
+        words = [m.group(0) for m in spans]
+        matches = self._glossary.match(words) if self._glossary is not None else {}
+        pairs = split_pairs(raw, canon=False)
+        for i, m in enumerate(spans):
+            seg = pairs[m.start() : m.end()]
+            if i in matches:
+                gpairs, shift, skip = matches[i]
+                seg = override_word(seg, gpairs, shift, skip)
+            else:
+                eng = engine_letters(words[i])[0]
+                keep = self.ambiguity(eng) or (
+                    self.passive is not None and self.passive(eng, join_pairs(seg))
+                )
+                if not keep:
+                    seg = [(b, "".join(c for c in mk if c == "\u0651" or c in "\u064b\u064c\u064d"))
+                           for b, mk in seg]  # fmt: skip
+            pairs[m.start() : m.end()] = seg
+        return join_pairs(pairs)
+
+    def _apply_level(self, raw: str, spans, conn: sqlite3.Connection) -> str:
+        if self.level == "legal":
+            return self._legal(raw, spans, conn)
         if self.level != "minimal":
             return reduce_level(raw, self.level)
         if self.ambiguity is None:

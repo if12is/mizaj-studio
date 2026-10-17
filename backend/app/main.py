@@ -15,8 +15,9 @@ import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import dictionary, documents, health, packs, projects, settings, tashkeel
+from app.api import dictionary, documents, health, packs, projects, settings, spelling, tashkeel
 from app.api import docx as docx_api
+from app.api import legal as legal_api
 from app.core.database import DB_NAME
 from app.core.errors import MizajError, install_handlers
 from app.core.logging_setup import setup_logging
@@ -24,6 +25,7 @@ from app.core.migrations import MigrationError, run_migrations
 from app.core.watchdog import start_parent_watchdog
 from app.engine import config
 from app.engine.manager import manager
+from app.legal.store import seed_templates
 
 log = logging.getLogger("mizaj.main")
 
@@ -44,6 +46,7 @@ def create_app(data_dir: Path, migrations_dir: Path | None = None) -> FastAPI:
             "فشلت ترقية قاعدة البيانات. تم حفظ نسخة احتياطية.",
             str(exc),
         ) from exc
+    seed_templates(db_path)
     app = FastAPI(title="Mizaj Studio Backend", version=health.VERSION)
     app.state.data_dir = data_dir
     app.state.db_path = db_path
@@ -56,7 +59,18 @@ def create_app(data_dir: Path, migrations_dir: Path | None = None) -> FastAPI:
         allow_headers=["*"],
     )
     install_handlers(app)
-    for mod in (health, projects, documents, settings, dictionary, tashkeel, docx_api, packs):
+    for mod in (
+        health,
+        projects,
+        documents,
+        settings,
+        dictionary,
+        tashkeel,
+        docx_api,
+        packs,
+        legal_api,
+        spelling,
+    ):
         app.include_router(mod.router)
     return app
 

@@ -1,0 +1,1798 @@
+{
+ "_comment": "Sample legal glossary written for Mizaj Studio (GPL-3.0-or-later). Forms carry internal vowels and shadda only; final case endings are left to the engine. Sample data: needs review by a legal/linguistic specialist before professional use.",
+ "version": 1,
+ "entries": [
+  {
+   "term": "الطرف الأول",
+   "diacritized": "الطَّرَف الْأَوَّل",
+   "preferred": "الطرف الأول",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "الطرف الثاني",
+   "diacritized": "الطَّرَف الثَّانِي",
+   "preferred": "الطرف الثاني",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "الطرفان",
+   "diacritized": "الطَّرَفَان",
+   "preferred": "الطرفان",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "المؤجر",
+   "diacritized": "الْمُؤَجِّر",
+   "preferred": "المؤجر",
+   "avoid": [
+    "المؤجّر الأصلي"
+   ],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": "الذي يؤجّر (اسم فاعل) - يختلف عن المستأجَر"
+  },
+  {
+   "term": "المستأجر",
+   "diacritized": "الْمُسْتَأْجِر",
+   "preferred": "المستأجر",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": "الذي يستأجر (اسم فاعل)"
+  },
+  {
+   "term": "البائع",
+   "diacritized": "الْبَائِع",
+   "preferred": "البائع",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "المشتري",
+   "diacritized": "الْمُشْتَرِي",
+   "preferred": "المشتري",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "الموكل",
+   "diacritized": "الْمُوَكِّل",
+   "preferred": "الموكل",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": "من يُوكِّل غيره (الأصيل) - يختلف عن الْمُوَكَّل (من أُسنِدت إليه الوكالة)"
+  },
+  {
+   "term": "الوكيل",
+   "diacritized": "الْوَكِيل",
+   "preferred": "الوكيل",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "الكفيل",
+   "diacritized": "الْكَفِيل",
+   "preferred": "الكفيل",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "المكفول",
+   "diacritized": "الْمَكْفُول",
+   "preferred": "المكفول",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "الدائن",
+   "diacritized": "الدَّائِن",
+   "preferred": "الدائن",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "المدين",
+   "diacritized": "الْمَدِين",
+   "preferred": "المدين",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "الراهن",
+   "diacritized": "الرَّاهِن",
+   "preferred": "الراهن",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "المرتهن",
+   "diacritized": "الْمُرْتَهِن",
+   "preferred": "المرتهن",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "المقاول",
+   "diacritized": "الْمُقَاوِل",
+   "preferred": "المقاول",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "المقاول من الباطن",
+   "diacritized": "الْمُقَاوِل مِنَ الْبَاطِن",
+   "preferred": "المقاول من الباطن",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "صاحب العمل",
+   "diacritized": "صَاحِب الْعَمَل",
+   "preferred": "صاحب العمل",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "رب العمل",
+   "diacritized": "رَبّ الْعَمَل",
+   "preferred": "رب العمل",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "العامل",
+   "diacritized": "الْعَامِل",
+   "preferred": "العامل",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "المورد",
+   "diacritized": "الْمُوَرِّد",
+   "preferred": "المورد",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "المدعي",
+   "diacritized": "الْمُدَّعِي",
+   "preferred": "المدعي",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "المدعى عليه",
+   "diacritized": "الْمُدَّعَى عَلَيْهِ",
+   "preferred": "المدعى عليه",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "المحكم",
+   "diacritized": "الْمُحَكِّم",
+   "preferred": "المحكم",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "الشاهد",
+   "diacritized": "الشَّاهِد",
+   "preferred": "الشاهد",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "الضامن",
+   "diacritized": "الضَّامِن",
+   "preferred": "الضامن",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "المضمون",
+   "diacritized": "الْمَضْمُون",
+   "preferred": "المضمون",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "المتعاقد",
+   "diacritized": "الْمُتَعَاقِد",
+   "preferred": "المتعاقد",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "المتعاقدان",
+   "diacritized": "الْمُتَعَاقِدَان",
+   "preferred": "المتعاقدان",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "الموصي",
+   "diacritized": "الْمُوصِي",
+   "preferred": "الموصي",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "الموصى له",
+   "diacritized": "الْمُوصَى لَهُ",
+   "preferred": "الموصى له",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "الورثة",
+   "diacritized": "الْوَرَثَة",
+   "preferred": "الورثة",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "المالك",
+   "diacritized": "الْمَالِك",
+   "preferred": "المالك",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "الشريك",
+   "diacritized": "الشَّرِيك",
+   "preferred": "الشريك",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "الشركاء",
+   "diacritized": "الشُّرَكَاء",
+   "preferred": "الشركاء",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "المحال له",
+   "diacritized": "الْمُحَالُ لَهُ",
+   "preferred": "المحال له",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "المحال عليه",
+   "diacritized": "الْمُحَالُ عَلَيْهِ",
+   "preferred": "المحال عليه",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "العين المؤجرة",
+   "diacritized": "الْعَيْن الْمُؤَجَّرَة",
+   "preferred": "العين المؤجرة",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": "المأجور؛ «العين» هنا بمعنى الشيء المؤجَّر"
+  },
+  {
+   "term": "الأجرة",
+   "diacritized": "الْأُجْرَة",
+   "preferred": "الأجرة",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": "بدل الإيجار"
+  },
+  {
+   "term": "الأجر",
+   "diacritized": "الْأَجْر",
+   "preferred": "الأجر",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "الإيجار",
+   "diacritized": "الْإِيجَار",
+   "preferred": "الإيجار",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "عقد الإيجار",
+   "diacritized": "عَقْد الْإِيجَار",
+   "preferred": "عقد الإيجار",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "عقد البيع",
+   "diacritized": "عَقْد الْبَيْع",
+   "preferred": "عقد البيع",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "الثمن",
+   "diacritized": "الثَّمَن",
+   "preferred": "الثمن",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "المبيع",
+   "diacritized": "الْمَبِيع",
+   "preferred": "المبيع",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "العربون",
+   "diacritized": "الْعُرْبُون",
+   "preferred": "العربون",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "الشرط الجزائي",
+   "diacritized": "الشَّرْط الْجَزَائِي",
+   "preferred": "الشرط الجزائي",
+   "avoid": [
+    "الجزاء الاتفاقي"
+   ],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "التعويض",
+   "diacritized": "التَّعْوِيض",
+   "preferred": "التعويض",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "الضرر",
+   "diacritized": "الضَّرَر",
+   "preferred": "الضرر",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "الغرامة",
+   "diacritized": "الْغَرَامَة",
+   "preferred": "الغرامة",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "القوة القاهرة",
+   "diacritized": "الْقُوَّة الْقَاهِرَة",
+   "preferred": "القوة القاهرة",
+   "avoid": [
+    "الظرف الطارئ القاهر"
+   ],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "السبب الأجنبي",
+   "diacritized": "السَّبَب الْأَجْنَبِي",
+   "preferred": "السبب الأجنبي",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "الإخلال",
+   "diacritized": "الْإِخْلَال",
+   "preferred": "الإخلال",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "الفسخ",
+   "diacritized": "الْفَسْخ",
+   "preferred": "الفسخ",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "الإنهاء",
+   "diacritized": "الْإِنْهَاء",
+   "preferred": "الإنهاء",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "الانقضاء",
+   "diacritized": "الِانْقِضَاء",
+   "preferred": "الانقضاء",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "التنازل",
+   "diacritized": "التَّنَازُل",
+   "preferred": "التنازل",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "الحوالة",
+   "diacritized": "الْحَوَالَة",
+   "preferred": "الحوالة",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "الكفالة",
+   "diacritized": "الْكَفَالَة",
+   "preferred": "الكفالة",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": "بالفتح: الضمان؛ وبالكسر «كِفالة» غير مستعملة في هذا المعنى"
+  },
+  {
+   "term": "الوكالة",
+   "diacritized": "الْوَكَالَة",
+   "preferred": "الوكالة",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": "بالفتح: التفويض؛ وبالكسر «وِكالة» بمعنى مكتب/جهة"
+  },
+  {
+   "term": "الرهن",
+   "diacritized": "الرَّهْن",
+   "preferred": "الرهن",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "الحيازة",
+   "diacritized": "الْحِيَازَة",
+   "preferred": "الحيازة",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "الملكية",
+   "diacritized": "الْمِلْكِيَّة",
+   "preferred": "الملكية",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "الشفعة",
+   "diacritized": "الشُّفْعَة",
+   "preferred": "الشفعة",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "التقادم",
+   "diacritized": "التَّقَادُم",
+   "preferred": "التقادم",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "الذمة",
+   "diacritized": "الذِّمَّة",
+   "preferred": "الذمة",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "الذمة المالية",
+   "diacritized": "الذِّمَّة الْمَالِيَّة",
+   "preferred": "الذمة المالية",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "الغرر",
+   "diacritized": "الْغَرَر",
+   "preferred": "الغرر",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "الخيار",
+   "diacritized": "الْخِيَار",
+   "preferred": "الخيار",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": "بالكسر: حق الاختيار؛ وبالفتح «خَيار» نوع من الخضر"
+  },
+  {
+   "term": "خيار الشرط",
+   "diacritized": "خِيَار الشَّرْط",
+   "preferred": "خيار الشرط",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "الجهالة",
+   "diacritized": "الْجَهَالَة",
+   "preferred": "الجهالة",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "الإذعان",
+   "diacritized": "الْإِذْعَان",
+   "preferred": "الإذعان",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "عقد الإذعان",
+   "diacritized": "عَقْد الْإِذْعَان",
+   "preferred": "عقد الإذعان",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "التحكيم",
+   "diacritized": "التَّحْكِيم",
+   "preferred": "التحكيم",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "الاختصاص",
+   "diacritized": "الِاخْتِصَاص",
+   "preferred": "الاختصاص",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "الدعوى",
+   "diacritized": "الدَّعْوَى",
+   "preferred": "الدعوى",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "الحكم",
+   "diacritized": "الْحُكْم",
+   "preferred": "الحكم",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": "القرار القضائي؛ الْحَكَم (بفتحتين) هو المحكِّم"
+  },
+  {
+   "term": "المحكمة",
+   "diacritized": "الْمَحْكَمَة",
+   "preferred": "المحكمة",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "القاضي",
+   "diacritized": "الْقَاضِي",
+   "preferred": "القاضي",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "المحامي",
+   "diacritized": "الْمُحَامِي",
+   "preferred": "المحامي",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "القضاء",
+   "diacritized": "الْقَضَاء",
+   "preferred": "القضاء",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "الاستئناف",
+   "diacritized": "الِاسْتِئْنَاف",
+   "preferred": "الاستئناف",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "الطعن",
+   "diacritized": "الطَّعْن",
+   "preferred": "الطعن",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "النقض",
+   "diacritized": "النَّقْض",
+   "preferred": "النقض",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "الإعلان",
+   "diacritized": "الْإِعْلَان",
+   "preferred": "الإعلان",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "الإنذار",
+   "diacritized": "الْإِنْذَار",
+   "preferred": "الإنذار",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "الإخطار",
+   "diacritized": "الْإِخْطَار",
+   "preferred": "الإخطار",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "الإشعار",
+   "diacritized": "الْإِشْعَار",
+   "preferred": "الإشعار",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "التسليم",
+   "diacritized": "التَّسْلِيم",
+   "preferred": "التسليم",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "التسلم",
+   "diacritized": "التَّسَلُّم",
+   "preferred": "التسلم",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "الاستلام",
+   "diacritized": "الِاسْتِلَام",
+   "preferred": "الاستلام",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "الوفاء",
+   "diacritized": "الْوَفَاء",
+   "preferred": "الوفاء",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "السداد",
+   "diacritized": "السَّدَاد",
+   "preferred": "السداد",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "الالتزام",
+   "diacritized": "الِالْتِزَام",
+   "preferred": "الالتزام",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "الالتزامات",
+   "diacritized": "الِالْتِزَامَات",
+   "preferred": "الالتزامات",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "الحق",
+   "diacritized": "الْحَقّ",
+   "preferred": "الحق",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "الحقوق",
+   "diacritized": "الْحُقُوق",
+   "preferred": "الحقوق",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "الواجبات",
+   "diacritized": "الْوَاجِبَات",
+   "preferred": "الواجبات",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "الضمان",
+   "diacritized": "الضَّمَان",
+   "preferred": "الضمان",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "الضمانات",
+   "diacritized": "الضَّمَانَات",
+   "preferred": "الضمانات",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "التأمين",
+   "diacritized": "التَّأْمِين",
+   "preferred": "التأمين",
+   "avoid": [
+    "الوديعة التأمينية"
+   ],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "المسؤولية",
+   "diacritized": "الْمَسْؤُولِيَّة",
+   "preferred": "المسؤولية",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "العقد",
+   "diacritized": "الْعَقْد",
+   "preferred": "العقد",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "العقود",
+   "diacritized": "الْعُقُود",
+   "preferred": "العقود",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "البند",
+   "diacritized": "الْبَنْد",
+   "preferred": "البند",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "البنود",
+   "diacritized": "الْبُنُود",
+   "preferred": "البنود",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "المادة",
+   "diacritized": "الْمَادَّة",
+   "preferred": "المادة",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "الفقرة",
+   "diacritized": "الْفِقْرَة",
+   "preferred": "الفقرة",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "الملحق",
+   "diacritized": "الْمُلْحَق",
+   "preferred": "الملحق",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "المرفقات",
+   "diacritized": "الْمُرْفَقَات",
+   "preferred": "المرفقات",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "النظام العام",
+   "diacritized": "النِّظَام الْعَامّ",
+   "preferred": "النظام العام",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "الآداب العامة",
+   "diacritized": "الْآدَاب الْعَامَّة",
+   "preferred": "الآداب العامة",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "حسن النية",
+   "diacritized": "حُسْن النِّيَّة",
+   "preferred": "حسن النية",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "سوء النية",
+   "diacritized": "سُوء النِّيَّة",
+   "preferred": "سوء النية",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "القانون",
+   "diacritized": "الْقَانُون",
+   "preferred": "القانون",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "اللائحة",
+   "diacritized": "اللَّائِحَة",
+   "preferred": "اللائحة",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "الأهلية",
+   "diacritized": "الْأَهْلِيَّة",
+   "preferred": "الأهلية",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "الأهلية القانونية",
+   "diacritized": "الْأَهْلِيَّة الْقَانُونِيَّة",
+   "preferred": "الأهلية القانونية",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "الشخصية الاعتبارية",
+   "diacritized": "الشَّخْصِيَّة الِاعْتِبَارِيَّة",
+   "preferred": "الشخصية الاعتبارية",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "الممثل القانوني",
+   "diacritized": "الْمُمَثِّل الْقَانُونِي",
+   "preferred": "الممثل القانوني",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "المفوض بالتوقيع",
+   "diacritized": "الْمُفَوَّض بِالتَّوْقِيع",
+   "preferred": "المفوض بالتوقيع",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "السجل التجاري",
+   "diacritized": "السِّجِلّ التِّجَارِي",
+   "preferred": "السجل التجاري",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "الرخصة",
+   "diacritized": "الرُّخْصَة",
+   "preferred": "الرخصة",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "العقار",
+   "diacritized": "الْعَقَار",
+   "preferred": "العقار",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "المنقول",
+   "diacritized": "الْمَنْقُول",
+   "preferred": "المنقول",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "الإفلاس",
+   "diacritized": "الْإِفْلَاس",
+   "preferred": "الإفلاس",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "التصفية",
+   "diacritized": "التَّصْفِيَة",
+   "preferred": "التصفية",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "التركة",
+   "diacritized": "التَّرِكَة",
+   "preferred": "التركة",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "الميراث",
+   "diacritized": "الْمِيرَاث",
+   "preferred": "الميراث",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "الوصية",
+   "diacritized": "الْوَصِيَّة",
+   "preferred": "الوصية",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "الوقف",
+   "diacritized": "الْوَقْف",
+   "preferred": "الوقف",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "الهبة",
+   "diacritized": "الْهِبَة",
+   "preferred": "الهبة",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "القرض",
+   "diacritized": "الْقَرْض",
+   "preferred": "القرض",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "الفائدة",
+   "diacritized": "الْفَائِدَة",
+   "preferred": "الفائدة",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "الدين",
+   "diacritized": "الدَّيْن",
+   "preferred": "الدين",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": "بفتح الدال: المبلغ المستحق؛ وبكسرها «الدِّين» بمعنى الملّة"
+  },
+  {
+   "term": "الأقساط",
+   "diacritized": "الْأَقْسَاط",
+   "preferred": "الأقساط",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "الشيك",
+   "diacritized": "الشِّيك",
+   "preferred": "الشيك",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "السند",
+   "diacritized": "السَّنَد",
+   "preferred": "السند",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "السند لأمر",
+   "diacritized": "السَّنَد لِأَمْر",
+   "preferred": "السند لأمر",
+   "avoid": [
+    "السند الأذني"
+   ],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "الكمبيالة",
+   "diacritized": "الْكَمْبِيَالَة",
+   "preferred": "الكمبيالة",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "الحجز",
+   "diacritized": "الْحَجْز",
+   "preferred": "الحجز",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "التنفيذ",
+   "diacritized": "التَّنْفِيذ",
+   "preferred": "التنفيذ",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "الصيغة التنفيذية",
+   "diacritized": "الصِّيغَة التَّنْفِيذِيَّة",
+   "preferred": "الصيغة التنفيذية",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "المحضر",
+   "diacritized": "الْمَحْضَر",
+   "preferred": "المحضر",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": "محضر الجلسة/الاجتماع؛ وبضم الميم وكسر الضاد «الْمُحْضِر» موظف التبليغ"
+  },
+  {
+   "term": "الشهادة",
+   "diacritized": "الشَّهَادَة",
+   "preferred": "الشهادة",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "الإقرار",
+   "diacritized": "الْإِقْرَار",
+   "preferred": "الإقرار",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "اليمين",
+   "diacritized": "الْيَمِين",
+   "preferred": "اليمين",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "البينة",
+   "diacritized": "الْبَيِّنَة",
+   "preferred": "البينة",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "الإثبات",
+   "diacritized": "الْإِثْبَات",
+   "preferred": "الإثبات",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "الصلح",
+   "diacritized": "الصُّلْح",
+   "preferred": "الصلح",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "التسوية",
+   "diacritized": "التَّسْوِيَة",
+   "preferred": "التسوية",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "الإبراء",
+   "diacritized": "الْإِبْرَاء",
+   "preferred": "الإبراء",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "المقاصة",
+   "diacritized": "الْمُقَاصَّة",
+   "preferred": "المقاصة",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "التجديد",
+   "diacritized": "التَّجْدِيد",
+   "preferred": "التجديد",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "الاتفاق",
+   "diacritized": "الِاتِّفَاق",
+   "preferred": "الاتفاق",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "الاتفاقية",
+   "diacritized": "الِاتِّفَاقِيَّة",
+   "preferred": "الاتفاقية",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "التعديل",
+   "diacritized": "التَّعْدِيل",
+   "preferred": "التعديل",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "التمديد",
+   "diacritized": "التَّمْدِيد",
+   "preferred": "التمديد",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "السرية",
+   "diacritized": "السِّرِّيَّة",
+   "preferred": "السرية",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "المعلومات السرية",
+   "diacritized": "الْمَعْلُومَات السِّرِّيَّة",
+   "preferred": "المعلومات السرية",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "الأسرار التجارية",
+   "diacritized": "الْأَسْرَار التِّجَارِيَّة",
+   "preferred": "الأسرار التجارية",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "حقوق الملكية الفكرية",
+   "diacritized": "حُقُوق الْمِلْكِيَّة الْفِكْرِيَّة",
+   "preferred": "حقوق الملكية الفكرية",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "براءة الاختراع",
+   "diacritized": "بَرَاءَة الِاخْتِرَاع",
+   "preferred": "براءة الاختراع",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "العلامة التجارية",
+   "diacritized": "الْعَلَامَة التِّجَارِيَّة",
+   "preferred": "العلامة التجارية",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "المنافسة",
+   "diacritized": "الْمُنَافَسَة",
+   "preferred": "المنافسة",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "الاحتكار",
+   "diacritized": "الِاحْتِكَار",
+   "preferred": "الاحتكار",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "الأجير",
+   "diacritized": "الْأَجِير",
+   "preferred": "الأجير",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "الأجور",
+   "diacritized": "الْأُجُور",
+   "preferred": "الأجور",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "الراتب",
+   "diacritized": "الرَّاتِب",
+   "preferred": "الراتب",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "المكافأة",
+   "diacritized": "الْمُكَافَأَة",
+   "preferred": "المكافأة",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "الإجازة",
+   "diacritized": "الْإِجَازَة",
+   "preferred": "الإجازة",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "فترة التجربة",
+   "diacritized": "فَتْرَة التَّجْرِبَة",
+   "preferred": "فترة التجربة",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "الاستقالة",
+   "diacritized": "الِاسْتِقَالَة",
+   "preferred": "الاستقالة",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "الفصل",
+   "diacritized": "الْفَصْل",
+   "preferred": "الفصل",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "مكافأة نهاية الخدمة",
+   "diacritized": "مُكَافَأَة نِهَايَة الْخِدْمَة",
+   "preferred": "مكافأة نهاية الخدمة",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "ساعات العمل",
+   "diacritized": "سَاعَات الْعَمَل",
+   "preferred": "ساعات العمل",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "الإصابة",
+   "diacritized": "الْإِصَابَة",
+   "preferred": "الإصابة",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "الترخيص",
+   "diacritized": "التَّرْخِيص",
+   "preferred": "الترخيص",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "يعد",
+   "diacritized": "يُعَدّ",
+   "preferred": "يعد",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": "مبني للمجهول: يُحسَب/يُعتبر"
+  },
+  {
+   "term": "تعد",
+   "diacritized": "تُعَدّ",
+   "preferred": "تعد",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": "مبني للمجهول"
+  },
+  {
+   "term": "يعتبر",
+   "diacritized": "يُعْتَبَر",
+   "preferred": "يعتبر",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": "مبني للمجهول"
+  },
+  {
+   "term": "تعتبر",
+   "diacritized": "تُعْتَبَر",
+   "preferred": "تعتبر",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": "مبني للمجهول"
+  },
+  {
+   "term": "يتعهد",
+   "diacritized": "يَتَعَهَّد",
+   "preferred": "يتعهد",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "يضمن",
+   "diacritized": "يَضْمَن",
+   "preferred": "يضمن",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "يجوز",
+   "diacritized": "يَجُوز",
+   "preferred": "يجوز",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "يجب",
+   "diacritized": "يَجِب",
+   "preferred": "يجب",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "يحظر",
+   "diacritized": "يُحْظَر",
+   "preferred": "يحظر",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": "مبني للمجهول: يُمنَع"
+  },
+  {
+   "term": "يحق",
+   "diacritized": "يَحِقّ",
+   "preferred": "يحق",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "تحرر",
+   "diacritized": "تَحَرَّر",
+   "preferred": "تحرر",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "تنتهي",
+   "diacritized": "تَنْتَهِي",
+   "preferred": "تنتهي",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "يسري",
+   "diacritized": "يَسْرِي",
+   "preferred": "يسري",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "تسري",
+   "diacritized": "تَسْرِي",
+   "preferred": "تسري",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "يبطل",
+   "diacritized": "يَبْطُل",
+   "preferred": "يبطل",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "يستحق",
+   "diacritized": "يَسْتَحِقّ",
+   "preferred": "يستحق",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "يخضع",
+   "diacritized": "يَخْضَع",
+   "preferred": "يخضع",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "تخضع",
+   "diacritized": "تَخْضَع",
+   "preferred": "تخضع",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "يشمل",
+   "diacritized": "يَشْمَل",
+   "preferred": "يشمل",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  },
+  {
+   "term": "يتحمل",
+   "diacritized": "يَتَحَمَّل",
+   "preferred": "يتحمل",
+   "avoid": [],
+   "jurisdiction": "",
+   "source": "Mizaj Studio sample",
+   "note": ""
+  }
+ ]
+}

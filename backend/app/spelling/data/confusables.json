@@ -1,0 +1,463 @@
+{
+ "_comment": "Closed list of common Arabic orthographic confusions (7.9.2). word (marks stripped) -> {fix, code, severity, confidence, note}. Suggestion-only; never applied automatically.",
+ "words": {
+  "الى": {
+   "fix": [
+    "إلى"
+   ],
+   "code": "HAMZA_QAT",
+   "severity": "error",
+   "confidence": 0.95,
+   "note": "إلى حرف جر وتُكتب بهمزة قطع وألف مقصورة."
+  },
+  "الي": {
+   "fix": [
+    "إلى"
+   ],
+   "code": "ALEF_MAQSURA",
+   "severity": "error",
+   "confidence": 0.85,
+   "note": "الصواب «إلى» بهمزة قطع وألف مقصورة."
+  },
+  "اذا": {
+   "fix": [
+    "إذا"
+   ],
+   "code": "HAMZA_QAT",
+   "severity": "error",
+   "confidence": 0.9,
+   "note": "«إذا» تُكتب بهمزة قطع تحت الألف."
+  },
+  "اذ": {
+   "fix": [
+    "إذ"
+   ],
+   "code": "HAMZA_QAT",
+   "severity": "error",
+   "confidence": 0.9,
+   "note": "«إذ» تُكتب بهمزة قطع تحت الألف."
+  },
+  "حتي": {
+   "fix": [
+    "حتى"
+   ],
+   "code": "ALEF_MAQSURA",
+   "severity": "error",
+   "confidence": 0.95,
+   "note": "«حتى» تُكتب بألف مقصورة."
+  },
+  "متي": {
+   "fix": [
+    "متى"
+   ],
+   "code": "ALEF_MAQSURA",
+   "severity": "error",
+   "confidence": 0.95,
+   "note": "«متى» تُكتب بألف مقصورة."
+  },
+  "فى": {
+   "fix": [
+    "في"
+   ],
+   "code": "ALEF_MAQSURA",
+   "severity": "warning",
+   "confidence": 0.9,
+   "note": "حرف الجر «في» يُكتب بياء."
+  },
+  "مستشفي": {
+   "fix": [
+    "مستشفى"
+   ],
+   "code": "ALEF_MAQSURA",
+   "severity": "error",
+   "confidence": 0.9,
+   "note": "«مستشفى» تُكتب بألف مقصورة."
+  },
+  "لاكن": {
+   "fix": [
+    "لكن"
+   ],
+   "code": "SPLIT_JOIN",
+   "severity": "error",
+   "confidence": 0.98,
+   "note": "«لكن» تُكتب بلا ألف بعد اللام."
+  },
+  "لاكنه": {
+   "fix": [
+    "لكنه"
+   ],
+   "code": "SPLIT_JOIN",
+   "severity": "error",
+   "confidence": 0.98,
+   "note": "«لكنّه» تُكتب بلا ألف بعد اللام."
+  },
+  "لاكنها": {
+   "fix": [
+    "لكنها"
+   ],
+   "code": "SPLIT_JOIN",
+   "severity": "error",
+   "confidence": 0.98,
+   "note": "«لكنّها» تُكتب بلا ألف بعد اللام."
+  },
+  "هاذا": {
+   "fix": [
+    "هذا"
+   ],
+   "code": "SPLIT_JOIN",
+   "severity": "error",
+   "confidence": 0.98,
+   "note": "«هذا» تُكتب بلا ألف بعد الهاء."
+  },
+  "هاذه": {
+   "fix": [
+    "هذه"
+   ],
+   "code": "SPLIT_JOIN",
+   "severity": "error",
+   "confidence": 0.98,
+   "note": "«هذه» تُكتب بلا ألف بعد الهاء."
+  },
+  "ذالك": {
+   "fix": [
+    "ذلك"
+   ],
+   "code": "SPLIT_JOIN",
+   "severity": "error",
+   "confidence": 0.98,
+   "note": "«ذلك» تُكتب بلا ألف بعد الذال."
+  },
+  "كذالك": {
+   "fix": [
+    "كذلك"
+   ],
+   "code": "SPLIT_JOIN",
+   "severity": "error",
+   "confidence": 0.98,
+   "note": "«كذلك» تُكتب بلا ألف بعد الذال."
+  },
+  "اولائك": {
+   "fix": [
+    "أولئك"
+   ],
+   "code": "SPLIT_JOIN",
+   "severity": "error",
+   "confidence": 0.98,
+   "note": "«أولئك» بهمزة قطع، وتُكتب الهمزة على الياء دون ألف."
+  },
+  "اولئك": {
+   "fix": [
+    "أولئك"
+   ],
+   "code": "HAMZA_QAT",
+   "severity": "error",
+   "confidence": 0.95,
+   "note": "«أولئك» بهمزة قطع."
+  },
+  "هاؤلاء": {
+   "fix": [
+    "هؤلاء"
+   ],
+   "code": "SPLIT_JOIN",
+   "severity": "error",
+   "confidence": 0.98,
+   "note": "«هؤلاء» تُكتب بلا ألف بعد الهاء."
+  },
+  "اللذي": {
+   "fix": [
+    "الذي"
+   ],
+   "code": "SPLIT_JOIN",
+   "severity": "error",
+   "confidence": 0.95,
+   "note": "الاسم الموصول «الذي» بلام واحدة بعد الألف."
+  },
+  "اللتي": {
+   "fix": [
+    "التي"
+   ],
+   "code": "SPLIT_JOIN",
+   "severity": "error",
+   "confidence": 0.95,
+   "note": "الاسم الموصول «التي» بلام واحدة بعد الألف."
+  },
+  "شئ": {
+   "fix": [
+    "شيء"
+   ],
+   "code": "HAMZA_SEAT",
+   "severity": "error",
+   "confidence": 0.9,
+   "note": "الصواب «شيء» بهمزة على السطر."
+  },
+  "شيئ": {
+   "fix": [
+    "شيء"
+   ],
+   "code": "HAMZA_SEAT",
+   "severity": "error",
+   "confidence": 0.95,
+   "note": "الصواب «شيء» بهمزة على السطر بعد ياء ساكنة."
+  },
+  "مسؤل": {
+   "fix": [
+    "مسؤول"
+   ],
+   "code": "HAMZA_SEAT",
+   "severity": "error",
+   "confidence": 0.9,
+   "note": "الصواب «مسؤول»."
+  },
+  "انشاءالله": {
+   "fix": [
+    "إن شاء الله"
+   ],
+   "code": "SPLIT_JOIN",
+   "severity": "error",
+   "confidence": 0.9,
+   "note": "الصواب «إن شاء الله» بكلمتين."
+  },
+  "انشالله": {
+   "fix": [
+    "إن شاء الله"
+   ],
+   "code": "SPLIT_JOIN",
+   "severity": "error",
+   "confidence": 0.9,
+   "note": "الصواب «إن شاء الله» بكلمتين."
+  },
+  "احد": {
+   "fix": [
+    "أحد"
+   ],
+   "code": "HAMZA_QAT",
+   "severity": "error",
+   "confidence": 0.8,
+   "note": "همزة القطع في أول الكلمة: «أحد»."
+  },
+  "احدى": {
+   "fix": [
+    "إحدى"
+   ],
+   "code": "HAMZA_QAT",
+   "severity": "error",
+   "confidence": 0.8,
+   "note": "همزة القطع في أول الكلمة: «إحدى»."
+  },
+  "اكثر": {
+   "fix": [
+    "أكثر"
+   ],
+   "code": "HAMZA_QAT",
+   "severity": "error",
+   "confidence": 0.8,
+   "note": "همزة القطع في أول الكلمة: «أكثر»."
+  },
+  "اقل": {
+   "fix": [
+    "أقل"
+   ],
+   "code": "HAMZA_QAT",
+   "severity": "error",
+   "confidence": 0.8,
+   "note": "همزة القطع في أول الكلمة: «أقل»."
+  },
+  "اكبر": {
+   "fix": [
+    "أكبر"
+   ],
+   "code": "HAMZA_QAT",
+   "severity": "error",
+   "confidence": 0.8,
+   "note": "همزة القطع في أول الكلمة: «أكبر»."
+  },
+  "اصغر": {
+   "fix": [
+    "أصغر"
+   ],
+   "code": "HAMZA_QAT",
+   "severity": "error",
+   "confidence": 0.8,
+   "note": "همزة القطع في أول الكلمة: «أصغر»."
+  },
+  "اهم": {
+   "fix": [
+    "أهم"
+   ],
+   "code": "HAMZA_QAT",
+   "severity": "error",
+   "confidence": 0.8,
+   "note": "همزة القطع في أول الكلمة: «أهم»."
+  },
+  "اجمل": {
+   "fix": [
+    "أجمل"
+   ],
+   "code": "HAMZA_QAT",
+   "severity": "error",
+   "confidence": 0.8,
+   "note": "همزة القطع في أول الكلمة: «أجمل»."
+  },
+  "افضل": {
+   "fix": [
+    "أفضل"
+   ],
+   "code": "HAMZA_QAT",
+   "severity": "error",
+   "confidence": 0.8,
+   "note": "همزة القطع في أول الكلمة: «أفضل»."
+  },
+  "اسرع": {
+   "fix": [
+    "أسرع"
+   ],
+   "code": "HAMZA_QAT",
+   "severity": "error",
+   "confidence": 0.8,
+   "note": "همزة القطع في أول الكلمة: «أسرع»."
+  },
+  "اعلى": {
+   "fix": [
+    "أعلى"
+   ],
+   "code": "HAMZA_QAT",
+   "severity": "error",
+   "confidence": 0.8,
+   "note": "همزة القطع في أول الكلمة: «أعلى»."
+  },
+  "ادنى": {
+   "fix": [
+    "أدنى"
+   ],
+   "code": "HAMZA_QAT",
+   "severity": "error",
+   "confidence": 0.8,
+   "note": "همزة القطع في أول الكلمة: «أدنى»."
+  },
+  "اطول": {
+   "fix": [
+    "أطول"
+   ],
+   "code": "HAMZA_QAT",
+   "severity": "error",
+   "confidence": 0.8,
+   "note": "همزة القطع في أول الكلمة: «أطول»."
+  },
+  "اول": {
+   "fix": [
+    "أول"
+   ],
+   "code": "HAMZA_QAT",
+   "severity": "error",
+   "confidence": 0.8,
+   "note": "همزة القطع في أول الكلمة: «أول»."
+  },
+  "اخرى": {
+   "fix": [
+    "أخرى"
+   ],
+   "code": "HAMZA_QAT",
+   "severity": "error",
+   "confidence": 0.8,
+   "note": "همزة القطع في أول الكلمة: «أخرى»."
+  },
+  "اخر": {
+   "fix": [
+    "آخر",
+    "أخر"
+   ],
+   "code": "HAMZA_QAT",
+   "severity": "warning",
+   "confidence": 0.5,
+   "note": "«آخر» (الأخير) أو «أخّر» (فعل): الهمزة همزة قطع."
+  }
+ },
+ "repeat_function_words": [
+  "في",
+  "من",
+  "على",
+  "إلى",
+  "عن",
+  "أن",
+  "إن",
+  "التي",
+  "الذي",
+  "هذا",
+  "هذه",
+  "ذلك",
+  "أو",
+  "ثم",
+  "قد",
+  "مع",
+  "بين"
+ ],
+ "repeat_allowed": [
+  "لا",
+  "جدا",
+  "جداً",
+  "حقا",
+  "أبدا",
+  "بعد",
+  "قبل",
+  "بين",
+  "خطوة",
+  "يوما",
+  "تماما",
+  "حين",
+  "نعم",
+  "يا",
+  "صلى",
+  "سبحان"
+ ],
+ "alla_names_before": [
+  "السيد",
+  "الأستاذ",
+  "الدكتور",
+  "المهندس",
+  "الشيخ",
+  "الإمام",
+  "الخليفة",
+  "أبو",
+  "ابن",
+  "بن",
+  "الأمير",
+  "القاضي",
+  "المحامي",
+  "الأخ",
+  "الحاج",
+  "سيدنا",
+  "الصحابي"
+ ],
+ "ala_after_verbs": [
+  "يجب",
+  "ينبغي",
+  "وجب",
+  "يعتمد",
+  "تعتمد",
+  "اعتمد",
+  "اعتمدت",
+  "يؤكد",
+  "أكد",
+  "تؤكد",
+  "يؤثر",
+  "أثر",
+  "يركز",
+  "ركز",
+  "تركز",
+  "يحصل",
+  "حصل",
+  "تحصل",
+  "يوافق",
+  "وافق",
+  "اطلع",
+  "يطلع",
+  "حرص",
+  "يحرص",
+  "يحافظ",
+  "حافظ",
+  "اشتمل",
+  "يشتمل",
+  "يحتوي",
+  "بناء"
+ ]
+}

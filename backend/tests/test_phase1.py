@@ -41,7 +41,7 @@ def test_health(client):
         "status": "ok",
         "version": "0.1.0",
         "engine_mode": "mock",
-        "db_user_version": 1,
+        "db_user_version": 2,
     }
 
 
@@ -99,9 +99,10 @@ def test_pragmas_and_wal(data_dir):
 def test_schema(data_dir):
     create_app(data_dir)
     conn = connect(data_dir / "mizaj.db")
-    assert conn.execute("PRAGMA user_version").fetchone()[0] == 1
+    assert conn.execute("PRAGMA user_version").fetchone()[0] == 2
     names = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
     assert {"projects", "documents", "tashkeel_cache", "settings", "recent_files"} <= names
+    assert {"legal_glossary", "legal_templates"} <= names
     idx = conn.execute(
         "SELECT sql FROM sqlite_master WHERE name='idx_cache_word_unique'"
     ).fetchone()
@@ -112,29 +113,29 @@ def test_schema(data_dir):
 def _fake_migrations(tmp_path, second_sql):
     d = tmp_path / "mig"
     d.mkdir()
-    real = BACKEND / "app" / "migrations" / "001_initial.sql"
-    (d / "001_initial.sql").write_text(real.read_text(encoding="utf-8"), encoding="utf-8")
-    (d / "002_extra.sql").write_text(second_sql, encoding="utf-8")
+    for real in sorted((BACKEND / "app" / "migrations").glob("*.sql")):
+        (d / real.name).write_text(real.read_text(encoding="utf-8"), encoding="utf-8")
+    (d / "003_extra.sql").write_text(second_sql, encoding="utf-8")
     return d
 
 
 def test_backup_on_upgrade_not_on_fresh(tmp_path):
     data = tmp_path / "data"
     data.mkdir()
-    create_app(data)  # fresh -> v1, no backup
+    create_app(data)  # fresh -> v2, no backup
     assert not (data / "backups").exists() or not list((data / "backups").iterdir())
     mig = _fake_migrations(tmp_path, "CREATE TABLE extra(x INTEGER);")
     # also fresh db with all migrations: no backup
     fresh = tmp_path / "fresh"
     fresh.mkdir()
-    assert run_migrations(fresh / "mizaj.db", fresh / "backups", mig) == 2
+    assert run_migrations(fresh / "mizaj.db", fresh / "backups", mig) == 3
     assert not (fresh / "backups").exists()
     # upgrade existing
-    assert run_migrations(data / "mizaj.db", data / "backups", mig) == 2
-    backups = list((data / "backups").glob("mizaj-*-v1.db"))
+    assert run_migrations(data / "mizaj.db", data / "backups", mig) == 3
+    backups = list((data / "backups").glob("mizaj-*-v2.db"))
     assert len(backups) == 1
     b = sqlite3.connect(backups[0])
-    assert b.execute("PRAGMA user_version").fetchone()[0] == 1
+    assert b.execute("PRAGMA user_version").fetchone()[0] == 2
     b.close()
 
 
@@ -147,7 +148,7 @@ def test_migration_failure_rolls_back(tmp_path):
         run_migrations(data / "mizaj.db", data / "backups", mig)
     assert ei.value.error_code == "ERR_DB_MIGRATION_FAILED"
     conn = connect(data / "mizaj.db")
-    assert conn.execute("PRAGMA user_version").fetchone()[0] == 1
+    assert conn.execute("PRAGMA user_version").fetchone()[0] == 2
     assert conn.execute("SELECT 1 FROM sqlite_master WHERE name='good'").fetchone() is None
     conn.close()
     with pytest.raises(Exception) as ei2:

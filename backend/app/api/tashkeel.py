@@ -28,7 +28,7 @@ log = logging.getLogger("mizaj.api.tashkeel")
 router = APIRouter(tags=["tashkeel"])
 
 Mode = Literal["fast", "accurate"]
-Level = Literal["full", "irab_only", "minimal"]
+Level = Literal["full", "irab_only", "minimal", "legal"]
 MAX_TEXT = 5_000_000
 
 

@@ -38,7 +38,7 @@ class ExportRequest(BaseModel):
     source_path: str | None = None
     target_path: str
     mode: Literal["fast", "accurate"] = "fast"
-    level: Literal["full", "irab_only", "minimal"] = "full"
+    level: Literal["full", "irab_only", "minimal", "legal"] = "full"
     include_comments: bool = False
 
 

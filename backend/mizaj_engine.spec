@@ -22,6 +22,7 @@ datas, binaries, hiddenimports = [], [], []
 for pkg in (
     "mishkal", "qalsadi", "tashaphyne", "arramooz", "pyarabic", "naftawayh", "alyahmor",
     "libqutrub", "asmai", "maskouk", "mysam", "arabicstopwords", "sylajone", "codernitydb3",
+    "hijridate",
 ):
     d, b, h = collect_all(pkg)
     datas += d
@@ -44,7 +45,10 @@ hiddenimports += collect_submodules("app")
 # our own resources
 datas += [
     (os.path.join(BACKEND, "app", "migrations"), os.path.join("app", "migrations")),
+    (os.path.join(BACKEND, "app", "legal", "data"), os.path.join("app", "legal", "data")),
     (os.path.join(BACKEND, "app", "engine", "catt", "NOTICE"), os.path.join("app", "engine", "catt")),
+    # 7.9 spelling: ayaspell Hunspell dictionary (ar.aff, ar.dic.gz), confusables.json, licences
+    (os.path.join(BACKEND, "app", "spelling", "data"), os.path.join("app", "spelling", "data")),
 ]
 
 # --- size trimming: drop test suites and dev-only data shipped inside packages ---

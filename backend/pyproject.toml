@@ -11,6 +11,10 @@ extend-exclude = [".venv", "app/engine/catt/bw2ar.py", "app/engine/catt/tokenize
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "B", "UP"]
 
+[tool.ruff.lint.per-file-ignores]
+"app/legal/*.py" = ["E501"]  # long Arabic literals / message strings
+"tests/test_phase7_legal.py" = ["E501"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["."]

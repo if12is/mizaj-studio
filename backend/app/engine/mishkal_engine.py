@@ -53,6 +53,7 @@ class MishkalEngine(Engine):
         # pipeline still runs inside the shared engine executor; it only waits on this thread.
         self._pool = ThreadPoolExecutor(max_workers=1, thread_name_prefix="mizaj-mishkal")
         self._pool.submit(self._init_libs).result()
+        self._passive: dict[str, frozenset[str]] = {}
         self._candidates = lru_cache(maxsize=50000)(self._candidates_uncached)
 
     def _init_libs(self) -> None:
@@ -83,15 +84,32 @@ class MishkalEngine(Engine):
         """(vocalized, pos_description, freq) for each distinct analysis of `word`."""
         result = self._pool.submit(self._analex.check_text, word).result()
         seen: dict[str, tuple[str, str, int]] = {}
+        passive: set[str] = set()
         for group in result:
             for sw in group:
                 voc = sw.vocalized
                 if not voc or strip_marks(voc) != word:
                     continue
+                if "المجهول" in (sw.tags or ""):
+                    passive.add(voc)
                 freq = int(getattr(sw, "freq", 0) or 0)
                 if voc not in seen or freq > seen[voc][2]:
                     seen[voc] = (voc, _pos_description(sw), freq)
+        self._passive[word] = frozenset(passive)
         return tuple(seen.values())
+
+    def passive_vocalizations(self, word: str) -> frozenset[str]:
+        """Vocalizations of `word` that qalsadi analyses as passive-voice verbs."""
+        bare = strip_marks(word)
+        self._candidates(bare)
+        return self._passive.get(bare, frozenset())
+
+    def is_passive_form(self, bare: str, diacritized: str) -> bool:
+        """True if `diacritized` (case ending ignored) equals a passive-verb vocalization."""
+        from app.engine.normalize import last_letter_split
+
+        want = last_letter_split(diacritized)[0]
+        return any(last_letter_split(v)[0] == want for v in self.passive_vocalizations(bare))
 
     def candidates(self, word: str) -> tuple[tuple[str, str, int], ...]:
         return self._candidates(strip_marks(word))
