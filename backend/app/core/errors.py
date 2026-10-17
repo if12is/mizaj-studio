@@ -114,6 +114,16 @@ def disk_full(path: str) -> MizajError:
     )
 
 
+def pack_invalid(reason: str, details: dict | None = None) -> MizajError:
+    return MizajError(
+        "ERR_PACK_INVALID",
+        422,
+        "حزمة التحديث غير صالحة أو تالفة.",
+        f"Invalid update pack: {reason}",
+        details or {"reason": reason},
+    )
+
+
 def _json(err: MizajError) -> JSONResponse:
     return JSONResponse(status_code=err.status, content=err.envelope())
 

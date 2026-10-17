@@ -13,6 +13,7 @@ async def build_pipeline(
     level: str,
     keep_existing: bool = True,
     morph_filter: bool | None = None,
+    use_cache: bool = True,
 ) -> TashkeelPipeline:
     engine = await manager.ensure(mode)
     morph = None
@@ -24,5 +25,10 @@ async def build_pipeline(
         oracle = engine if engine.name == "mock" else await manager.ensure_key("mishkal", mode)
         ambiguity = oracle.is_ambiguous
     return TashkeelPipeline(
-        engine, level=level, keep_existing=keep_existing, morph=morph, ambiguity=ambiguity
+        engine,
+        level=level,
+        keep_existing=keep_existing,
+        morph=morph,
+        ambiguity=ambiguity,
+        use_cache=use_cache,
     )

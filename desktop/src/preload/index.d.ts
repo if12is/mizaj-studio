@@ -19,6 +19,7 @@ declare global {
     windowToggleMaximize(): Promise<void>
     windowClose(): Promise<void>
     getPathForFile(file: File): string
+    showOpenPackDialog(): Promise<string | null>
     showSaveDialog(defaultName: string): Promise<string | null>
     onBeforeQuitFlush(cb: () => Promise<void>): () => void
   }

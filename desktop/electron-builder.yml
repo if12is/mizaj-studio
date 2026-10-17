@@ -1,0 +1,47 @@
+appId: com.mizaj.studio
+productName: Mizaj Studio
+artifactName: Mizaj-Studio-Setup-${version}.${ext}
+copyright: GPL-3.0-or-later
+asar: true
+directories:
+  buildResources: build
+  output: dist
+files:
+  - out/**
+  - package.json
+extraResources:
+  # Frozen Python engine (PyInstaller onedir) -> <resources>/engine
+  - from: ../backend/dist/mizaj-engine
+    to: engine
+  # CATT ONNX models -> <resources>/models/catt_eo
+  - from: ../backend/models/catt_eo
+    to: models/catt_eo
+    filter:
+      - '**/*.onnx'
+win:
+  target: nsis
+  icon: build/icon.png
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  differentialPackage: true
+  multiLanguageInstaller: true
+  installerLanguages:
+    - ar_SA
+    - en_US
+mac:
+  target: dmg
+  category: public.app-category.productivity
+  icon: build/icon.png
+dmg:
+  title: Mizaj Studio
+linux:
+  target: AppImage
+  category: Office
+  icon: build/icon.png
+publish:
+  provider: github
+  owner: if12is
+  repo: mizaj-studio
+  releaseType: release

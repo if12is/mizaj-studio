@@ -37,8 +37,10 @@ function onLeave(): void {
 
 function pathOf(file: File): string {
   const api = window.mizajAPI
-  if (api?.getPathForFile) return api.getPathForFile(file)
-  return (file as File & { path?: string }).path ?? ''
+  // webUtils gives '' for files that are not on disk; fall back to a `path` property
+  // (non-Electron browsers, synthetic drops in E2E tests).
+  const p = api?.getPathForFile ? api.getPathForFile(file) : ''
+  return p || (file as File & { path?: string }).path || ''
 }
 
 async function onDrop(e: DragEvent): Promise<void> {

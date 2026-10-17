@@ -1,12 +1,74 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { onMounted, ref } from 'vue'
 import { useSettingsStore } from '@renderer/stores/settings'
 import DictionaryPanel from './DictionaryPanel.vue'
+import { useApi } from '@renderer/api'
+import { ApiError } from '@renderer/api/client'
 
 const emit = defineEmits<{ (e: 'close'): void }>()
 const settings = useSettingsStore()
 const tab = ref<'general' | 'dictionary'>('general')
 const fontSize = ref(settings.fontSize)
+
+interface PackStatus {
+  installed?: boolean
+  version: string | null
+  models_dir: string | null
+  models_source?: string | null
+}
+const pack = ref<PackStatus | null>(null)
+const packMsg = ref<{ ok: boolean; text: string } | null>(null)
+const packBusy = ref(false)
+const sourceLabel: Record<string, string> = {
+  env: 'مدمجة مع التطبيق',
+  'data-dir': 'حزمة محدّثة (.mizajpack)',
+  exe: 'مدمجة مع التطبيق',
+  dev: 'نسخة التطوير',
+  pack: 'حزمة محدّثة (.mizajpack)',
+  bundled: 'مدمجة مع التطبيق'
+}
+
+async function loadPack(): Promise<void> {
+  try {
+    pack.value = await useApi().get<PackStatus>('/api/packs/status', true)
+  } catch {
+    pack.value = null
+  }
+}
+onMounted(() => void loadPack())
+
+async function applyPack(): Promise<void> {
+  const api = window.mizajAPI
+  const path = api?.showOpenPackDialog
+    ? await api.showOpenPackDialog()
+    : window.prompt('مسار ملف ‎.mizajpack‎ (مطلق)', '') || null
+  if (!path) return
+  packBusy.value = true
+  packMsg.value = null
+  try {
+    const r = await useApi().request<{ version?: string; files?: number }>(
+      'POST',
+      '/api/packs/apply',
+      { path },
+      true
+    )
+    packMsg.value = {
+      ok: true,
+      text: `تم تحديث النماذج بنجاح${r.version ? ` (الإصدار ${r.version})` : ''}.`
+    }
+    await loadPack()
+  } catch (e) {
+    const text =
+      e instanceof ApiError
+        ? e.errorCode === 'ERR_PACK_INVALID'
+          ? `ملف الحزمة غير صالح: ${e.messageAr}`
+          : e.messageAr
+        : 'تعذر تطبيق الحزمة.'
+    packMsg.value = { ok: false, text }
+  } finally {
+    packBusy.value = false
+  }
+}
 
 const field = 'rounded border px-2 py-1 dark:border-slate-600 dark:bg-slate-800'
 </script>
@@ -121,6 +183,34 @@ const field = 'rounded border px-2 py-1 dark:border-slate-600 dark:bg-slate-800'
           <option value="light">نهاري</option>
         </select>
       </div>
+      <div v-if="tab === 'general'" class="mt-4 border-t pt-3 text-sm dark:border-slate-700">
+        <h3 class="mb-2 font-semibold">النماذج</h3>
+        <p data-testid="pack-status">
+          الإصدار المثبّت:
+          <b data-testid="pack-version">{{ pack?.version ?? 'غير محدد' }}</b>
+          <span v-if="pack?.models_source" class="text-slate-500">
+            — {{ sourceLabel[pack.models_source] ?? pack.models_source }}
+          </span>
+        </p>
+        <button
+          class="mt-2 rounded border px-3 py-1 hover:bg-slate-100 disabled:opacity-50 dark:border-slate-600 dark:hover:bg-slate-700"
+          :disabled="packBusy"
+          data-testid="pack-apply"
+          @click="applyPack"
+        >
+          تحديث النماذج من ملف (.mizajpack)
+        </button>
+        <p
+          v-if="packMsg"
+          class="mt-2"
+          :class="packMsg.ok ? 'text-mizaj-emerald' : 'text-red-500'"
+          data-testid="pack-result"
+        >
+          {{ packMsg.text }}
+        </p>
+      </div>
+      <!-- Seam for Phase 6: manual "check for updates" (GitHub Releases) goes here. -->
+      <div v-if="tab === 'general'" data-testid="updates-section" class="hidden" />
       <DictionaryPanel v-else />
     </div>
   </div>

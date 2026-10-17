@@ -22,9 +22,16 @@ class Health(BaseModel):
     version: str
     engine_mode: Literal["mock", "real"]
     db_user_version: int
+    models_dir: str
 
 
 @router.get("/health", response_model=Health)
 def health(db: Annotated[sqlite3.Connection, Depends(get_db)]) -> Health:
     uv = db.execute("PRAGMA user_version").fetchone()[0]
-    return Health(status="ok", version=VERSION, engine_mode=engine_mode(), db_user_version=uv)
+    return Health(
+        status="ok",
+        version=VERSION,
+        engine_mode=engine_mode(),
+        db_user_version=uv,
+        models_dir=str(config.catt_dir()),
+    )

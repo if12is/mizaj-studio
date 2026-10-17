@@ -20,7 +20,14 @@ const mizajAPI = {
   },
   windowMinimize: (): Promise<void> => ipcRenderer.invoke('window:minimize'),
   windowToggleMaximize: (): Promise<void> => ipcRenderer.invoke('window:toggle-maximize'),
-  getPathForFile: (file: File): string => webUtils.getPathForFile(file),
+  getPathForFile: (file: File): string => {
+    try {
+      return webUtils.getPathForFile(file)
+    } catch {
+      return ''
+    }
+  },
+  showOpenPackDialog: (): Promise<string | null> => ipcRenderer.invoke('dialog:open-pack'),
   showSaveDialog: (defaultName: string): Promise<string | null> =>
     ipcRenderer.invoke('dialog:save-docx', defaultName),
   windowClose: (): Promise<void> => ipcRenderer.invoke('window:close'),

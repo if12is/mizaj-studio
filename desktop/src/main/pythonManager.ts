@@ -33,6 +33,10 @@ export interface PythonManagerOptions {
   stableAfterMs?: number
   killGraceMs?: number
   platform?: NodeJS.Platform
+  /** Arguments placed before the sidecar CLI args (dev: ['-m','app.main']; packaged: []). */
+  prefixArgs?: string[]
+  /** Extra environment for the child process. */
+  extraEnv?: Record<string, string>
   /** Windows tree kill (taskkill). Injectable for tests. */
   killTree?: (pid: number) => void
   setTimeoutFn?: typeof setTimeout
@@ -56,6 +60,50 @@ export function resolvePythonExe(
       : join(backendDir, '.venv', 'bin', 'python')
   if (exists(venv)) return venv
   return platform === 'win32' ? 'python' : 'python3'
+}
+
+export interface SidecarTarget {
+  pythonExe: string
+  backendDir: string
+  prefixArgs: string[]
+  extraEnv: Record<string, string>
+}
+
+export interface ResolveSidecarInput {
+  isPackaged: boolean
+  resourcesPath: string
+  /** <repo>/backend in development */
+  backendDir: string
+  userDataDir: string
+  env: NodeJS.ProcessEnv
+  platform?: NodeJS.Platform
+  exists?: (p: string) => boolean
+}
+
+/**
+ * Packaged: run the frozen engine directly (no Python) from <resources>/engine.
+ * MIZAJ_MODELS_DIR points at the bundled models unless a pack was installed
+ * into <userData>/models (the backend gives the user-data pack precedence only
+ * when the env var is unset). Dev: python -m app.main from backend/.
+ */
+export function resolveSidecar(i: ResolveSidecarInput): SidecarTarget {
+  const platform = i.platform ?? process.platform
+  const exists = i.exists ?? existsSync
+  if (!i.isPackaged) {
+    return {
+      pythonExe: resolvePythonExe(i.env, i.backendDir, platform, exists),
+      backendDir: i.backendDir,
+      prefixArgs: ['-m', 'app.main'],
+      extraEnv: {}
+    }
+  }
+  const engineDir = join(i.resourcesPath, 'engine')
+  const exe = join(engineDir, platform === 'win32' ? 'mizaj-engine.exe' : 'mizaj-engine')
+  const extraEnv: Record<string, string> = {}
+  if (!exists(join(i.userDataDir, 'models'))) {
+    extraEnv.MIZAJ_MODELS_DIR = join(i.resourcesPath, 'models', 'catt_eo')
+  }
+  return { pythonExe: exe, backendDir: engineDir, prefixArgs: [], extraEnv }
 }
 
 export class PythonProcessManager extends EventEmitter {
@@ -84,11 +132,17 @@ export class PythonProcessManager extends EventEmitter {
       startupTimeoutMs: 20_000,
       stableAfterMs: 30_000,
       killGraceMs: 3000,
+      prefixArgs: ['-m', 'app.main'],
+      extraEnv: {},
       platform: process.platform,
       setTimeoutFn: setTimeout,
       clearTimeoutFn: clearTimeout,
       ...options
     }
+  }
+
+  getPid(): number | null {
+    return this.child?.pid ?? null
   }
 
   getStatus(): SidecarStatus {
@@ -141,14 +195,28 @@ export class PythonProcessManager extends EventEmitter {
     this.port = null
     this.message = undefined
     this.setState(initialState)
-    const args = ['-m', 'app.main', '--host', '127.0.0.1', '--port', '0', '--data-dir', dataDir]
+    const args = [
+      ...this.opts.prefixArgs,
+      '--host',
+      '127.0.0.1',
+      '--port',
+      '0',
+      '--data-dir',
+      dataDir
+    ]
     this.opts.logger.info('spawning sidecar', pythonExe, args.join(' '))
     let child: ChildProcess
     try {
       child = this.opts.spawn(pythonExe, args, {
         cwd: backendDir,
         windowsHide: true,
-        env: { ...process.env, PYTHONUNBUFFERED: '1' }
+        // MIZAJ_PARENT_PID lets the sidecar exit by itself if Electron dies without will-quit.
+        env: {
+          ...process.env,
+          ...this.opts.extraEnv,
+          PYTHONUNBUFFERED: '1',
+          MIZAJ_PARENT_PID: String(process.pid)
+        }
       })
     } catch (err) {
       this.opts.logger.error('spawn threw', err)
@@ -156,6 +224,7 @@ export class PythonProcessManager extends EventEmitter {
       return
     }
     this.child = child
+    if (child.pid) this.opts.logger.info(`sidecar started pid=${child.pid}`)
     let handled = false
     const once = (code: number | null, signal: NodeJS.Signals | null, msg?: string): void => {
       if (handled) return

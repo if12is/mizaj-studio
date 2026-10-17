@@ -83,7 +83,19 @@ export function registerIpc(getStatus: () => SidecarStatus): void {
     else w.maximize()
   })
   ipcMain.handle('window:close', (e) => winOf(e)?.close())
+  ipcMain.handle('dialog:open-pack', async (e) => {
+    if (process.env.MIZAJ_E2E_PACK_PATH) return process.env.MIZAJ_E2E_PACK_PATH
+    const w = winOf(e)
+    const opts = {
+      properties: ['openFile' as const],
+      filters: [{ name: 'Mizaj model pack', extensions: ['mizajpack'] }]
+    }
+    const r = w ? await dialog.showOpenDialog(w, opts) : await dialog.showOpenDialog(opts)
+    return r.canceled || !r.filePaths[0] ? null : r.filePaths[0]
+  })
   ipcMain.handle('dialog:save-docx', async (e, defaultName: unknown) => {
+    // test-only stub for the native dialog
+    if (process.env.MIZAJ_E2E_SAVE_PATH) return process.env.MIZAJ_E2E_SAVE_PATH
     const w = winOf(e)
     const name = typeof defaultName === 'string' && defaultName ? defaultName : 'mizaj.docx'
     const opts = {
