@@ -55,15 +55,22 @@ jobs:
         if: inputs.mode == 'local'
         shell: pwsh
         run: |
-          pip install -r backend/requirements.txt -r backend/requirements-build.txt
-          python scripts/build_backend.py
+          function Step($name, [scriptblock]$cmd) {
+            Write-Host "== $name"
+            & $cmd
+            if ($LASTEXITCODE -ne 0) {
+              Write-Host "::error title=Local build::$name failed with exit code $LASTEXITCODE"
+              exit 1
+            }
+          }
+          Step 'pip install' { pip install -r backend/requirements.txt -r backend/requirements-build.txt }
+          Step 'freeze engine' { python scripts/build_backend.py }
           Push-Location desktop
-          npm run build
-          npx electron-builder --win --publish never -c.extraMetadata.version=99.0.0 -c.directories.output=dist-a
-          if ($LASTEXITCODE -ne 0) { throw 'build 99.0.0 failed' }
-          npx electron-builder --win --publish never -c.extraMetadata.version=99.0.1 -c.directories.output=dist-b
-          if ($LASTEXITCODE -ne 0) { throw 'build 99.0.1 failed' }
-          Get-ChildItem dist-b -File | Select-Object Name, Length | Format-Table | Out-String | Write-Host
+          Step 'npm run build' { npm run build }
+          Step 'package 99.0.0' { npx electron-builder --win --publish never -c.extraMetadata.version=99.0.0 -c.directories.output=dist-a }
+          Step 'package 99.0.1' { npx electron-builder --win --publish never -c.extraMetadata.version=99.0.1 -c.directories.output=dist-b }
+          $files = (Get-ChildItem dist-b -File | ForEach-Object { "$($_.Name) ($($_.Length))" }) -join ', '
+          Write-Host "::notice title=Local build::dist-b: $files"
           Pop-Location
 
       - name: Resolve versions
