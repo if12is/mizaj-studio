@@ -174,8 +174,18 @@ def test_cache_word_level_for_mock(conn):
 def test_levels():
     full = "كَتَّبَ الْوَلَدُ دَرْسًا"
     assert reduce_level(full, "irab_only") == "كتبَ الولدُ درسًا"
-    assert reduce_level(full, "minimal") == "كتّب الولد درسًا"
+    assert reduce_level(full, "minimal") == full  # minimal is applied by the pipeline
     assert reduce_level(full, "full") == full
+
+
+def test_minimal_level_mock_rule(conn):
+    """Mock rule: only 3-letter (triliteral) words are 'ambiguous' and get diacritized."""
+    eng = MockEngine()
+    pipe = TashkeelPipeline(eng, level="minimal", ambiguity=eng.is_ambiguous)
+    r = pipe.process_chunk(conn, "علم كتاب ذهب المدرسة")
+    assert r.text == "عَلمُ كتاب ذَهبُ المدرسة"
+    with pytest.raises(RuntimeError):
+        TashkeelPipeline(eng, level="minimal").process_chunk(conn, "علم")
 
 
 # ---------- pipeline via API ----------
@@ -201,9 +211,11 @@ def test_api_keep_existing_and_level(client):
 def test_api_user_dictionary_wins(client):
     client.post("/api/dictionary", json={"word_or_phrase": "كتاب", "diacritized_form": "كِتَابٌ"})
     r = client.post("/api/tashkeel", json={"text": "كتاب", "level": "minimal"})
-    assert r.json()["text"] == "كِتَابٌ"
+    assert r.json()["text"] == "كِتَابٌ"  # dictionary wins even when minimal leaves it bare
+    r = client.post("/api/tashkeel", json={"text": "كتاب علم ذهب", "level": "minimal"})
+    assert r.json()["text"] == "كِتَابٌ عَلمُ ذَهبُ"
     lst = client.get("/api/dictionary").json()
-    assert lst[0]["usage_count"] == 2
+    assert lst[0]["usage_count"] == 3
 
 
 # ---------- SSE ----------

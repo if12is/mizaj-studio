@@ -33,3 +33,6 @@ class CattEngine(Engine):
                 out = [self._model.diacritize(w) for w in words]
         # normalise mark order per letter
         return ["".join(b + m for b, m in split_pairs(w)) for w in out]
+
+    def is_ambiguous(self, word: str) -> bool:
+        raise NotImplementedError("use the mishkal oracle")

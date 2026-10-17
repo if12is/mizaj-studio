@@ -15,10 +15,10 @@ from pydantic import BaseModel, Field
 from app.api.settings import DEFAULTS
 from app.core.database import connect
 from app.core.errors import MizajError, not_found, task_cancelled, validation_error
-from app.engine import config
 from app.engine.cache import TashkeelCache
 from app.engine.chunk_map import ChunkMap
 from app.engine.executor import run_blocking
+from app.engine.factory import build_pipeline
 from app.engine.manager import manager
 from app.engine.normalize import has_arabic_letters, strip_marks
 from app.engine.pipeline import TashkeelPipeline
@@ -67,17 +67,10 @@ async def _build_pipeline(request: Request, body: TashkeelRequest, document_id=N
     level, doc_ok = await run_blocking(_read_setting_and_doc, db_path, document_id)
     if not doc_ok:
         raise not_found("Document", document_id)
-    engine = await manager.ensure(body.mode)
-    morph = None
-    use_filter = config.morph_filter_default() if body.morph_filter is None else body.morph_filter
-    if engine.name == "catt" and use_filter:
-        morph = await run_blocking(manager.morph_filter)
-    pipeline = TashkeelPipeline(
-        engine,
-        level=body.level or level,
-        keep_existing=body.keep_existing,
-        morph=morph,
+    pipeline = await build_pipeline(
+        body.mode, body.level or level, body.keep_existing, body.morph_filter
     )
+    engine = pipeline.engine
     return engine, pipeline
 
 

@@ -29,3 +29,6 @@ class LibtashkeelEngine(Engine):
 
     def suggestions(self, word: str) -> list[dict[str, str]]:
         return [{"diacritized": self.diacritize([word])[0], "pos": "غير محدد"}]
+
+    def is_ambiguous(self, word: str) -> bool:
+        raise NotImplementedError("use the mishkal oracle")
