@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 import logging
+import os
 import threading
 
-from app.core.errors import engine_not_ready, model_missing
+from app.core.errors import MizajError, engine_not_ready, model_missing
 from app.engine import config
 from app.engine.base import Engine
 from app.engine.executor import run_blocking
@@ -20,12 +21,14 @@ class EngineManager:
         self._engines: dict[str, Engine] = {}
         self._loading: set[str] = set()
         self._fast_key: str | None = None
+        self._failed: set[str] = set()
 
     def reset(self) -> None:
         with self._lock:
             self._engines.clear()
             self._loading.clear()
             self._fast_key = None
+            self._failed.clear()
 
     # ---- key resolution (cheap, no loading) ----
     def key_for(self, mode: str) -> str:
@@ -99,6 +102,43 @@ class EngineManager:
     async def ensure_analyzer(self) -> Engine:
         """Engine used for word suggestions (mock in mock mode, else mishkal)."""
         return await self.ensure_key("mock" if config.env_mock() else "mishkal", "analyzer")
+
+    # ---- status & warm-up (7.7.4) ----
+    def engine_states(self) -> dict[str, str]:
+        """fast/accurate: 'ready' (loaded), 'loading' (not yet loaded / being loaded),
+        'missing' (accurate model absent), 'error' (warm-up failed)."""
+        out = {}
+        for mode in ("fast", "accurate"):
+            if mode == "accurate" and not config.env_mock() and not config.model_present():
+                out[mode] = "missing"
+                continue
+            key = "mock" if config.env_mock() else ("catt" if mode == "accurate" else None)
+            if key is None:
+                key = self._fast_key or self._resolve_fast()
+            if key in self._engines:
+                out[mode] = "ready"
+            elif key in self._failed:
+                out[mode] = "error"
+            else:
+                out[mode] = "loading"
+        return out
+
+    async def warmup(self) -> None:
+        """Load and exercise the engines in the executor (never blocks the event loop)."""
+        if os.environ.get("MIZAJ_PRELOAD", "1").lower() in ("0", "false", "off", "no"):
+            return
+        for mode in ("fast", "accurate"):
+            try:
+                key = self.key_for(mode)
+            except MizajError:
+                continue  # accurate model missing -> reported as 'missing'
+            try:
+                eng = await self.ensure_key(key, mode)
+                await run_blocking(eng.diacritize, ["كتاب"])
+                log.info("warm-up: %s engine ready", key)
+            except Exception:
+                self._failed.add(key)
+                log.exception("warm-up of %s failed", key)
 
     def morph_filter(self) -> MorphFilter:
         from app.engine.mishkal_engine import MishkalEngine

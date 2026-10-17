@@ -19,8 +19,8 @@ export interface Suggestion {
 export interface InspectorConfig {
   fetchSuggestions(bareWord: string): Promise<Suggestion[]>
   saveToDictionary(bareWord: string, form: string): Promise<void>
-  /** number of words changed manually through the inspector */
-  onManualEdit(count: number): void
+  /** `count` word occurrences of `bareWord` were changed manually through the inspector */
+  onManualEdit(count: number, bareWord: string): void
 }
 
 interface InspectorValue {
@@ -166,7 +166,7 @@ export function inspectorExtension(cfg: InspectorConfig) {
           const spec = applyHarakaSpec(view.state, v.from, v.to, v.letter, key)
           if (spec) {
             view.dispatch(spec)
-            cfg.onManualEdit(1)
+            cfg.onManualEdit(1, bare)
           }
         }
 
@@ -183,7 +183,7 @@ export function inspectorExtension(cfg: InspectorConfig) {
                 const f = cur?.from ?? v.from
                 const t = cur?.to ?? v.to
                 view.dispatch(replaceWordSpec(view.state, f, t, s.diacritized))
-                cfg.onManualEdit(1)
+                cfg.onManualEdit(1, bare)
               },
               'mi-sug'
             )
@@ -203,7 +203,7 @@ export function inspectorExtension(cfg: InspectorConfig) {
               const r = applyToAllSpec(view.state, bare, form)
               if (r) {
                 view.dispatch(r.spec)
-                cfg.onManualEdit(r.words)
+                cfg.onManualEdit(r.words, bare)
               }
             },
             'mi-act'

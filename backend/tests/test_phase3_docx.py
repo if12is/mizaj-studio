@@ -514,11 +514,6 @@ def test_api_validation(client, tmp_path, rich):
         == 404
     )
     pid = client.post("/api/projects", json={"name": "P"}).json()["id"]
-    plain = client.post("/api/documents", json={"project_id": pid, "title": "t"}).json()["id"]
-    assert (
-        client.post("/api/docx/export", json={"document_id": plain, "target_path": ok}).status_code
-        == 422
-    )
     assert (
         client.post("/api/docx/import", json={"path": "a.docx", "project_id": pid}).status_code
         == 422

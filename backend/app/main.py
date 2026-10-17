@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import asyncio
 import ipaddress
 import logging
 import os
@@ -22,6 +23,7 @@ from app.core.logging_setup import setup_logging
 from app.core.migrations import MigrationError, run_migrations
 from app.core.watchdog import start_parent_watchdog
 from app.engine import config
+from app.engine.manager import manager
 
 log = logging.getLogger("mizaj.main")
 
@@ -78,6 +80,8 @@ class _Server(uvicorn.Server):
             port = sockets[0].getsockname()[1]
             print(f"MIZAJ_PORT={port}", flush=True)
             print("MIZAJ_STATUS=READY", flush=True)
+            # warm the engines in the background; the handshake above is never delayed
+            self._warmup_task = asyncio.get_running_loop().create_task(manager.warmup())
 
 
 def main(argv: list[str] | None = None) -> int:

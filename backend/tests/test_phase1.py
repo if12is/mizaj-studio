@@ -35,6 +35,7 @@ def test_health(client):
     assert r.status_code == 200
     j = r.json()
     models_dir = j.pop("models_dir")
+    assert set(j.pop("engines")) == {"fast", "accurate"}
     assert isinstance(models_dir, str) and models_dir.endswith("catt_eo")
     assert j == {
         "status": "ok",

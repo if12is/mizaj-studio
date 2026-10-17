@@ -18,15 +18,21 @@ import { useDictionaryStore } from '@renderer/stores/dictionary'
 import { useEditorStore } from '@renderer/stores/editor'
 import { useProjectsStore } from '@renderer/stores/projects'
 import { useSettingsStore } from '@renderer/stores/settings'
+import { useSidecarStore } from '@renderer/stores/sidecar'
 import DiffView from './DiffView.vue'
 import DropOverlay from './DropOverlay.vue'
 import ProgressBar from './ProgressBar.vue'
 import StatsPanel from './StatsPanel.vue'
 
-const props = defineProps<{ openDocument: (id: number) => Promise<void> }>()
+const props = defineProps<{
+  openDocument: (id: number) => Promise<void>
+  /** flush autosave so the server has the latest text before exporting */
+  flushSave: () => Promise<void>
+}>()
 const emit = defineEmits<{ (e: 'change'): void }>()
 const editor = useEditorStore()
 const settings = useSettingsStore()
+const sidecar = useSidecarStore()
 const projects = useProjectsStore()
 const dictionary = useDictionaryStore()
 const host = ref<HTMLDivElement | null>(null)
@@ -100,7 +106,7 @@ function extensions(): Extension[] {
       inspector: {
         fetchSuggestions,
         saveToDictionary,
-        onManualEdit: (n) => editor.addManualEdits(projects.currentDocument?.id ?? 0, n)
+        onManualEdit: (n, w) => editor.addManualEdits(projects.currentDocument?.id ?? 0, n, w)
       }
     }),
     keymap.of([...defaultKeymap, ...historyKeymap]),
@@ -146,12 +152,13 @@ async function openAndMaybeDiacritize(id: number, diacritize: boolean): Promise<
 async function exportDocx(): Promise<void> {
   const doc = projects.currentDocument
   const api = window.mizajAPI
-  if (!doc?.source_docx_path) return
+  if (!doc) return
   let target: string | null = null
-  if (api?.showSaveDialog) target = await api.showSaveDialog(`${doc.title}-مشكول.docx`)
+  if (api?.showSaveDialog) target = await api.showSaveDialog(`${doc.title}.docx`)
   else target = window.prompt('مسار ملف DOCX الناتج (مطلق)', '') || null
   if (!target) return
   try {
+    await props.flushSave()
     const r = await useApi().request<{ target_path: string }>(
       'POST',
       '/api/docx/export',
@@ -217,7 +224,17 @@ const btnCls =
         @change="settings.update({ engine_mode: ($event.target as HTMLSelectElement).value })"
       >
         <option value="fast">سريع</option>
-        <option value="accurate">دقيق</option>
+        <option
+          value="accurate"
+          :disabled="sidecar.accurateMissing"
+          :title="
+            sidecar.accurateMissing
+              ? 'النموذج الدقيق غير متوفر. ثبّت حزمة النماذج من الإعدادات.'
+              : ''
+          "
+        >
+          دقيق
+        </option>
       </select>
       <select
         :class="selectCls"
@@ -268,7 +285,7 @@ const btnCls =
       <button
         :class="btnCls"
         data-testid="export-docx"
-        :disabled="!projects.currentDocument?.source_docx_path"
+        :disabled="!projects.currentDocument"
         @click="exportDocx"
       >
         تصدير DOCX

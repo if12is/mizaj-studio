@@ -8,6 +8,7 @@ from pydantic import BaseModel
 
 from app.api.deps import get_db
 from app.engine import config
+from app.engine.manager import manager
 
 router = APIRouter()
 VERSION = "0.1.0"
@@ -23,6 +24,7 @@ class Health(BaseModel):
     engine_mode: Literal["mock", "real"]
     db_user_version: int
     models_dir: str
+    engines: dict[str, str]
 
 
 @router.get("/health", response_model=Health)
@@ -34,4 +36,5 @@ def health(db: Annotated[sqlite3.Connection, Depends(get_db)]) -> Health:
         engine_mode=engine_mode(),
         db_user_version=uv,
         models_dir=str(config.catt_dir()),
+        engines=manager.engine_states(),
     )

@@ -152,14 +152,20 @@ def apply_unit(unit: ParagraphUnit, diacritized: str) -> tuple[bool, int]:
     if len(pairs) != len(bases) or any(pairs[k][0] != text[i] for k, i in enumerate(bases)):
         raise ValueError("diacritized text does not align with the source paragraph")
     pieces: dict[int, list[str]] = {id(t): [] for t in unit.t_nodes}
-    dropped = 0
+    pending = ""  # marks that follow an unowned placeholder (tab/break/...): keep, don't drop
+    last_node = None
     for k, i in enumerate(bases):
         node = unit.owners[i]
         base, marks = pairs[k]
         if node is None:
-            dropped += len(marks)
-        else:
-            pieces[id(node)].append(base + marks)
+            pending += marks
+            continue
+        pieces[id(node)].append(pending + base + marks)
+        pending = ""
+        last_node = node
+    if pending and last_node is not None:  # no owned letter after the placeholder
+        pieces[id(last_node)].append(pending)
+    dropped = 0
     changed = False
     for t in unit.t_nodes:
         new = "".join(pieces[id(t)])

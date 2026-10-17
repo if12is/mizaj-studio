@@ -8,6 +8,7 @@ import logging
 import os
 import uuid
 import zipfile
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -65,16 +66,12 @@ def _serialize(root) -> bytes:
     return etree.tostring(root, xml_declaration=True, encoding="UTF-8", standalone=True)
 
 
-def _write_atomic(src: Path, dst: Path, modified: dict[str, bytes]) -> None:
+def _atomic_write(dst: Path, write_fn: Callable[[Any], None]) -> None:
+    """Write via a unique temp file next to `dst`, fsync, then os.replace."""
     tmp = dst.parent / f"{TMP_PREFIX}{uuid.uuid4().hex[:12]}.docx"
     try:
-        with zipfile.ZipFile(src) as zin, open(tmp, "wb") as fh:
-            with zipfile.ZipFile(fh, "w") as zout:
-                for info in zin.infolist():
-                    data = modified.get(info.filename)
-                    if data is None:
-                        data = zin.read(info)
-                    zout.writestr(copy.copy(info), data, compress_type=info.compress_type)
+        with open(tmp, "wb") as fh:
+            write_fn(fh)
             fh.flush()
             os.fsync(fh.fileno())
         os.replace(tmp, dst)
@@ -90,6 +87,18 @@ def _write_atomic(src: Path, dst: Path, modified: dict[str, bytes]) -> None:
                 tmp.unlink()
         except OSError:
             log.warning("could not remove temp file %s", tmp)
+
+
+def _write_atomic(src: Path, dst: Path, modified: dict[str, bytes]) -> None:
+    def write(fh) -> None:
+        with zipfile.ZipFile(src) as zin, zipfile.ZipFile(fh, "w") as zout:
+            for info in zin.infolist():
+                data = modified.get(info.filename)
+                if data is None:
+                    data = zin.read(info)
+                zout.writestr(copy.copy(info), data, compress_type=info.compress_type)
+
+    _atomic_write(dst, write)
 
 
 def process_docx(
@@ -197,3 +206,86 @@ def _plain(unit) -> str:
             elif c.tag in (W_BR, W_CR):
                 parts.append("\n")
     return "".join(parts)
+
+
+PX_TO_PT = 0.75
+
+
+def build_docx_from_text(
+    title: str,
+    text: str,
+    font: str = "Amiri",
+    size_px: int = 20,
+    rtl: bool = True,
+):
+    """A clean RTL python-docx Document: one paragraph per line (blank lines preserved), Arabic
+    (complex-script) font and size on the defaults, `w:bidi` on every paragraph and the
+    section, `w:rtl` + `ar-SA` on every run."""
+    from docx import Document
+    from docx.oxml import OxmlElement
+    from docx.oxml.ns import qn
+    from docx.shared import Pt
+
+    doc = Document()
+    doc.core_properties.title = title
+    doc.core_properties.language = "ar-SA"
+    size_pt = Pt(round(size_px * PX_TO_PT * 2) / 2)
+    normal = doc.styles["Normal"]
+    normal.font.name = font
+    normal.font.size = size_pt
+    rpr = normal.element.get_or_add_rPr()
+    rfonts = rpr.get_or_add_rFonts()
+    for attr in ("ascii", "hAnsi", "cs", "eastAsia"):
+        rfonts.set(qn(f"w:{attr}"), font)
+    if rtl:
+        sz_cs = OxmlElement("w:szCs")
+        sz_cs.set(qn("w:val"), str(int(size_pt.pt * 2)))
+        rpr.append(sz_cs)
+        lang = OxmlElement("w:lang")
+        lang.set(qn("w:val"), "en-US")
+        lang.set(qn("w:bidi"), "ar-SA")
+        rpr.append(lang)
+        ppr = normal.element.get_or_add_pPr()
+        ppr.append(OxmlElement("w:bidi"))
+        doc.sections[0]._sectPr.append(OxmlElement("w:bidi"))
+    lines = text.replace("\r\n", "\n").replace("\r", "\n").split("\n")
+    for line in lines:
+        p = doc.add_paragraph()
+        if rtl:
+            p._p.get_or_add_pPr().append(OxmlElement("w:bidi"))
+        if line:
+            run = p.add_run(line)
+            if rtl:
+                run._r.get_or_add_rPr().append(OxmlElement("w:rtl"))
+    return doc, len(lines)
+
+
+def process_text_docx(
+    dst: Path,
+    title: str,
+    text: str,
+    pipeline: TashkeelPipeline | None,
+    db_path: Path,
+    font: str = "Amiri",
+    size_px: int = 20,
+) -> dict[str, Any]:
+    """Blocking: (diacritize `text` when a pipeline is given) and write a new .docx atomically."""
+    dst = Path(dst)
+    if not dst.parent.is_dir():
+        raise validation_error("target directory does not exist", {"dir": str(dst.parent)})
+    if pipeline is not None and has_arabic_letters(text):
+        conn = connect(db_path)
+        try:
+            text = pipeline.run_text(conn, text)
+        finally:
+            conn.close()
+    doc, n = build_docx_from_text(title, text, font, size_px)
+    _atomic_write(dst, lambda fh: doc.save(fh))
+    words = sum(
+        1
+        for m in WORD_RE.finditer(text)
+        if has_arabic_letters(m.group(0)) and any(c in MARKS for c in m.group(0))
+    )
+    parts = dict.fromkeys(PART_KEYS, 0)
+    parts["body"] = n
+    return {"paragraphs": n, "words_diacritized": words, "skipped_code_runs": 0, "parts": parts}

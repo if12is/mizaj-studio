@@ -190,3 +190,14 @@ def build_rich_docx(path: Path) -> Path:
 def read_members(path: Path) -> dict[str, bytes]:
     with zipfile.ZipFile(path) as z:
         return {i.filename: z.read(i) for i in z.infolist()}
+
+
+def build_tab_marks_docx(path: Path) -> Path:
+    """Marks typed right after a w:tab (they used to be dropped on export)."""
+    doc = Document()
+    sect = doc.element.body.sectPr
+    sect.addprevious(
+        _x(_p("<w:r><w:t>كتاب</w:t><w:tab/><w:t>ّعلم</w:t><w:tab/><w:t>َقلم</w:t></w:r>"))
+    )
+    doc.save(str(path))
+    return path

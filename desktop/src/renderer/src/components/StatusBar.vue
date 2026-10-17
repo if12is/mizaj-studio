@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import { useEditorStore } from '@renderer/stores/editor'
 import { useSidecarStore } from '@renderer/stores/sidecar'
+import { engineWarmupText } from '@renderer/stores/engines'
 
 const editor = useEditorStore()
 const sidecar = useSidecarStore()
@@ -31,6 +32,7 @@ const dot = computed(
       stopped: 'bg-slate-500'
     })[sidecar.status.state]
 )
+const warmup = computed(() => engineWarmupText(sidecar.engines))
 const saveText = computed(
   () => ({ saved: 'محفوظ', saving: 'جاري الحفظ', unsaved: 'غير محفوظ' })[editor.saveState]
 )
@@ -48,6 +50,14 @@ const saveText = computed(
     >
       <span class="inline-block h-2 w-2 rounded-full" :class="dot" />
       <span>{{ sidecarText }}</span>
+      <span
+        v-if="warmup && sidecar.status.state === 'ready'"
+        class="text-mizaj-amber"
+        data-testid="status-engines"
+        :data-accurate="sidecar.engines?.accurate"
+        :data-fast="sidecar.engines?.fast"
+        >· {{ warmup }}</span
+      >
     </div>
     <div class="flex items-center gap-4">
       <span data-testid="status-words">الكلمات: {{ editor.wordCount }}</span>

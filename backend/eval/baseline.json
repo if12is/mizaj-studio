@@ -1,0 +1,276 @@
+{
+  "corpus": {
+    "sentences": 152,
+    "words": 956
+  },
+  "engines": {
+    "mock": {
+      "unaligned_sentences": 0,
+      "with_case_ending": {
+        "all": {
+          "der": 75.698,
+          "wer": 99.895,
+          "letters": 4658,
+          "letter_errors": 3526,
+          "words": 956,
+          "word_errors": 955,
+          "internal_der": 75.23,
+          "final_der": 75.523,
+          "shadda_error": 100.0
+        },
+        "gold_only": {
+          "der": 84.386,
+          "wer": 99.163,
+          "letters": 3593,
+          "letter_errors": 3032,
+          "words": 956,
+          "word_errors": 948,
+          "internal_der": 87.585,
+          "final_der": 70.968,
+          "shadda_error": 100.0
+        }
+      },
+      "without_case_ending": {
+        "all": {
+          "der": 75.23,
+          "wer": 95.921,
+          "letters": 3702,
+          "letter_errors": 2785,
+          "words": 956,
+          "word_errors": 917
+        },
+        "gold_only": {
+          "der": 87.585,
+          "wer": 95.921,
+          "letters": 2787,
+          "letter_errors": 2441,
+          "words": 956,
+          "word_errors": 917
+        }
+      },
+      "by_category": {
+        "general": {
+          "der": 73.643,
+          "wer": 99.677,
+          "sentences": 57
+        },
+        "legal": {
+          "der": 77.409,
+          "wer": 100.0,
+          "sentences": 35
+        },
+        "letters": {
+          "der": 77.013,
+          "wer": 100.0,
+          "sentences": 25
+        },
+        "news": {
+          "der": 75.467,
+          "wer": 100.0,
+          "sentences": 35
+        }
+      }
+    },
+    "fast": {
+      "unaligned_sentences": 0,
+      "with_case_ending": {
+        "all": {
+          "der": 10.756,
+          "wer": 37.343,
+          "letters": 4658,
+          "letter_errors": 501,
+          "words": 956,
+          "word_errors": 357,
+          "internal_der": 6.483,
+          "final_der": 25.837,
+          "shadda_error": 11.182
+        },
+        "gold_only": {
+          "der": 12.747,
+          "wer": 35.46,
+          "letters": 3593,
+          "letter_errors": 458,
+          "words": 956,
+          "word_errors": 339,
+          "internal_der": 7.14,
+          "final_der": 30.397,
+          "shadda_error": 11.182
+        }
+      },
+      "without_case_ending": {
+        "all": {
+          "der": 6.861,
+          "wer": 17.573,
+          "letters": 3702,
+          "letter_errors": 254,
+          "words": 956,
+          "word_errors": 168
+        },
+        "gold_only": {
+          "der": 7.643,
+          "wer": 15.167,
+          "letters": 2787,
+          "letter_errors": 213,
+          "words": 956,
+          "word_errors": 145
+        }
+      },
+      "by_category": {
+        "general": {
+          "der": 11.276,
+          "wer": 38.065,
+          "sentences": 57
+        },
+        "legal": {
+          "der": 10.382,
+          "wer": 34.016,
+          "sentences": 35
+        },
+        "letters": {
+          "der": 12.019,
+          "wer": 41.618,
+          "sentences": 25
+        },
+        "news": {
+          "der": 9.593,
+          "wer": 36.681,
+          "sentences": 35
+        }
+      }
+    },
+    "accurate": {
+      "unaligned_sentences": 0,
+      "with_case_ending": {
+        "all": {
+          "der": 3.585,
+          "wer": 14.121,
+          "letters": 4658,
+          "letter_errors": 167,
+          "words": 956,
+          "word_errors": 135,
+          "internal_der": 2.593,
+          "final_der": 6.59,
+          "shadda_error": 4.792
+        },
+        "gold_only": {
+          "der": 4.537,
+          "wer": 13.912,
+          "letters": 3593,
+          "letter_errors": 163,
+          "words": 956,
+          "word_errors": 133,
+          "internal_der": 3.337,
+          "final_der": 7.692,
+          "shadda_error": 4.792
+        }
+      },
+      "without_case_ending": {
+        "all": {
+          "der": 2.755,
+          "wer": 8.473,
+          "letters": 3702,
+          "letter_errors": 102,
+          "words": 956,
+          "word_errors": 81
+        },
+        "gold_only": {
+          "der": 3.552,
+          "wer": 8.368,
+          "letters": 2787,
+          "letter_errors": 99,
+          "words": 956,
+          "word_errors": 80
+        }
+      },
+      "by_category": {
+        "general": {
+          "der": 3.242,
+          "wer": 12.581,
+          "sentences": 57
+        },
+        "legal": {
+          "der": 3.073,
+          "wer": 11.885,
+          "sentences": 35
+        },
+        "letters": {
+          "der": 4.084,
+          "wer": 17.919,
+          "sentences": 25
+        },
+        "news": {
+          "der": 4.16,
+          "wer": 15.721,
+          "sentences": 35
+        }
+      }
+    },
+    "accurate-nofilter": {
+      "unaligned_sentences": 0,
+      "with_case_ending": {
+        "all": {
+          "der": 3.328,
+          "wer": 13.075,
+          "letters": 4658,
+          "letter_errors": 155,
+          "words": 956,
+          "word_errors": 125,
+          "internal_der": 2.269,
+          "final_der": 6.59,
+          "shadda_error": 4.792
+        },
+        "gold_only": {
+          "der": 4.203,
+          "wer": 12.762,
+          "letters": 3593,
+          "letter_errors": 151,
+          "words": 956,
+          "word_errors": 122,
+          "internal_der": 2.906,
+          "final_der": 7.692,
+          "shadda_error": 4.792
+        }
+      },
+      "without_case_ending": {
+        "all": {
+          "der": 2.431,
+          "wer": 7.322,
+          "letters": 3702,
+          "letter_errors": 90,
+          "words": 956,
+          "word_errors": 70
+        },
+        "gold_only": {
+          "der": 3.122,
+          "wer": 7.113,
+          "letters": 2787,
+          "letter_errors": 87,
+          "words": 956,
+          "word_errors": 68
+        }
+      },
+      "by_category": {
+        "general": {
+          "der": 3.101,
+          "wer": 12.581,
+          "sentences": 57
+        },
+        "legal": {
+          "der": 2.824,
+          "wer": 10.656,
+          "sentences": 35
+        },
+        "letters": {
+          "der": 3.151,
+          "wer": 13.295,
+          "sentences": 25
+        },
+        "news": {
+          "der": 4.244,
+          "wer": 16.157,
+          "sentences": 35
+        }
+      }
+    }
+  }
+}

@@ -4,10 +4,12 @@ import { useSettingsStore } from '@renderer/stores/settings'
 import DictionaryPanel from './DictionaryPanel.vue'
 import { useApi } from '@renderer/api'
 import { useUpdaterStore } from '@renderer/stores/updater'
+import { useSidecarStore } from '@renderer/stores/sidecar'
 import { ApiError } from '@renderer/api/client'
 
 const emit = defineEmits<{ (e: 'close'): void }>()
 const settings = useSettingsStore()
+const sidecar = useSidecarStore()
 const tab = ref<'general' | 'dictionary'>('general')
 const fontSize = ref(settings.fontSize)
 
@@ -141,7 +143,17 @@ const field = 'rounded border px-2 py-1 dark:border-slate-600 dark:bg-slate-800'
           @change="settings.update({ engine_mode: ($event.target as HTMLSelectElement).value })"
         >
           <option value="fast">سريع</option>
-          <option value="accurate">دقيق</option>
+          <option
+            value="accurate"
+            :disabled="sidecar.accurateMissing"
+            :title="
+              sidecar.accurateMissing
+                ? 'النموذج الدقيق غير متوفر. ثبّت حزمة النماذج من الإعدادات.'
+                : ''
+            "
+          >
+            دقيق
+          </option>
         </select>
 
         <label for="s-level">مستوى التشكيل</label>

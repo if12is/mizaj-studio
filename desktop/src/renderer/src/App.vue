@@ -41,6 +41,7 @@ async function selectDocument(id: number): Promise<void> {
   projects.setCurrentDocument(d)
   pane.value?.setText(d.raw_content)
   autosave.setDocument(id)
+  editor.loadManualEdits(id, settings.values)
   if (d.diacritized_content) editor.diacritizedDocs = { ...editor.diacritizedDocs, [id]: true }
 }
 
@@ -103,7 +104,12 @@ onBeforeUnmount(() => {
             الإعدادات
           </button>
         </div>
-        <EditorPane ref="pane" :open-document="selectDocument" @change="autosave.markDirty()" />
+        <EditorPane
+          ref="pane"
+          :open-document="selectDocument"
+          :flush-save="autosave.flush"
+          @change="autosave.markDirty()"
+        />
       </main>
     </div>
     <StatusBar />

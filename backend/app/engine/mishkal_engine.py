@@ -3,9 +3,12 @@
 from __future__ import annotations
 
 import logging
+import tempfile
 from concurrent.futures import ThreadPoolExecutor
 from functools import lru_cache
+from pathlib import Path
 
+from app.engine import config
 from app.engine.base import Engine, Lookup
 from app.engine.normalize import SHADDA, split_pairs, strip_marks
 
@@ -19,6 +22,13 @@ CASE_AR = {
     "ِ": "مجرور",
     "ٍ": "مجرور",
 }
+
+
+def _cache_dir() -> Path:
+    base = config.get_data_dir() or Path(tempfile.gettempdir()) / "mizaj"
+    d = Path(base) / "cache"
+    d.mkdir(parents=True, exist_ok=True)
+    return d
 
 
 def _pos_description(sw) -> str:
@@ -46,9 +56,14 @@ class MishkalEngine(Engine):
         self._candidates = lru_cache(maxsize=50000)(self._candidates_uncached)
 
     def _init_libs(self) -> None:
+        import sylajone.cache as sylajone_cache
         from mishkal.tashkeel import TashkeelClass
         from qalsadi.analex import Analex
 
+        # sylajone's syntax-analyzer cache defaults to ~/.thaalabCache; redirect it into the
+        # data dir (class attribute, read at construction time) so nothing is written to $HOME.
+
+        sylajone_cache.cache.DB_PATH = str(_cache_dir() / ".thaalabCache")
         self._tashkeel = TashkeelClass()
         self._analex = Analex()
 

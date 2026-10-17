@@ -140,6 +140,28 @@ for (const name of ['sample_ar.docx', 'sample_mixed.docx']) {
     expect(after.replace(MARKS, '')).toBe(before.replace(MARKS, ''))
     await page.keyboard.press('Escape')
 
+    // the manual edit is counted, shown in the stats panel and persisted per document
+    if ((await text('stats-panel').count()) === 0) await text('toggle-stats').click()
+    await expect(text('stat-manual')).toHaveText('1')
+    await expect
+      .poll(async () =>
+        page.evaluate(async () => {
+          const cfg = await (
+            window as unknown as {
+              mizajAPI: { getBackendConfig(): Promise<{ baseUrl: string }> }
+            }
+          ).mizajAPI.getBackendConfig()
+          const all = (await (await fetch(`${cfg.baseUrl}/api/settings`)).json()) as Record<
+            string,
+            string
+          >
+          return Object.entries(all)
+            .filter(([k]) => k.startsWith('manual_edits:'))
+            .map(([, v]) => JSON.parse(v).count)
+        })
+      )
+      .toContain(1)
+
     // export through the (stubbed) native save dialog
     rmSync(exportPath, { force: true })
     await text('export-docx').click()
@@ -150,6 +172,31 @@ for (const name of ['sample_ar.docx', 'sample_mixed.docx']) {
     if (name === 'sample_mixed.docx') expect(xml).toContain('iPhone 16 Pro')
   })
 }
+
+// The backend generates a fresh RTL .docx for documents without a source file.
+test('export a document that was not imported from Word', async () => {
+  await text('new-document').first().click()
+  await text('new-document-input').fill('مستند يدوي')
+  await text('new-document-input').press('Enter')
+  await page.getByTestId('document-item').filter({ hasText: 'مستند يدوي' }).click()
+  await expect(text('doc-title')).toHaveText('مستند يدوي')
+  await page.evaluate(() => {
+    const v = (
+      document.querySelector('.cm-content') as unknown as {
+        cmView: { view: { state: { doc: { length: number } }; dispatch(s: unknown): void } }
+      }
+    ).cmView.view
+    v.dispatch({ changes: { from: 0, to: v.state.doc.length, insert: 'كتاب جميل' } })
+  })
+  await text('toolbar-tashkeel').click()
+  await expect.poll(async () => (await docText()).match(MARKS)?.length ?? 0).toBeGreaterThan(3)
+  rmSync(exportPath, { force: true })
+  await text('export-docx').click()
+  await expect.poll(() => existsSync(exportPath), { timeout: 30_000 }).toBe(true)
+  const xml = docxXml(exportPath)
+  expect((xml.match(MARKS) ?? []).length).toBeGreaterThan(3)
+  expect(xml).toContain('w:bidi')
+})
 
 test('settings shows the models version section', async () => {
   await text('open-settings').click()

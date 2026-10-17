@@ -5,7 +5,7 @@ import { useProjectsStore } from '@renderer/stores/projects'
 
 const editor = useEditorStore()
 const projects = useProjectsStore()
-const manual = computed(() => editor.manualEdits[projects.currentDocument?.id ?? 0] ?? 0)
+const manual = computed(() => editor.manualEdits[projects.currentDocument?.id ?? 0]?.count ?? 0)
 </script>
 
 <template>
@@ -21,7 +21,7 @@ const manual = computed(() => editor.manualEdits[projects.currentDocument?.id ??
     </span>
     <span>
       كلمات معدّلة يدوياً: <b data-testid="stat-manual">{{ manual }}</b>
-      <span class="text-slate-500">(للجلسة الحالية)</span>
+      <span class="text-slate-500">(محفوظة مع المستند)</span>
     </span>
   </div>
 </template>
