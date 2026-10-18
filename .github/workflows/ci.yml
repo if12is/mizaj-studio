@@ -28,8 +28,8 @@ jobs:
           if command -v ruff >/dev/null 2>&1; then ruff check .; fi
       - name: Verify Model Downloader Dry-Run
         run: python scripts/download_models.py --dry-run
-      - name: Verify domain packs are up to date
-        run: python scripts/build_domain_packs.py --check --no-catalog
+      - name: Verify domain packs and catalog checksums are up to date
+        run: python scripts/build_domain_packs.py --check
       - name: Run Pytest Suite (Mock Mode)
         working-directory: ./backend
         run: |
