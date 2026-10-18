@@ -92,6 +92,22 @@ MASC_AFTER_AYA = {  # أية + <masculine noun> -> أي
 # final-ya skip list: words whose ي is right/meaningful (name, «لدي», «إلي» = to me ...).
 YA_SKIP = {"علي", "لدي", "إلي", "الي", "ربي", "بي", "لي", "أني", "اني", "إني", "هي", "حي"}
 _AN_RE = re.compile(r"^(?P<pre>ول|وب|فب|و|ف|ل|ب|)(?P<h>[اأإ])ن(?P<suf>ه|ها|هم|هما|هن|ني|نا|ك|كم|)$")
+# Meaning-changing ي/ى pairs (مُدَّعٍ «plaintiff» vs مُدَّعًى «defendant»): the style flip
+# never touches defective-verb participles, present-tense verbs or construct forms.
+PARTICIPLES = {
+    "مدعي", "قاضي", "باقي", "راعي", "داعي", "ماضي", "جاني", "محامي", "مرمي", "منتهي", "مهتدي",
+    "مستدعي", "متعدي", "معتدي", "مشتكي", "مستغني", "متقاضي", "مقضي", "مسوي", "ساعي", "واقي",
+    "ناجي", "عاتي", "هادي", "جاري", "آتي", "الآتي", "مبني", "معني", "متوفي", "مستوفي", "مؤدي",
+    "مؤتمني", "ثاني", "مفتي", "موصي", "موصى", "مصطفي", "متبني", "مدعو",
+}  # fmt: skip
+# four-letter (or shorter) nisba adjectives that the fem. «ـية» test cannot cover safely
+NISBA_SHORT = {
+    "مدني", "كلي", "نسبي", "مالي", "فني", "عملي", "فعلي", "شرعي", "قولي", "أهلي", "ذاتي",
+    "حرفي", "رسمي", "جزئي", "عرفي", "ودي", "حسي", "طبي", "علمي", "فكري",
+}  # fmt: skip
+_FUNC_RE = re.compile(r"^(?:(?:و|ف)?ف|(?:و|ف|ب|ل|ك|ول|وب|فب)?(?:ال)?(?:ذ|ت)|(?:و|ف)?ذ)[يى]$")
+_NISBA_END = re.compile("(ائي|اوي|وني|اني|اري|وري|يعي|ادي|اسي|ابي|امي|لمي|عملي|طبي)$")
+_REL_RE = re.compile(r"^(?:و|ف|ب|ل|ك|ول|وب|فب)?(?:الذ|الت)[يى]$")
 _SHADDA_YA = re.compile("ّ[ً-ِْ]*[يى][ً-ْ]*$")
 _ILAYH_RE = re.compile(r"^الي(ه|ها|هم|هما|هن|ك|كم|كما|نا)$")
 _MADAA_RE = re.compile(r"^(و|ف|ب|ل|ك|ول|لل|ولل|)(ال)?(مدعي|مسوي)$")
@@ -320,6 +336,20 @@ class Proofreader:
         return None
 
     # ------------------------------------------------------------------ final ya
+    def _style_class_ok(self, key: str, stem: str) -> bool:
+        """May the ي/ى style flip touch this word? Only في, الذي/التي and nisba adjectives."""
+        if key in ("في", "فى", "ذي", "ذى") or _REL_RE.match(key) or _FUNC_RE.match(key):
+            return True
+        stems = [_relax(st) for _, st in _splits(key)]
+        if any(st in PARTICIPLES for st in stems):
+            return False
+        if any(st in NISBA_SHORT for st in stems):
+            return True
+        for st in stems:  # قانوني، نهائي، إداري: nisba suffix AND a real feminine «ـية»
+            if len(st) >= 5 and _NISBA_END.search(st) and self.eng.strong_valid(st[:-1] + "ية"):
+                return True
+        return False  # يدعي، يؤدي، تقضي، التصدي، أمري ...
+
     def _ya_token(self, key: str, style: YaStyle, known: set[str]):
         """(new_key, code, confidence, is_style) for the final ى/ي letter of one word."""
         if len(key) < 3 and key not in ("في", "فى", "ذي", "ذى"):
@@ -337,17 +367,27 @@ class Proofreader:
             if last == "ي":
                 maqsura_alt = alt in eng.hs.stems or alt in eng.lex
                 # etymological ى written with ي (دعوي، حتي، مستشفي): a fix whatever the style
-                if maqsura_alt and f_alt >= 1500 and f_alt >= 25 * max(f_cur, 1):
+                risky = stem in PARTICIPLES or (
+                    stem[0] in "يتنأ" and len(stem) <= 5 and not self._style_class_ok(key, stem)
+                )
+                if maqsura_alt and not risky and f_alt >= 1500 and f_alt >= 25 * max(f_cur, 1):
                     return p + alt, "YA_MAQSURA", 0.82, False
                 ety = f_alt >= max(1500, f_cur // 5) or (
                     f_cur == 0 and f_alt == 0 and alt in eng.lex
                 )
-                if style == "egyptian" and not ety and (eng.is_valid(stem) or stem in known):
+                if (
+                    style == "egyptian"
+                    and not ety
+                    and (eng.is_valid(stem) or stem in known)
+                    and self._style_class_ok(key, stem)
+                ):
                     best = best or (p + alt, "YA_EGY", 0.55, True)
             elif style == "standard":
                 if f_cur >= 1500 and f_cur >= 5 * max(f_alt, 1):
                     continue  # attested genuine alef maqsura (لدى، مصطفى، دعوى)
                 cur_ok = eng.is_valid(stem) or stem in known
+                if not self._style_class_ok(key, stem):
+                    continue
                 if (eng.is_valid(alt) or alt in known) and (
                     not cur_ok or (f_alt >= 1500 and f_alt >= 5 * max(f_cur, 1))
                 ):
