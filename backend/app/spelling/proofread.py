@@ -77,13 +77,34 @@ NAME_TITLES = {
     "السيد", "السيدة", "الأستاذ", "الاستاذ", "الأستاذة", "الدكتور", "الدكتورة", "المستشار",
     "المستشارة", "المهندس", "الشيخ", "الحاج", "الأمير", "الإمام", "الامام", "سيدنا", "د",
     "م", "أ", "بن", "ابن", "أبو", "ابو", "عبد", "للسيد", "للدكتور", "للأستاذ", "للمستشار",
-    "المحامي", "الرائد", "العقيد", "اللواء", "النقيب", "المساعد", "الفريق", "الأخ", "الاخ",
+    "المحامي", "المحامية", "المدعو", "المدعوة", "الآنسة", "الانسة", "الفاضل", "الفاضلة",
+    "السادة", "الأخت", "الاخت", "الرائد", "العقيد", "اللواء", "النقيب", "المساعد", "الفريق",
+    "الأخ", "الاخ",
 }  # fmt: skip
 NAME_FOLLOW = {
     "بن", "ابن", "محمد", "أحمد", "احمد", "محمود", "حسن", "حسين", "حسنين", "عبد", "عبدالله",
     "إبراهيم", "ابراهيم", "مصطفى", "عثمان", "عمر", "خالد", "يوسف", "سعيد", "فهمي", "كامل",
     "رضا", "جمال", "صلاح", "ماهر", "طارق", "ياسر", "رمضان", "إسماعيل", "اسماعيل",
 }  # fmt: skip
+
+
+def _fold_alef(w: str) -> str:
+    return w.translate(str.maketrans("أإآ", "ااا"))
+
+
+def _person_names() -> frozenset[str]:
+    """First tokens of the given names in the proper-noun lexicon (without علي itself)."""
+    from app.engine.names import builtin_names
+
+    out = set()
+    for e in builtin_names():
+        if e.note == "person":
+            out.add(_fold_alef(e.term.split()[0]))
+    out.discard("علي")
+    return frozenset(out)
+
+
+PERSON_NAMES = _person_names()
 MASC_AFTER_AYA = {  # أية + <masculine noun> -> أي
     "طلب", "دفع", "دفاع", "حق", "حكم", "أمر", "امر", "إجراء", "اجراء", "قرار", "تعويض",
     "مبلغ", "شخص", "سبب", "وجه", "نص", "شرط", "رسم", "ضرر", "التزام", "طعن", "قيد", "عقد",
@@ -529,6 +550,11 @@ class Proofreader:
             if k == "وعلي" and not c.next.startswith("ال"):
                 return None
             if c.prev in NAME_TITLES or c.next in NAME_FOLLOW or c.slash:
+                return None
+            if len(c.prev) > 3 and c.prev[0] in "وف" and c.prev[1:] in NAME_TITLES:
+                return None  # والسيد علي
+            # next to a known given name it is a name chain (محمد علي، علي محمد), not «على»
+            if _fold_alef(c.prev) in PERSON_NAMES or _fold_alef(c.next) in PERSON_NAMES:
                 return None
             if c.boundary == "start" and c.next in ("", "بن"):
                 return None
