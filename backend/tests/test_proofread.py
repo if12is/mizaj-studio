@@ -219,7 +219,8 @@ def test_ya_style_setting_direction():
 def test_standard_style_merges_into_hamza_item():
     # the hamza item already rewrites the word; the style letter is part of it (and explained)
     it = run("ليكون الاجمالى", "standard", ("hamza", "ya"))["items"][0]
-    assert it["replacement"] == "الإجمالي" and "الياء" in it["reason_ar"]
+    # «اجمالي» is not a style-flip class (only في، الذي/التي، nisba): the letter is kept
+    assert it["replacement"] == "الإجمالى"
     it = run("ليكون الاجمالى", "egyptian", ("hamza", "ya"))["items"][0]
     assert it["replacement"] == "الإجمالى"
 
@@ -390,6 +391,34 @@ def test_fixed_names_and_owner_decisions():
                 assert strip(it["replacement"]) == "أبو", it
     assert run("صندوق خدمات قدره حمص", "egyptian", ("hamza", "spelling"))["items"] == []
     assert ProofreadOptions().ya_style == "standard"
+
+
+@pytest.mark.parametrize("style", ["egyptian", "standard"])
+def test_style_flip_never_changes_the_reading(style):
+    """المدعي (plaintiff) vs المدعى (defendant), present verbs and construct forms stay put."""
+    safe = (
+        "برفض الدعوى وإلزام المدعي بالمصروفات والمدعي بصفته",
+        "من يدعي استحقاقه ويؤدي الرسوم وهو يلي الأمر ويماري ولا تنتهي الخصومة",
+        "القاضي والباقي والراعي والداعي والماضي والمحامي والمقضي والتداعي",
+        "تقدير أمري الرسوم وقرارَي المحكمة",
+        "وتقضي المحكمة والتصدي للنعي",
+    )
+    for text in safe:
+        items = run(text, style, ("ya",))["items"]
+        assert items == [], (style, text, items)
+
+
+def test_egyptian_style_flip_is_limited_to_fi_relatives_and_nisba():
+    items = run("في الذي والتي وبالذي مدني قانوني نهائي كلي والمدعي ويدعي", "egyptian", ("ya",))
+    got = {i["original"]: i["replacement"] for i in items["items"]}
+    allowed = {"في", "الذي", "والتي", "وبالذي", "مدني", "قانوني", "نهائي", "كلي"}
+    assert set(got) <= allowed, got
+    assert {"في", "الذي", "والتي", "مدني", "قانوني", "كلي"} <= set(got), got
+    assert got["في"] == "فى" and got["مدني"] == "مدنى"
+    assert "المدعي" not in got and "ويدعي" not in got
+    # the reverse direction (standard) is just as narrow
+    std = run("فى الذى مدنى والمدعى عليه ويدعى", "standard", ("ya",))["items"]
+    assert {i["original"] for i in std} <= {"فى", "الذى", "مدنى"}
 
 
 def test_module_exports():
