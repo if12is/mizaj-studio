@@ -42,7 +42,7 @@ const api = <T = unknown>(method: string, path: string, body?: unknown): Promise
 async function newProject(name: string): Promise<void> {
   await t('new-project').click()
   await t('new-project-input').fill(name)
-  await page.keyboard.press('Enter')
+  await t('new-project-input').press('Enter')
   await expect(page.getByTestId('project-name').filter({ hasText: name })).toBeVisible()
 }
 async function newDocument(projectName: string, title: string): Promise<void> {
@@ -52,7 +52,7 @@ async function newDocument(projectName: string, title: string): Promise<void> {
     .getByTestId('new-document')
     .click()
   await t('new-document-input').fill(title)
-  await page.keyboard.press('Enter')
+  await t('new-document-input').press('Enter')
   await expect(t('doc-title')).toHaveText(title)
 }
 const projectRow = (name: string) => page.getByTestId('project-item').filter({ hasText: name })
