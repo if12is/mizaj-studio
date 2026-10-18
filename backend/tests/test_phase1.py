@@ -247,6 +247,8 @@ DEFAULTS = {
     "editor_font_size": "20",
     "colored_diacritics": "true",
     "theme": "dark",
+    "ya_style": "standard",
+    "proofread_before_tashkeel": "ask",
 }
 
 
