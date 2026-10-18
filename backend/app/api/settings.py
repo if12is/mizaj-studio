@@ -19,12 +19,16 @@ DEFAULTS: dict[str, str] = {
     "editor_font_size": "20",
     "colored_diacritics": "true",
     "theme": "dark",
+    "ya_style": "standard",
+    "proofread_before_tashkeel": "ask",
 }
 ENUMS: dict[str, set[str]] = {
     "engine_mode": {"fast", "accurate"},
     "tashkeel_level": {"full", "irab_only", "essential", "minimal", "legal"},
     "theme": {"dark", "light"},
     "colored_diacritics": {"true", "false"},
+    "ya_style": {"standard", "egyptian"},
+    "proofread_before_tashkeel": {"ask", "auto_punct", "off"},
 }
 
 

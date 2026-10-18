@@ -20,6 +20,7 @@ import { toastClass, toasts } from './api/toast'
 import { createAutosave } from './composables/autosave'
 import type { DocumentFull } from './api/client'
 import { useEditorStore } from './stores/editor'
+import { useProofreadStore } from './stores/proofread'
 import { useProjectsStore } from './stores/projects'
 import { useSettingsStore } from './stores/settings'
 import { useSidecarStore } from './stores/sidecar'
@@ -32,11 +33,13 @@ const AboutDialog = lazyDialog(() => import('./components/AboutDialog.vue'))
 const BatchDialog = lazyDialog(() => import('./components/files/BatchDialog.vue'))
 const ImportPreviewDialog = lazyDialog(() => import('./components/files/ImportPreviewDialog.vue'))
 const OcrFailureDialog = lazyDialog(() => import('./components/files/OcrFailureDialog.vue'))
+const ProofreadDialog = lazyDialog(() => import('./components/ProofreadDialog.vue'))
 
 const sidecar = useSidecarStore()
 const projects = useProjectsStore()
 const settings = useSettingsStore()
 const editor = useEditorStore()
+const proofread = useProofreadStore()
 const files = useFileStore()
 const pane = ref<InstanceType<typeof EditorPane> | null>(null)
 
@@ -195,6 +198,9 @@ onBeforeUnmount(() => {
     </MotionTransition>
     <MotionTransition name="m-modal">
       <OcrFailureDialog v-if="files.ocrFailure" />
+    </MotionTransition>
+    <MotionTransition name="m-modal">
+      <ProofreadDialog v-if="proofread.open" />
     </MotionTransition>
     <MotionTransition name="m-modal">
       <ShortcutsDialog v-if="editor.shortcutsOpen" />
