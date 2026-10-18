@@ -25,8 +25,9 @@ python scripts/build_domain_packs.py            # rewrites these packs and app/r
 python scripts/build_domain_packs.py --check    # CI: fail when the packs are stale
 ```
 
-The output is byte-for-byte reproducible, so the `sha256` values in
-`backend/app/resources/catalog.json` change only when the data changes. The release workflow runs
-the script with `--version <release>` so the catalog download URLs
-(`https://github.com/if12is/mizaj-studio/releases/download/v<version>/<file>`) match the release,
-then uploads the three files as release assets.
+The output is byte-for-byte reproducible on every platform (zip members are stored, not
+deflated, and timestamps are fixed), so the `sha256` values in
+`backend/app/resources/catalog.json` change only when the data changes. The catalog URLs are
+`https://github.com/if12is/mizaj-studio/releases/latest/download/<file>`: every release workflow
+run rebuilds the packs, fails if they differ from the catalog checksums, and uploads the three
+files as release assets.

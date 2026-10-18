@@ -48,6 +48,8 @@ def test_catalog_entries_match_files():
         data = p.read_bytes()
         assert e["sha256"] == hashlib.sha256(data).hexdigest()
         assert e["size"] == len(data)
-        assert e["url"].startswith("https://github.com/if12is/mizaj-studio/releases/download/v")
+        assert e["url"] == (
+            "https://github.com/if12is/mizaj-studio/releases/latest/download/" + p.name
+        )
         assert e["url"].endswith("/" + p.name)
         assert e["license"] == "CC0-1.0"

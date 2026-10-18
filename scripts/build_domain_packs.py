@@ -1,14 +1,18 @@
 #!/usr/bin/env python3
 """Build the three domain `.mizajpack` v2 files (Task 7.4.4) with the app's own export logic.
 
-    python scripts/build_domain_packs.py                       # writes resources/packs/*.mizajpack
-    python scripts/build_domain_packs.py --version 0.2.0       # also points catalog.json at v0.2.0
-    python scripts/build_domain_packs.py --check               # fail if committed packs are stale
+    python scripts/build_domain_packs.py      # writes resources/packs/*.mizajpack + catalog.json
+    python scripts/build_domain_packs.py --check               # fail if committed packs or the
+                                                               # catalog sha256/size are stale
 
 Sources (CC0 1.0, authored for Mizaj Studio) live in scripts/domain_data/*.tsv; the legal pack also
 contains the bundled legal glossary (backend/app/legal/data/glossary.json). The output is byte
 deterministic (fixed timestamps), so the sha256 values in app/resources/catalog.json only change
-when the data changes. Release assets are named exactly like the files in resources/packs.
+when the data changes. Members are STORED (not deflated) on purpose: the compressed bytes of a
+deflate stream depend on the zlib build, so a Windows release runner and a Linux dev box produced
+different sha256 values. Release assets are named exactly like the files in resources/packs and
+the catalog URLs use `releases/latest/download/<name>` (each release attaches the same files), so
+the catalog never points at a tag that lacks them.
 """
 
 # ruff: noqa: E501
@@ -77,7 +81,7 @@ def main() -> int:
         description=__doc__, formatter_class=argparse.RawTextHelpFormatter
     )
     ap.add_argument(
-        "--version", help="release version for the catalog URLs (default: app VERSION)"
+        "--version", help="ignored (kept for old callers): catalog URLs use releases/latest"
     )
     ap.add_argument("--out", default=str(OUT))
     ap.add_argument(
@@ -89,13 +93,11 @@ def main() -> int:
     args = ap.parse_args()
 
     sys.path.insert(0, str(BACKEND))
-    from app.api.health import VERSION
     from app.core.database import connect
     from app.core.migrations import run_migrations
     from app.engine.normalize import strip_marks
     from app.packs2 import export as ex
 
-    version = args.version or VERSION
     ex.VERSION = MIN_APP  # app_version / min_app_version recorded in the manifests
 
     class _Fixed:
@@ -173,13 +175,13 @@ def main() -> int:
             # Re-pack with fixed timestamps and a stable member order for reproducible bytes.
             buf = io.BytesIO()
             with zipfile.ZipFile(tmp) as zin, zipfile.ZipFile(
-                buf, "w", zipfile.ZIP_DEFLATED
+                buf, "w", zipfile.ZIP_STORED
             ) as zo:
                 for n in sorted(
                     zin.namelist(), key=lambda s: (s != "manifest.json", s)
                 ):
                     zi = zipfile.ZipInfo(n, ZIP_DATE)
-                    zi.compress_type = zipfile.ZIP_DEFLATED
+                    zi.compress_type = zipfile.ZIP_STORED
                     zi.external_attr = 0o644 << 16
                     zo.writestr(zi, zin.read(n))
         data = buf.getvalue()
@@ -197,6 +199,17 @@ def main() -> int:
         )
 
     if args.check:
+        if not args.no_catalog:
+            cat = json.loads(CATALOG.read_text(encoding="utf-8"))
+            entries = {r["id"]: r for r in cat["resources"] if r.get("kind") == "mizajpack"}
+            for pid in PACKS:
+                e, b = entries.get(pid), built[pid]
+                want_url = f"https://github.com/{REPO}/releases/latest/download/{b['file']}"
+                if e is None or (e["sha256"], e["size"], e["url"]) != (
+                    b["sha256"], b["size"], want_url
+                ):
+                    print(f"[STALE] catalog entry {pid} (sha256/size/url)")
+                    stale = True
         return 1 if stale else 0
     if not args.no_catalog:
         cat = json.loads(CATALOG.read_text(encoding="utf-8"))
@@ -208,14 +221,14 @@ def main() -> int:
                     "id": pid,
                     "name": spec["name"],
                     "kind": "mizajpack",
-                    "url": f"https://github.com/{REPO}/releases/download/v{version}/{b['file']}",
+                    "url": f"https://github.com/{REPO}/releases/latest/download/{b['file']}",
                     "filename": b["file"],
                     "sha256": b["sha256"],
                     "size": b["size"],
                     "license": LICENSE,
                     "license_url": LICENSE_URL,
                     "attribution": "Mizaj Studio contributors (CC0 1.0)",
-                    "notes": "Domain pack (.mizajpack v2). Downloaded from the matching GitHub "
+                    "notes": "Domain pack (.mizajpack v2). Downloaded from the latest GitHub "
                     "release; import it from the packs screen. Needs expert review before "
                     "professional use.",
                 }
@@ -224,7 +237,7 @@ def main() -> int:
         CATALOG.write_text(
             json.dumps(cat, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
         )
-        print(f"[OK] catalog updated ({CATALOG}) for v{version}")
+        print(f"[OK] catalog updated ({CATALOG})")
     return 0
 
 

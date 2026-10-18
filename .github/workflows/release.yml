@@ -133,8 +133,13 @@ jobs:
           MIZAJ_ENGINE_MODE: real
         run: python scripts/quantize_catt.py --guard 0.3
 
-      - name: Build domain packs (.mizajpack) and point the catalog at this release
-        run: python scripts/build_domain_packs.py --version "${{ steps.version.outputs.version }}"
+      # The catalog URLs are releases/latest/download/<name> with a static sha256. The packs are
+      # byte-deterministic (stored zip members, fixed timestamps), so rebuilding on this runner must
+      # reproduce the committed files and the catalog checksums exactly; otherwise fail the release.
+      - name: Build domain packs (.mizajpack) and verify they match the catalog checksums
+        run: |
+          python scripts/build_domain_packs.py --no-catalog
+          python scripts/build_domain_packs.py --check
 
       # Bootloader compiled from source + VERSIONINFO: avoids the prebuilt-bootloader
       # signatures that trigger antivirus false positives (see desktop/WINDOWS_DEFENDER.md).
@@ -207,6 +212,16 @@ jobs:
           if ($rel.isDraft) { throw "Release v$v is still a draft" }
           $names = $rel.assets | ForEach-Object { $_.name }
           Write-Host "assets: $($names -join ', ')"
-          foreach ($need in @("Mizaj-Studio-Setup-$v.exe", 'latest.yml', 'sbom.json')) {
+          $packs = (Get-ChildItem resources/packs -Filter *.mizajpack).Name
+          if ($packs.Count -ne 3) { throw "Expected 3 .mizajpack files, found $($packs.Count)" }
+          foreach ($need in @("Mizaj-Studio-Setup-$v.exe", 'latest.yml', 'sbom.json') + $packs) {
             if ($names -notcontains $need) { throw "Missing release asset: $need" }
+          }
+          # the catalog points at releases/latest/download/<name>: the published bytes must match
+          $catalog = Get-Content backend/app/resources/catalog.json -Raw -Encoding utf8 | ConvertFrom-Json
+          foreach ($e in ($catalog.resources | Where-Object { $_.kind -eq 'mizajpack' })) {
+            $asset = $rel.assets | Where-Object { $_.name -eq $e.filename }
+            if ($asset.size -ne $e.size) { throw "$($e.filename): published size $($asset.size) != catalog $($e.size)" }
+            $local = (Get-FileHash "resources/packs/$($e.filename)" -Algorithm SHA256).Hash.ToLower()
+            if ($local -ne $e.sha256) { throw "$($e.filename): built sha256 $local != catalog $($e.sha256)" }
           }

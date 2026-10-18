@@ -26,11 +26,14 @@ from app.docx.extractor import (
     W_T,
     W_TAB,
     apply_unit,
+    build_unit,
     discover_parts,
     iter_units,
     owner_paragraph,
 )
 from app.docx.mixed import verify_mixed
+from app.docx.stored import apply_text
+from app.docx.stored import plan as stored_plan
 from app.engine.executor import run_blocking
 from app.engine.factory import build_pipeline
 from app.engine.normalize import MARKS, WORD_RE, has_arabic_letters
@@ -129,14 +132,30 @@ def _write_atomic(src: Path, dst: Path, modified: dict[str, bytes]) -> None:
     _atomic_write(dst, write)
 
 
+def _marked_words(text: str) -> int:
+    return sum(
+        1
+        for m in WORD_RE.finditer(text)
+        if has_arabic_letters(m.group(0)) and any(c in MARKS for c in m.group(0))
+    )
+
+
 def process_docx(
     src: Path,
     dst: Path,
     pipeline: TashkeelPipeline,
     db_path: Path,
     include_comments: bool = False,
+    stored: str | None = None,
+    stored_diacritized: bool = False,
 ) -> dict[str, Any]:
-    """Blocking implementation (run it in the engine executor)."""
+    """Blocking implementation (run it in the engine executor).
+
+    `stored`: the editor's text of the document (flow text of the body). Paragraphs it covers
+    are written from it, run by run, instead of being diacritized again: when
+    `stored_diacritized` the stored text is final; otherwise it is the user's edited raw text
+    and the engine still runs on top. Paragraphs that do not align fall back to the engine and
+    are counted in `stats["engine_fallback"]`."""
     src, dst = Path(src), Path(dst)
     if not src.is_file():
         raise FileNotFoundError(str(src))
@@ -147,6 +166,8 @@ def process_docx(
     doc = open_source(src)
     parts = discover_parts(doc, include_comments)
     stats = _new_stats(include_comments)
+    if stored is not None and stored_diacritized:
+        stats.update(from_editor=0, edited_text=0, engine_fallback=0)
     modified: dict[str, bytes] = {}
     conn = connect(db_path)
     try:
@@ -157,12 +178,35 @@ def process_docx(
                 except (KeyError, etree.XMLSyntaxError, zipfile.BadZipFile) as exc:
                     raise docx_corrupt(f"{name}: {exc}") from exc
                 changed_part = False
-                for unit in iter_units(root, kind):
+                units = list(iter_units(root, kind))
+                use_stored = stored is not None and kind == "body"
+                plan = stored_plan(units, stored) if use_stored else {}
+                for ui, unit in enumerate(units):
                     stats["skipped_code_runs"] += unit.skipped_code_runs
                     if not unit.t_nodes:
                         continue
                     stats["paragraphs"] += 1
                     stats["parts"][unit.category] += 1
+                    if use_stored and unit.category in ("body", "sdt"):
+                        if not stored_diacritized and plan.get(ui) == _plain(unit):
+                            plan.pop(ui, None)  # untouched raw paragraph: engine as before
+                        how = apply_text(unit, plan[ui]) if ui in plan else None
+                        if how is None:
+                            if stored_diacritized:
+                                stats["engine_fallback"] += 1
+                        else:
+                            changed_part = True
+                            for key in ("from_editor", "edited_text", "engine_fallback"):
+                                stats.setdefault(key, 0)
+                            stats["from_editor"] += 1
+                            stats["edited_text"] += how == "edited"
+                            if stored_diacritized:
+                                stats["words_diacritized"] += _marked_words(plan[ui])
+                                continue
+                            rebuilt = build_unit(unit.p, kind)  # edited raw text: engine on top
+                            if rebuilt is None:
+                                continue
+                            unit = rebuilt
                     if not has_arabic_letters(unit.text):
                         continue
                     out = pipeline.run_text(conn, unit.text)
@@ -171,11 +215,7 @@ def process_docx(
                         continue
                     changed, _ = apply_unit(unit, out)
                     changed_part |= changed
-                    stats["words_diacritized"] += sum(
-                        1
-                        for m in WORD_RE.finditer(out)
-                        if has_arabic_letters(m.group(0)) and any(c in MARKS for c in m.group(0))
-                    )
+                    stats["words_diacritized"] += _marked_words(out)
                 if changed_part:
                     modified[name] = _serialize(root)
     finally:
@@ -192,10 +232,14 @@ async def diacritize_docx(
     include_comments: bool,
     db_path: Path,
     keep_existing: bool = True,
+    stored: str | None = None,
+    stored_diacritized: bool = False,
 ) -> dict[str, Any]:
     """Async entry point: builds the Phase 2 pipeline, then runs off the event loop."""
     pipeline = await build_pipeline(mode, level, keep_existing)
-    return await run_blocking(process_docx, src, dst, pipeline, db_path, include_comments)
+    return await run_blocking(
+        process_docx, src, dst, pipeline, db_path, include_comments, stored, stored_diacritized
+    )
 
 
 def extract_plain_text(src: Path) -> tuple[str, dict[str, Any]]:

@@ -11,6 +11,7 @@ from __future__ import annotations
 
 from collections.abc import Iterator
 from dataclasses import dataclass, field
+from difflib import SequenceMatcher
 
 from docx.oxml.ns import qn
 
@@ -173,3 +174,60 @@ def apply_unit(unit: ParagraphUnit, diacritized: str) -> tuple[bool, int]:
             t.text = new
             changed = True
     return changed, dropped
+
+
+def apply_unit_edit(unit: ParagraphUnit, new_text: str) -> bool:
+    """Write `new_text` (the user's edited paragraph, base letters may differ from the source)
+    into the unit's w:t nodes, keeping every run's formatting.
+
+    The source and edited base-letter sequences are diffed; unchanged letters keep their run,
+    replaced/inserted letters join the run of the nearest source letter, deleted letters go.
+    Tabs, breaks, drawings and field codes are never touched. Returns True when any w:t changed.
+    """
+    old: list[tuple[str, object, str]] = []  # (base, owner node or None, marks)
+    for i, c in enumerate(unit.text):
+        if c == PLACEHOLDER:
+            continue
+        if c in MARKS:
+            if old:
+                b, o, m = old[-1]
+                old[-1] = (b, o, m + c)
+            continue
+        old.append((c, unit.owners[i], ""))
+    if not old or not unit.t_nodes:
+        raise ValueError("paragraph has no editable text")
+    new = split_pairs(new_text, canon=False)
+
+    def owner_near(idx: int):
+        idx = max(0, min(idx, len(old) - 1))
+        for k in list(range(idx, -1, -1)) + list(range(idx + 1, len(old))):
+            if old[k][1] is not None:
+                return old[k][1]
+        return unit.t_nodes[0]
+
+    pieces: dict[int, list[str]] = {id(t): [] for t in unit.t_nodes}
+    sm = SequenceMatcher(None, [o[0] for o in old], [n[0] for n in new], autojunk=False)
+    for tag, i1, i2, j1, j2 in sm.get_opcodes():
+        if tag == "delete":
+            continue
+        for k in range(j2 - j1):
+            base, marks = new[j1 + k]
+            if tag == "equal":
+                node = old[i1 + k][1]
+                if node is None:
+                    continue  # tab/break: stays in the XML as is
+            else:
+                if base in "\t\n":
+                    continue  # cannot create tabs/breaks in a run
+                idx = min(i1 + k, i2 - 1) if tag == "replace" else (i1 - 1 if i1 > 0 else 0)
+                node = owner_near(idx)
+            pieces[id(node)].append(base + marks)
+    changed = False
+    for t in unit.t_nodes:
+        txt = "".join(pieces[id(t)])
+        if txt != (t.text or ""):
+            t.text = txt
+            changed = True
+            if txt[:1].isspace() or txt[-1:].isspace():
+                t.set("{http://www.w3.org/XML/1998/namespace}space", "preserve")
+    return changed
