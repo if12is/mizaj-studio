@@ -22,6 +22,9 @@ export const DEFAULT_SETTINGS: SettingsMap = {
   confidence_show: 'true',
   confidence_threshold: '0.75',
   quran_protect: 'true',
+  // proofreading before tashkeel: ask | auto_punct (punctuation only) | off; final ya: standard | egyptian
+  proofread_before_tashkeel: 'ask',
+  ya_style: 'standard',
   theme: 'dark',
   // opt-in online features (AGENTS.md section 5): always off until the user turns them on
   online_resources: 'false',

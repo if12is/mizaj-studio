@@ -11,6 +11,7 @@ import { useApi } from '@renderer/api'
 import { useUpdaterStore } from '@renderer/stores/updater'
 import { useSidecarStore } from '@renderer/stores/sidecar'
 import { ApiError } from '@renderer/api/client'
+import { BEFORE_TASHKEEL_OPTIONS, YA_STYLE_OPTIONS } from '@renderer/proofread/model'
 
 const reduced = useReducedMotion()
 const emit = defineEmits<{ (e: 'close'): void }>()
@@ -219,6 +220,36 @@ const field = 'rounded border px-2 py-1 dark:border-slate-600 dark:bg-slate-800'
               <option value="irab_only">أواخر الكلمات (الإعراب)</option>
               <option value="minimal">الحد الأدنى (فك اللبس)</option>
               <option value="legal">قانوني (حيث يزيل اللبس)</option>
+            </select>
+
+            <label for="s-proofread">التدقيق قبل التشكيل</label>
+            <select
+              id="s-proofread"
+              :class="field"
+              :value="settings.values.proofread_before_tashkeel"
+              data-testid="setting-proofread-before"
+              @change="
+                settings.update({
+                  proofread_before_tashkeel: ($event.target as HTMLSelectElement).value
+                })
+              "
+            >
+              <option v-for="[v, label] in BEFORE_TASHKEEL_OPTIONS" :key="v" :value="v">
+                {{ label }}
+              </option>
+            </select>
+
+            <label for="s-ya">الياء آخر الكلمة</label>
+            <select
+              id="s-ya"
+              :class="field"
+              :value="settings.values.ya_style"
+              data-testid="setting-ya-style"
+              @change="settings.update({ ya_style: ($event.target as HTMLSelectElement).value })"
+            >
+              <option v-for="[v, label] in YA_STYLE_OPTIONS" :key="v" :value="v">
+                {{ label }}
+              </option>
             </select>
 
             <label for="s-font">خط المحرر</label>

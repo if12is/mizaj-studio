@@ -382,5 +382,15 @@ def test_api_apply_reports_stale_items(client):
     assert out["text"] == "قال أبو" and out["applied"] == 1 and len(out["skipped"]) == 1
 
 
+def test_fixed_names_and_owner_decisions():
+    """«أبو» in place names stays أبو (never أبي/أبا); خدمات / حمص get no proposal at all."""
+    for text in ("محكمة أبو حمص الكلية", "محكمة ابو حمص", "صندوق خدمات قدره", "حُمُّص وخَدَمَات"):
+        for style in ("standard", "egyptian"):
+            for it in run(text, style)["items"]:
+                assert strip(it["replacement"]) == "أبو", it
+    assert run("صندوق خدمات قدره حمص", "egyptian", ("hamza", "spelling"))["items"] == []
+    assert ProofreadOptions().ya_style == "standard"
+
+
 def test_module_exports():
     assert proofread_api.router.prefix == "/api/proofread"

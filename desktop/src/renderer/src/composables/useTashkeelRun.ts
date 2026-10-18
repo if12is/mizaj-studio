@@ -11,6 +11,7 @@ import { RunSession } from '@renderer/editor/runSession'
 import { addConfidence, buildConfMarks } from '@renderer/editor/confidence'
 import { quranField } from '@renderer/editor/quran'
 import { useQualityStore } from '@renderer/stores/quality'
+import { useProofreadStore } from '@renderer/stores/proofread'
 
 export const readOnlyCompartment = new Compartment()
 
@@ -31,6 +32,7 @@ export function useTashkeelRun(getView: () => EditorView | null, onApplied: () =
   const sidecar = useSidecarStore()
   const projects = useProjectsStore()
   const quality = useQualityStore()
+  const proofread = useProofreadStore()
   let ctrl: AbortController | null = null
   let paused: PausedRange | null = null
   let session: RunSession | null = null
@@ -147,10 +149,18 @@ export function useTashkeelRun(getView: () => EditorView | null, onApplied: () =
     session = null
   }
 
-  /** Diacritize the selection, or the whole document when nothing is selected. */
-  async function start(): Promise<void> {
+  const isBusy = (): boolean => editor.runState === 'running' || editor.runState === 'waiting'
+
+  /**
+   * Diacritize the selection, or the whole document when nothing is selected.
+   * The proofreading gate runs first (setting «التدقيق قبل التشكيل»); `force` always opens the
+   * review panel («تدقيق ثم تشكيل»). The gate only ever applies what the user accepted.
+   */
+  async function start(opts: { force?: boolean; skipGate?: boolean } = {}): Promise<void> {
     const view = getView()
-    if (!view || editor.runState === 'running' || editor.runState === 'waiting') return
+    if (!view || isBusy()) return
+    if (!opts.skipGate && !(await proofread.gate(opts.force === true))) return
+    if (getView() !== view || isBusy()) return // the document changed while the panel was open
     if (doneTimer) clearTimeout(doneTimer)
     const sel = view.state.selection.main
     editor.diffBase = view.state.doc.toString()
@@ -196,5 +206,8 @@ export function useTashkeelRun(getView: () => EditorView | null, onApplied: () =
     editor.progress = 0
   }
 
-  return { start, pause, resume, cancel, reset }
+  /** The toolbar workflow «تدقيق ثم تشكيل»: review proposals, apply the accepted, then run. */
+  const proofreadThenStart = (): Promise<void> => start({ force: true })
+
+  return { start, proofreadThenStart, pause, resume, cancel, reset }
 }

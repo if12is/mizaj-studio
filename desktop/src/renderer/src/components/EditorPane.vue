@@ -501,6 +501,15 @@ const btnCls =
       >
         تشكيل
       </button>
+      <button
+        :class="btnCls"
+        data-testid="toolbar-proofread"
+        :disabled="editor.runState === 'running' || editor.runState === 'waiting'"
+        title="مراجعة الهمزات والإملاء والياء والترقيم ثم التشكيل"
+        @click="run.proofreadThenStart()"
+      >
+        تدقيق ثم تشكيل
+      </button>
       <select
         :class="selectCls"
         :value="settings.values.engine_mode"
