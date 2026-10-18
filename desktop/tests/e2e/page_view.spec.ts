@@ -12,7 +12,10 @@ import { join, resolve } from 'node:path'
 
 const desktopDir = resolve(__dirname, '../..')
 const fixture = resolve(desktopDir, '../backend/tests/fixtures/page_view.docx')
-const shots = resolve(desktopDir, '../docs/screenshots')
+// Screenshots go to test-results unless UPDATE_DOC_SCREENSHOTS=1 refreshes the docs copies.
+const shots = process.env.UPDATE_DOC_SCREENSHOTS
+  ? resolve(desktopDir, '../docs/screenshots')
+  : resolve(desktopDir, 'test-results/screenshots')
 const popupShots = join(shots, 'popups')
 // optional: render a real document for the visual comparison (PAGE_VIEW_DOCX=/abs/in.docx)
 const ownerDocx = process.env.PAGE_VIEW_DOCX
