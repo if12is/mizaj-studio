@@ -36,3 +36,4 @@ userData/
 # IDE
 .vscode/
 .idea/
+.claude/worktrees/
