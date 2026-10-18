@@ -32,6 +32,7 @@ SPECS: dict[str, dict[str, Any]] = {
     "accurate": {"mode": "accurate", "morph": False},
     "accurate+mf1": {"mode": "accurate", "morph": True, "morph_version": "1"},
     "accurate+mf2": {"mode": "accurate", "morph": True, "morph_version": "2"},
+    "accurate+mf2+fixes": {"mode": "accurate", "morph": True, "morph_version": "2", "fixes": True},
     "accurate+irab": {"mode": "accurate", "morph": False, "irab": True},
     "accurate+mf2+irab": {"mode": "accurate", "morph": True, "morph_version": "2", "irab": True},
     "accurate-int8": {"mode": "accurate", "morph": False, "precision": "int8"},
@@ -85,6 +86,7 @@ async def _run_engine(name: str, sentences: list[str], data_dir: Path):
         irab_rules=spec.get("irab", False),
         use_names=False,  # measure the engine, not the dictionary
         protect_quran=False,
+        grammar_fixes=spec.get("fixes", False),  # legal_fix.py: lexicon + grammar rules
     )
     db = data_dir / "mizaj.db"
 
@@ -229,6 +231,8 @@ def main(argv: list[str] | None = None) -> int:
         items = load_corpus(args.corpus, args.max_lines, args.min_diacritized)
     else:
         items = load_gold(args.gold)
+        if args.gold == GOLD_DIR:  # owner's legal memo gold (apart: other tests glob GOLD_DIR)
+            items += load_gold(EVAL_DIR / "gold_owner")
     if not items:
         print("no evaluation sentences found", file=sys.stderr)
         return 2

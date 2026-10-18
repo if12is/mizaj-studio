@@ -13,7 +13,7 @@ from collections import Counter
 from collections.abc import Callable
 from dataclasses import dataclass, field
 
-from app.engine import irab_rules
+from app.engine import irab_rules, legal_fix
 from app.engine.base import Engine
 from app.engine.cache import TashkeelCache
 from app.engine.chunk_map import ChunkMap
@@ -97,6 +97,8 @@ class TashkeelPipeline:
         irab_threshold: float = 0.75,
         minimal_words: frozenset[str] = frozenset(),
         protector: Callable[[str], list[Span]] | None = None,
+        fixes_on: bool = False,
+        fix_oracle=None,
     ) -> None:
         self.engine = engine
         self.level = level
@@ -113,6 +115,8 @@ class TashkeelPipeline:
         self.irab_threshold = irab_threshold
         self.minimal_words = minimal_words
         self.protector = protector
+        self.fixes_on = fixes_on
+        self.fix_oracle = fix_oracle
         self._glossary: GlossaryIndex | None = None
         self._names: GlossaryIndex | None = None
         self.splitter = splitter or ArabicSentenceSplitter()
@@ -147,6 +151,8 @@ class TashkeelPipeline:
         if self.irab_rules_on:
             raw, irab_changes = self._irab(raw, spans, confs)
         raw = self._apply_names(raw, spans, conn)
+        if self.fixes_on:  # grammar + legal-lexicon corrections (legal_fix.py)
+            raw, _ = legal_fix.apply_fixes(stripped, spans, raw, self.fix_oracle)
         out = self._apply_level(raw, spans, conn, confs)
         out = self._apply_dictionary(cache, out, stripped, spans)
         out = lock.apply(out)

@@ -59,7 +59,7 @@ export interface BatchForm {
   input_dir: string
   output_dir: string
   mode: 'fast' | 'accurate'
-  level: 'full' | 'irab_only' | 'minimal' | 'legal'
+  level: 'full' | 'irab_only' | 'essential' | 'minimal' | 'legal'
   formats: string[]
   recursive: boolean
   on_exist: 'skip' | 'rename' | 'overwrite'

@@ -92,6 +92,7 @@ onBeforeUnmount(() => batch.stopPolling())
         <select id="b-level" v-model="form.level" :class="field" data-testid="batch-level">
           <option value="full">كامل</option>
           <option value="irab_only">أواخر الكلمات (الإعراب)</option>
+          <option value="essential">إلزامي: أواخر الكلمات والتنوين والشدة</option>
           <option value="minimal">الحد الأدنى (فك اللبس)</option>
           <option value="legal">قانوني</option>
         </select>

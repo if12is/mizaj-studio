@@ -217,6 +217,7 @@ const field = 'rounded border px-2 py-1 dark:border-slate-600 dark:bg-slate-800'
             >
               <option value="full">كامل</option>
               <option value="irab_only">أواخر الكلمات (الإعراب)</option>
+              <option value="essential">إلزامي: أواخر الكلمات والتنوين والشدة</option>
               <option value="minimal">الحد الأدنى (فك اللبس)</option>
               <option value="legal">قانوني (حيث يزيل اللبس)</option>
             </select>

@@ -22,7 +22,7 @@ DEFAULTS: dict[str, str] = {
 }
 ENUMS: dict[str, set[str]] = {
     "engine_mode": {"fast", "accurate"},
-    "tashkeel_level": {"full", "irab_only", "minimal", "legal"},
+    "tashkeel_level": {"full", "irab_only", "essential", "minimal", "legal"},
     "theme": {"dark", "light"},
     "colored_diacritics": {"true", "false"},
 }

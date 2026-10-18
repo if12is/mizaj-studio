@@ -114,10 +114,13 @@ def reduce_level(text: str, level: str) -> str:
 
     full      : unchanged.
     irab_only : only the marks on the last letter of each word (case ending / tanween).
+    essential : the last letter's marks (case ending / tanween, incl. fathatan before a final
+                alef) plus every shadda with its vowel anywhere in the word.
     minimal   : handled by the pipeline (needs a per-word ambiguity oracle); unchanged here.
     """
-    if level not in ("irab_only",):
+    if level not in ("irab_only", "essential"):
         return text
+    essential = level == "essential"
 
     def fix(m: re.Match[str]) -> str:
         pairs = split_pairs(m.group(0))
@@ -129,7 +132,10 @@ def reduce_level(text: str, level: str) -> str:
             if i == last:
                 out.append((b, marks))
             elif tail_alef and "\u064b" in marks:
-                out.append((b, "\u064b"))
+                # essential keeps the shadda (with its vowel) of that letter as well
+                out.append((b, marks if essential and SHADDA in marks else "\u064b"))
+            elif essential and SHADDA in marks:
+                out.append((b, marks))  # every shadda, with its vowel
             else:
                 out.append((b, ""))
         return join_pairs(out)

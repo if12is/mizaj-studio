@@ -530,6 +530,7 @@ const btnCls =
       >
         <option value="full">كامل</option>
         <option value="irab_only">إعراب</option>
+        <option value="essential">إلزامي: أواخر الكلمات والتنوين والشدة</option>
         <option value="minimal">أدنى</option>
         <option value="legal">قانوني (حيث يزيل اللبس)</option>
       </select>

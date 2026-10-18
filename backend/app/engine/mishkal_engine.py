@@ -180,6 +180,19 @@ def _noun_only(self: MishkalEngine, word: str) -> bool:
 MishkalEngine.is_noun_only = _noun_only  # type: ignore[attr-defined]
 
 
+def _noun_dominant(self: MishkalEngine, word: str) -> bool:
+    """True if the most frequent qalsadi analysis of `word` is a noun (a looser test than
+    `is_noun_only`: bare words like قلم are also verbs on paper but nouns in practice)."""
+    cands = self.candidates(word)
+    if not cands:
+        return False
+    top = max(c[2] for c in cands)
+    return all(pos.startswith("اسم") for _, pos, f in cands if f == top)
+
+
+MishkalEngine.is_noun_dominant = _noun_dominant  # type: ignore[attr-defined]
+
+
 def _analyses(self: MishkalEngine, word: str) -> list[dict]:
     """Full qalsadi analyses of a bare word (vocalized, kind, tags, root, lemma, freq)."""
     bare = strip_marks(word)
