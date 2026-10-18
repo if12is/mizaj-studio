@@ -106,7 +106,7 @@ function tooltipFor(
     end: m.to,
     above: false,
     strictSide: true,
-    arrow: true,
+    arrow: false,
     create(v2) {
       const dom = document.createElement('div')
       dom.className = 'mizaj-spell-tip'

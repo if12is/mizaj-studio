@@ -168,3 +168,45 @@ async def export_docx(body: ExportRequest, request: Request) -> dict[str, Any]:
             src["size_px"],
         )
     return {"target_path": str(target), "stats": stats}
+
+
+class RenderRequest(BaseModel):
+    document_id: int
+    diacritized: bool = False
+
+
+def _render_sync(db_path: Path, body: RenderRequest) -> dict[str, Any]:
+    from app.docx import render  # lazy: python-docx/lxml (startup time)
+
+    conn = connect(db_path)
+    try:
+        row = conn.execute(
+            "SELECT title, raw_content, diacritized_content, source_docx_path FROM documents "
+            "WHERE id=? AND is_deleted=0",
+            (body.document_id,),
+        ).fetchone()
+        if row is None:
+            raise not_found("Document", body.document_id)
+        st = dict(conn.execute("SELECT key, value FROM settings").fetchall())
+    finally:
+        conn.close()
+    diac = (row["diacritized_content"] or "") if body.diacritized else ""
+    if row["source_docx_path"]:
+        try:
+            src = _check_in(row["source_docx_path"], "source_docx_path")
+        except MizajError:
+            src = None
+        if src is not None and src.is_file():
+            return render.render_docx(src, diac if diac.strip() else None)
+    try:
+        size = int(st.get("editor_font_size", DEFAULTS["editor_font_size"]))
+    except ValueError:
+        size = int(DEFAULTS["editor_font_size"])
+    text = diac if diac.strip() else row["raw_content"]
+    return render.render_text(text, st.get("editor_font") or DEFAULTS["editor_font"], size)
+
+
+@router.post("/render")
+async def render_docx(body: RenderRequest, request: Request) -> dict[str, Any]:
+    """Sanitized HTML of the document's page view (formatting from the source .docx)."""
+    return await run_blocking(_render_sync, request.app.state.db_path, body)

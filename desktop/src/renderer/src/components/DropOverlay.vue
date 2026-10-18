@@ -114,7 +114,7 @@ defineExpose({ onDrop })
   <MotionTransition name="m-fade">
     <div
       v-if="visible"
-      class="absolute inset-0 z-40 flex items-center justify-center bg-mizaj-slate/70"
+      class="absolute inset-0 z-40 flex items-center justify-center bg-mizaj-slate/95"
       data-testid="drop-overlay"
     >
       <div

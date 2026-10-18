@@ -21,6 +21,7 @@ import { useSettingsStore } from '@renderer/stores/settings'
 import { useSidecarStore } from '@renderer/stores/sidecar'
 import DropOverlay from './DropOverlay.vue'
 import ProgressBar from './ProgressBar.vue'
+import PageView from './PageView.vue'
 import EnginePill from './ui/EnginePill.vue'
 import { lazyDialog, lazyPanel } from '@renderer/lib/lazy'
 import { markEditorReady } from '@renderer/lib/boot'
@@ -84,6 +85,24 @@ const flushMarks = throttle2(() => {
 }, 300)
 
 const tts = useTts()
+
+// «عرض الصفحة»: server-rendered, Word-like read-only view (CodeMirror stays mounted underneath)
+const pageView = ref(false)
+const pageZoom = ref(100)
+const pageTick = ref(0)
+function togglePageView(): void {
+  pageView.value = !pageView.value
+  if (pageView.value) pageTick.value++
+}
+function zoomPage(delta: number): void {
+  pageZoom.value = Math.min(200, Math.max(50, pageZoom.value + delta))
+}
+watch(
+  () => editor.runState,
+  (s, prev) => {
+    if (pageView.value && s === 'done' && prev !== 'done') pageTick.value++
+  }
+)
 
 const run = useTashkeelRun(
   () => view,
@@ -556,6 +575,29 @@ const btnCls =
 
       <span class="mx-1 h-4 border-s dark:border-slate-600" />
       <button
+        :class="[btnCls, pageView ? 'border-mizaj-emerald' : '']"
+        data-testid="toggle-page-view"
+        :aria-pressed="pageView"
+        :disabled="!projects.currentDocument"
+        @click="togglePageView"
+      >
+        {{ pageView ? 'تحرير النص' : 'عرض الصفحة' }}
+      </button>
+      <template v-if="pageView">
+        <button
+          :class="btnCls"
+          aria-label="تصغير"
+          data-testid="page-zoom-out"
+          @click="zoomPage(-10)"
+        >
+          −
+        </button>
+        <span class="tabular-nums" data-testid="page-zoom">{{ pageZoom }}%</span>
+        <button :class="btnCls" aria-label="تكبير" data-testid="page-zoom-in" @click="zoomPage(10)">
+          +
+        </button>
+      </template>
+      <button
         :class="btnCls"
         data-testid="toggle-diff"
         :disabled="editor.diffBase === null"
@@ -742,8 +784,16 @@ const btnCls =
     <StatsPanel v-if="editor.showStats" />
     <ProgressBar @pause="run.pause()" @resume="run.resume()" @cancel="run.cancel()" />
     <DiffView v-if="editor.showDiff && editor.diffBase !== null" />
+    <PageView
+      v-if="pageView && projects.currentDocument"
+      :document-id="projects.currentDocument.id"
+      :diacritized="!!editor.diacritizedDocs[projects.currentDocument.id]"
+      :tick="pageTick"
+      :zoom="pageZoom"
+      :before-render="props.flushSave"
+    />
     <div
-      v-show="!(editor.showDiff && editor.diffBase !== null)"
+      v-show="!pageView && !(editor.showDiff && editor.diffBase !== null)"
       ref="host"
       class="mizaj-editor min-h-0 flex-1"
       :class="[paletteClass, quality.confidenceShow ? '' : 'conf-off']"

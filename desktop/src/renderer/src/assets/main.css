@@ -141,8 +141,42 @@ body,
   flex-wrap: wrap;
 }
 .cm-tooltip {
-  border: none !important;
-  background: transparent !important;
+  /* fully opaque, above everything (editor text, panels, dialogs' backdrop) */
+  z-index: 1000 !important;
+  opacity: 1 !important;
+  background: #ffffff !important;
+  color: #0f172a;
+  border: 1px solid #94a3b8 !important;
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  backdrop-filter: none !important;
+  direction: rtl;
+  font-family: 'Cairo', system-ui, sans-serif;
+  line-height: 1.5;
+  isolation: isolate;
+}
+.dark .cm-tooltip {
+  background: #1e293b !important;
+  color: #f1f5f9;
+  border-color: #64748b !important;
+}
+html.hc .cm-tooltip {
+  background: #000 !important;
+  color: #fff;
+  border-color: #fff !important;
+}
+.cm-tooltip:has(> .mizaj-quran-tip) {
+  background: #1e3a8a !important;
+  border-color: #1e3a8a !important;
+}
+.cm-tooltip .cm-tooltip-arrow {
+  display: none;
+}
+.cm-tooltip .mizaj-spell-tip,
+.cm-tooltip .mizaj-inspector {
+  border: none;
+  box-shadow: none;
+  background: transparent;
 }
 
 /* Merge (diff) view */
