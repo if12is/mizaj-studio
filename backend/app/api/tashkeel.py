@@ -21,7 +21,7 @@ from app.engine.executor import run_blocking
 from app.engine.factory import build_pipeline
 from app.engine.manager import manager
 from app.engine.normalize import has_arabic_letters, strip_marks
-from app.engine.pipeline import TashkeelPipeline, local_spans
+from app.engine.pipeline import TashkeelPipeline, local_spans, neighbour_context
 from app.engine.splitter import ArabicSentenceSplitter
 
 log = logging.getLogger("mizaj.api.tashkeel")
@@ -189,6 +189,7 @@ async def tashkeel_stream(body: StreamRequest, request: Request) -> StreamingRes
                     conn,
                     chunk.text,
                     local_spans(protected, chunk.start, chunk.end),
+                    *neighbour_context(cmap, chunk.index),
                 )
                 words += res.words
                 cached_chunks += res.cached

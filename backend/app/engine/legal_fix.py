@@ -411,6 +411,40 @@ def _heading(ctx: Ctx) -> None:
             ctx.set_case(ctx.toks[0], "nom")
 
 
+_LEX_CTX_CORES = frozenset({"تخلص", "تؤول", "فصلت", "مباشرة", "مؤكدا", "يستحق"})
+
+
+def _lexical_context(ctx: Ctx) -> None:
+    """Frequent legal words whose reading depends on the neighbours."""
+    toks = ctx.toks
+    for i, t in enumerate(toks):
+        prv = toks[i - 1] if i > 0 and ctx.adjacent(i - 1, i) else None
+        nxt = toks[i + 1] if ctx.adjacent(i, i + 1) else None
+        off = 1 if t.nb[:1] in "وف" and t.nb[1:] in _LEX_CTX_CORES else 0
+        core = t.nb[off:]
+        if core == "تخلص" and nxt is not None and nxt.nb not in ("من", "منه", "منها"):
+            ctx.put(t, "تَخْلُصُ", "form", offset=off)  # `يتلخص` typo: "تَخْلُصُ وَجِيزُهَا"
+        elif core == "تؤول" and nxt is not None and not nxt.nb.startswith(("ب", "علي")):
+            ctx.put(t, "تَؤُولُ", "form", offset=off)  # "تَؤُولُ حَصِيلَتُهُ إِلَى"
+        elif core == "فصلت" and _third_person_context(ctx, i):
+            ctx.put(t, "فَصَّلَتْ", "form", offset=off)
+        elif core == "مباشرة" and off == 1 and prv is not None and prv.nb.endswith("ية"):
+            ctx.put(t, "مُبَاشِرَة", "keep", offset=off)  # adjective: "شَخْصِيَّةٌ وَمُبَاشِرَةٌ"
+        elif core == "مؤكدا" and nxt is not None and ctx.is_def(nxt):
+            ctx.put(t, "مُؤَكِّدًا", "form", offset=off)  # active participle with an object
+        elif core == "يستحق" and prv is not None and prv.nb == "ما":
+            ctx.put(t, "يَسْتَحِقّ", "keep", offset=off)  # "مَا يَسْتَحِقُّ عَنْهَا"
+
+
+def _third_person_context(ctx: Ctx, i: int) -> bool:
+    """Past verb ending in ـت: third-person feminine unless a first-person pronoun is near."""
+    back = [x.nb for x in ctx.toks[max(0, i - 3) : i]]
+    if any(w in ("انا", "نحن") for w in back):
+        return False
+    prev = ctx.toks[i - 1] if i > 0 else None
+    return prev is not None and (prev.nb in ("قد", "وقد") or prev.nb.endswith("ة"))
+
+
 def _hamza_below(ctx: Ctx) -> None:
     """`إلَّا` -> `إِلَّا`: an initial hamza-below always takes its kasra (the engine drops it);
     the single-letter abbreviation `ص` (page) carries no mark."""
@@ -1030,6 +1064,7 @@ RULES: list[Callable[[Ctx], None]] = [
     _article_alef,
     _lexicon,
     _hamza_below,
+    _lexical_context,
     _heading,
     _mahall,
     _alif_maqsura_preps,
@@ -1058,12 +1093,32 @@ RULES: list[Callable[[Ctx], None]] = [
 ]
 
 
-def apply_fixes(stripped: str, spans, raw: str, oracle=None) -> tuple[str, int]:
+def apply_fixes(
+    stripped: str, spans, raw: str, oracle=None, left: str = "", right: str = ""
+) -> tuple[str, int]:
     """Apply all corrections to the engine output `raw` (aligned letter-for-letter with
-    `stripped`; `spans` = Arabic-word matches in `stripped`). Returns (text, mark edits)."""
+    `stripped`; `spans` = Arabic-word matches in `stripped`). Returns (text, mark edits).
+
+    `left` / `right` are the (unmarked) words of the neighbouring chunks: they are visible to the
+    rules as context (a preposition at the end of the previous chunk still governs the first
+    word of this one) but are never changed or returned."""
     pairs = split_pairs(raw, canon=False)
     if len(pairs) != len(stripped):
         return raw, 0
+    if left or right:
+        from app.engine.normalize import WORD_RE, has_arabic_letters
+
+        text = left + stripped + right
+        pairs = [(c, "") for c in left] + pairs + [(c, "") for c in right]
+        spans = [m for m in WORD_RE.finditer(text) if has_arabic_letters(m.group(0))]
+        ctx = Ctx(text, spans, pairs, oracle)
+        for rule in RULES:
+            rule(ctx)
+        if not ctx.changes:
+            return raw, 0
+        mid = ctx.pairs[len(left) : len(left) + len(stripped)]
+        out = "".join(b + m for b, m in mid)
+        return out, (0 if out == raw else ctx.changes)
     ctx = Ctx(stripped, spans, pairs, oracle)
     for rule in RULES:
         rule(ctx)

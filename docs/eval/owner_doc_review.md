@@ -10,7 +10,7 @@ are out of scope here (suggestions belong to the proofreading module).
 | | DER | WER | WER w/o case ending | DER w/o case ending |
 | :--- | ---: | ---: | ---: | ---: |
 | engine alone | 5.28 | 17.80 | 9.20 | 3.61 |
-| + `legal_fix` (this change) | 2.00 | 6.93 | 2.91 | 1.22 |
+| + `legal_fix` (this change) | 1.89 | 6.63 | 2.63 | 1.12 |
 
 Eval harness (`python -m eval.run_eval`, `accurate+mf2` -> `accurate+mf2+fixes`):
 
