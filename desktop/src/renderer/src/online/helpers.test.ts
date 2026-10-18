@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { ApiError } from '@renderer/api/client'
-import { formatBytes, jobActive, jobPercent, onlineErrorText } from './helpers'
+import { formatBytes, jobActive, jobPercent, onlineErrorText, quranErrText } from './helpers'
 
 describe('online helpers', () => {
   it('formats sizes', () => {
@@ -25,5 +25,20 @@ describe('online helpers', () => {
       'الترخيص'
     )
     expect(onlineErrorText(new ApiError(500, 'E', 'رسالة', ''))).toBe('رسالة')
+  })
+})
+
+describe('quranErrText', () => {
+  it('is always Arabic and actionable', () => {
+    const dl = new ApiError(
+      502,
+      'ERR_QURAN_DOWNLOAD',
+      'تعذر الاتصال بموقع Tanzil',
+      'Quran download failed.'
+    )
+    expect(quranErrText(dl)).toBe('تعذر الاتصال بموقع Tanzil')
+    expect(quranErrText(new ApiError(403, 'ERR_ONLINE_DISABLED', 'x', ''))).toContain('معطّل')
+    expect(quranErrText(new ApiError(500, 'ERR_UNKNOWN', '', 'HTTP 500'))).toContain('المحرك')
+    expect(quranErrText(new TypeError('Failed to fetch'))).not.toMatch(/[A-Za-z]/)
   })
 })

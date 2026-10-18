@@ -206,6 +206,8 @@ export const useFileStore = defineStore('fileio', () => {
         }
       } else {
         const r = await api.request<{ text: string }>('POST', '/api/io/import', { path }, true)
+        if (!r.text.trim())
+          return void notify('الملف فارغ؛ لا يوجد نص لاستيراده.', { kind: 'info' })
         await createFromText(stem(path) || baseName(path), r.text)
       }
     } catch (e) {

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 import threading
 import time
 from pathlib import Path
@@ -247,11 +248,16 @@ def test_brackets_and_quotes(sp):
     assert q["severity"] == "info" and q["suggestions"] == ["«اقتباس»"]
 
 
-def test_mixed_digits_info(sp):
-    res = chk(sp, "في ١٢ مايو و 15 يونيو و 20 يوليو", checks=P)
-    (i,) = (x for x in res["issues"] if x["code"] == "PUNCT_MIXED_DIGITS")
-    assert i["severity"] == "info" and i["word"] == "١٢" and i["suggestions"] == ["12"]
-    assert chk(sp, "في ١٢ مايو و ١٥ يونيو", checks=P)["issues"] == []
+def test_numbers_are_never_flagged(sp):
+    for txt in (
+        "في ١٢ مايو و 15 يونيو و 20 يوليو",
+        "صدر القانون عام 1996 م وفي ١٩٩٦ و2020/05/03 و12.5% و v2 و iPhone15 و ABC",
+        "في سنة 1996م وفي (1996) والرقم 1,996 و 1996هـ",
+    ):
+        res = chk(sp, txt)
+        bad = [x for x in res["issues"] if re.search(r"[0-9٠-٩A-Za-z]", x["word"])]
+        assert bad == [], (txt, bad)
+        assert "PUNCT_MIXED_DIGITS" not in codes(res)
 
 
 def test_clean_punctuation_has_no_issues(sp):
@@ -381,3 +387,9 @@ def test_performance_many_unique_words():
     res = check_text(text, eng)
     assert time.perf_counter() - t < 5.0
     assert res["stats"]["unique"] >= 4000
+
+
+def test_quote_style_span_never_wraps_numbers(sp):
+    res = chk(sp, 'قال القاضي "المادة 14 لسنة 1944" في حكمه وقال "نص عربي صرف"')
+    q = [i for i in res["issues"] if i["code"] == "PUNCT_QUOTE_STYLE"]
+    assert [i["word"] for i in q] == ['"نص عربي صرف"']

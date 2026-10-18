@@ -130,7 +130,7 @@ def validate_index(data: Any) -> dict[str, Any]:
         raise IndexError_(f'expected {{"kind": "{INDEX_KIND}", "laws": [...]}}')
     laws = data.get("laws")
     if not isinstance(laws, list) or len(laws) > MAX_INDEX:
-        raise IndexError_("laws must be a list (max %d)" % MAX_INDEX)
+        raise IndexError_(f"laws must be a list (max {MAX_INDEX})")
     out = []
     for i, law in enumerate(laws):
         if not isinstance(law, dict):

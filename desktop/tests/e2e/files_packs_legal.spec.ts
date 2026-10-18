@@ -265,7 +265,7 @@ test('pack export -> preview -> conflict choice -> apply -> undo (dictionary ent
   expect(dict.find((d) => d.word_or_phrase === 'كتاب')).toBeUndefined()
 
   // a locked local entry that differs is a conflict: keep by default, override on request
-  await api('POST', '/api/dictionary', { word_or_phrase: 'كتاب', diacritized_form: 'كُتُبٌ' })
+  await api('POST', '/api/dictionary', { word_or_phrase: 'كتاب', diacritized_form: 'كِتَابٍ' })
   await t('pack-import').click()
   await expect(t('pack-group-dictionary-conflicts')).toBeVisible()
   await expect(t('pack-item-conflicts').first()).toContainText('مقفل')

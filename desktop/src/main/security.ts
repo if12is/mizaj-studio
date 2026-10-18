@@ -62,6 +62,14 @@ export interface AppLocation {
   platform?: NodeJS.Platform
 }
 
+/**
+ * The only web permission the app's own pages may use: writing text to the clipboard (copy
+ * buttons, "copy without diacritics"). Reading the clipboard and everything else stay denied.
+ */
+export function isPermissionAllowed(permission: string, url: unknown, loc: AppLocation): boolean {
+  return permission === 'clipboard-sanitized-write' && isAppUrl(url, loc)
+}
+
 /** True if `raw` is the app's own page (exact index.html, or the dev server origin). Hash/query are ignored. */
 export function isAppUrl(raw: unknown, loc: AppLocation): boolean {
   if (typeof raw !== 'string' || !raw) return false

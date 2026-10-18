@@ -104,7 +104,13 @@ const set = (k: string, v: boolean): Promise<void> => settings.update({ [k]: Str
         />
         ملاحظات نحوية من LanguageTool (محلي)
         <span class="text-xs text-slate-500">
-          {{ quality.ltOn ? 'مفعّل ومكتشف' : 'يتطلب تفعيله في الإعدادات وتشغيل الخادم المحلي' }}
+          {{
+            quality.ltOn
+              ? 'مفعّل ومكتشف'
+              : settings.values.online_languagetool === 'true'
+                ? 'المفتاح مفعّل لكن الخادم المحلي غير مكتشف؛ شغّل LanguageTool على المنفذ 8081'
+                : 'يتطلب تفعيله في «الاتصال والموارد المجانية» وتشغيل الخادم المحلي'
+          }}
         </span>
       </label>
       <p
@@ -112,7 +118,14 @@ const set = (k: string, v: boolean): Promise<void> => settings.update({ [k]: Str
         :class="quality.ollamaOn ? 'text-mizaj-emerald' : 'text-slate-500'"
         data-testid="ollama-status"
       >
-        رأي Ollama المحلي في نافذة الكلمة: {{ quality.ollamaOn ? 'مفعّل' : 'غير مفعّل' }}
+        رأي Ollama المحلي في نافذة الكلمة:
+        {{
+          quality.ollamaOn
+            ? 'مفعّل'
+            : settings.values.online_ollama === 'true'
+              ? 'المفتاح مفعّل لكن Ollama غير مكتشف؛ شغّله على هذا الجهاز'
+              : 'غير مفعّل'
+        }}
       </p>
     </div>
 

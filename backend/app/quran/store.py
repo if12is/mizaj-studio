@@ -48,6 +48,10 @@ DOWNLOAD_ENDPOINT = "https://tanzil.net/pub/download/download.php"
 KINDS = ("uthmani", "uthmani-min", "simple", "simple-enhanced", "simple-min", "simple-clean")
 DEFAULT_KINDS = ("uthmani", "simple-clean")  # rasm used by writers + a clean one for matching
 META = "meta.json"
+DOWNLOAD_FAIL_AR = (
+    "تعذر الاتصال بموقع Tanzil (tanzil.net). تحقق من اتصالك بالإنترنت، أو نزّل الملف "
+    "بنفسك من tanzil.net/download واستخدم «تثبيت من ملف»."
+)
 
 # Canonical number of verses per sura (Hafs / Kufan count used by Tanzil); total 6236.
 VERSE_COUNTS = (
@@ -174,11 +178,29 @@ def quran_dir(data_dir: Path) -> Path:
     return Path(data_dir) / "resources" / "quran"
 
 
+_COUNT_AR = "عدد الآيات أو ترتيبها غير مطابق (المطلوب 6236 آية)؛ نزّل الملف كاملاً دون تعديل."
+_INVALID_AR = {
+    "unexpected line": (
+        "صيغة الملف غير مدعومة. من tanzil.net/download اختر «Text (with aya numbers)» "
+        "(الصيغة sura|aya|text) ثم نزّل الملف دون تعديل."
+    ),
+    "file is not UTF-8": "ترميز الملف ليس UTF-8؛ استخدم الملف الأصلي كما نُزِّل من tanzil.net.",
+    "wrong verse count": _COUNT_AR,
+    "wrong verse count in sura": _COUNT_AR,
+    "verse numbering not monotonic": _COUNT_AR,
+    "licence notice (Tanzil / Creative Commons) missing": (
+        "إشعار الترخيص (Tanzil / CC BY 3.0) مفقود في آخر الملف؛ لا تحذف أي سطر من الملف."
+    ),
+}
+
+
 def _invalid(reason: str, **details) -> MizajError:
     return MizajError(
         "ERR_QURAN_INVALID",
         422,
-        "ملف نص القرآن غير صالح أو معدَّل؛ استخدم الملف الأصلي من tanzil.net.",
+        _INVALID_AR.get(
+            reason, "ملف نص القرآن غير صالح أو معدَّل؛ استخدم الملف الأصلي من tanzil.net."
+        ),
         f"Not a valid unmodified Tanzil text file: {reason}",
         {"reason": reason, **details},
     )
@@ -190,7 +212,7 @@ def validate_tanzil_text(text: str) -> dict:
     last = (0, 0)
     per_sura = [0] * 114
     notice: list[str] = []
-    for n, line in enumerate(text.splitlines(), 1):
+    for n, line in enumerate(text.lstrip("\ufeff").splitlines(), 1):
         if not line.strip():
             continue
         if line.startswith("#"):
@@ -369,7 +391,7 @@ def _default_post(url: str, fields: dict[str, str]) -> bytes:
         raise MizajError(
             "ERR_QURAN_DOWNLOAD",
             502,
-            "تعذر تنزيل النص.",
+            DOWNLOAD_FAIL_AR,
             "Quran download failed.",
             {"reason": str(exc)},
         ) from exc

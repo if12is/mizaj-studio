@@ -32,10 +32,13 @@ export const useDictionaryStore = defineStore('dictionary', () => {
   }
   async function importEntries(
     data: DictExport['entries']
-  ): Promise<{ imported: number; updated: number }> {
-    const r = await useApi().post<{ imported: number; updated: number }>('/api/dictionary/import', {
-      entries: data
-    })
+  ): Promise<{ imported: number; updated: number; rejected: number }> {
+    const r = await useApi().post<{ imported: number; updated: number; rejected: number }>(
+      '/api/dictionary/import',
+      {
+        entries: data
+      }
+    )
     await load()
     return r
   }

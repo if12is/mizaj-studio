@@ -44,8 +44,10 @@ def not_found(what: str, ident: Any) -> MizajError:
     )
 
 
-def validation_error(message_en: str, details: dict[str, Any] | None = None) -> MizajError:
-    return MizajError("ERR_VALIDATION", 422, "بيانات غير صالحة.", message_en, details)
+def validation_error(
+    message_en: str, details: dict[str, Any] | None = None, message_ar: str | None = None
+) -> MizajError:
+    return MizajError("ERR_VALIDATION", 422, message_ar or "بيانات غير صالحة.", message_en, details)
 
 
 def duplicate_word(word: str) -> MizajError:

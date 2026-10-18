@@ -2,6 +2,7 @@
 import { ref } from 'vue'
 import { useApi } from '@renderer/api'
 import { notify } from '@renderer/api/toast'
+import { copyText } from '@renderer/lib/native'
 import { useEditorStore } from '@renderer/stores/editor'
 
 const editor = useEditorStore()
@@ -36,8 +37,9 @@ const insert = (): void => {
   if (result.value) editor.accessor?.insertText(result.value.words)
 }
 async function copy(): Promise<void> {
-  if (result.value) await navigator.clipboard?.writeText(result.value.words)
-  notify('تم النسخ.', { kind: 'success', ms: 1500 })
+  if (!result.value) return
+  if (await copyText(result.value.words)) notify('تم النسخ.', { kind: 'success', ms: 1500 })
+  else notify('تعذر النسخ إلى الحافظة.')
 }
 </script>
 

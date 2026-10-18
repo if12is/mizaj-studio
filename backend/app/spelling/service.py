@@ -66,6 +66,23 @@ def _dictionary_issues(
     return out
 
 
+_NON_WORD = re.compile(r"[0-9٠-٩۰-۹A-Za-z]")
+_SPELL_CATS = ("spelling", "pattern")
+_SPAN_CODES = ("PUNCT_QUOTE_STYLE",)  # whole-quote spans: skip any that wrap numbers/Latin
+
+
+def _drop_non_words(text: str, issues: list[dict]) -> list[dict]:
+    """Numbers, digits and Latin tokens are never spelling/pattern errors (hard guarantee)."""
+    return [
+        i
+        for i in issues
+        if not (
+            (i["category"] in _SPELL_CATS or i["code"] in _SPAN_CODES)
+            and _NON_WORD.search(text[i["start"] : i["end"]])
+        )
+    ]
+
+
 def _merge(issues: list[dict]) -> list[dict]:
     """A pattern issue explains (and replaces) dictionary issues on the same span."""
     pats = [i for i in issues if i["category"] == "pattern"]
@@ -106,7 +123,7 @@ def check_text(
         issues += check_typography(text, masker)
     if "punctuation" in checks:
         issues += check_punctuation(text, masker)
-    issues = _merge(issues)
+    issues = _merge(_drop_non_words(text, issues))
     issues.sort(key=lambda i: (i["start"], i["end"], i["code"]))
     # drop exact duplicates
     seen: set[tuple[int, int, str]] = set()

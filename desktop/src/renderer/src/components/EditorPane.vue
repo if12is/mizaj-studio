@@ -75,6 +75,10 @@ let silent = false
 
 const quality = useQualityStore()
 const quranDetect = useQuranDetect(() => view)
+watch(
+  () => quality.quranRevision,
+  () => void quranDetect.detectNow()
+)
 const quals = useEditorQuality(() => view)
 const spell = useSpellCheck(() => view)
 const spelling = useSpellingStore()
