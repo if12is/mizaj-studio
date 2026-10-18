@@ -19,7 +19,11 @@ const dialog = ref<HTMLElement | null>(null)
 useFocusTrap(dialog, () => emit('close'))
 const settings = useSettingsStore()
 const sidecar = useSidecarStore()
-const tab = ref<SettingsSection>(settings.settingsSection)
+// bound to the store so a request from inside the dialog (e.g. "install Quran") switches the tab
+const tab = computed<SettingsSection>({
+  get: () => settings.settingsSection,
+  set: (v) => (settings.settingsSection = v)
+})
 
 // each settings tab is its own chunk, loaded the first time it is opened
 const DictionaryPanel = lazyPanel(() => import('./DictionaryPanel.vue'))

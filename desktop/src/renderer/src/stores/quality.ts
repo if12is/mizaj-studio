@@ -2,7 +2,7 @@ import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 import { useApi } from '@renderer/api'
 import { useProjectsStore } from './projects'
-import { useSettingsStore } from './settings'
+import { useSettingsStore, type SettingsSection } from './settings'
 
 export interface ToolsInfo {
   ollama?: { detected: boolean; models?: string[]; url?: string }
@@ -68,11 +68,18 @@ export const useQualityStore = defineStore('quality', () => {
   const review = ref({ active: false, total: 0, reviewed: 0, remaining: 0 })
 
   const quranInstalled = ref<boolean | null>(null)
+  /** Bumped when the Quran text is installed/removed so open editors re-detect immediately. */
+  const quranRevision = ref(0)
+  function quranChanged(installed: boolean): void {
+    quranInstalled.value = installed
+    quranRevision.value++
+  }
   const quranHintDismissed = computed(() => settings.values.quran_hint_dismissed === 'true')
   const settingsRequest = ref<string | null>(null)
-  /** UI-B listens (settingsRequest ref or the DOM event) to open the settings dialog at a section. */
+  /** Opens the settings dialog at `section` (also announced as a DOM event for other listeners). */
   function openSettings(section: string): void {
     settingsRequest.value = section
+    settings.openSettings(section as SettingsSection)
     window.dispatchEvent(new CustomEvent('mizaj:open-settings', { detail: { section } }))
   }
 
@@ -98,6 +105,8 @@ export const useQualityStore = defineStore('quality', () => {
     ollamaModel,
     review,
     quranInstalled,
+    quranRevision,
+    quranChanged,
     quranHintDismissed,
     settingsRequest,
     openSettings,

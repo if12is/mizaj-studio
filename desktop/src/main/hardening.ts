@@ -1,5 +1,11 @@
 import { app, type Session } from 'electron'
-import { buildCsp, isAllowedExternalUrl, isAppUrl, type AppLocation } from './security'
+import {
+  buildCsp,
+  isAllowedExternalUrl,
+  isAppUrl,
+  isPermissionAllowed,
+  type AppLocation
+} from './security'
 
 interface Log {
   info(...a: unknown[]): void
@@ -44,14 +50,17 @@ function safeOrigin(url: string): string {
   }
 }
 
-/** Deny every permission, and send the strict CSP header with the app's own documents. */
+/** Deny every permission except clipboard writes, and send the strict CSP header with the app's own documents. */
 export function hardenSession(ses: Session, loc: AppLocation, log: Log): void {
   ses.setSpellCheckerEnabled(false) // the app has its own Arabic spelling; nothing is sent to a spell-check service
-  ses.setPermissionRequestHandler((_wc, permission, cb) => {
-    log.info('security: permission denied', permission)
-    cb(false)
+  ses.setPermissionRequestHandler((wc, permission, cb, details) => {
+    const ok = isPermissionAllowed(permission, details?.requestingUrl ?? wc.getURL(), loc)
+    if (!ok) log.info('security: permission denied', permission)
+    cb(ok)
   })
-  ses.setPermissionCheckHandler(() => false)
+  ses.setPermissionCheckHandler((_wc, permission, origin, details) =>
+    isPermissionAllowed(permission, details?.requestingUrl ?? origin, loc)
+  )
   ses.setDevicePermissionHandler(() => false)
 
   const csp = buildCsp({ dev: !!loc.rendererUrl })

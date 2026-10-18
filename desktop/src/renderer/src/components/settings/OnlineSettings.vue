@@ -161,7 +161,7 @@ const toolKeys = ['ollama', 'languagetool', 'tesseract'] as const
             class="text-xs text-red-500"
             data-testid="resource-error"
           >
-            فشل التنزيل: {{ r.job.error?.message_ar ?? r.job.error?.error_code }}
+            {{ r.job.error?.message_ar ?? 'فشل التنزيل. أعد المحاولة لاحقاً.' }}
           </p>
 
           <label class="flex items-center gap-2 text-xs">

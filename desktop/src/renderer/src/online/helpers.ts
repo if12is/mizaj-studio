@@ -121,3 +121,15 @@ export function onlineErrorText(e: unknown): string {
   }
   return 'تعذرت العملية.'
 }
+
+/** Quran settings: always an Arabic, actionable message (never a raw/English error). */
+export function quranErrText(e: unknown): string {
+  if (e instanceof ApiError) {
+    if (e.errorCode === 'ERR_ONLINE_DISABLED')
+      return 'التنزيل معطّل؛ فعّل «تنزيل الموارد المجانية العامة» من تبويب الاتصال.'
+    if (e.errorCode === 'ERR_UNKNOWN')
+      return 'تعذر الاتصال بالمحرك الخلفي. أعد تشغيل التطبيق ثم حاول مجدداً.'
+    return e.messageAr || 'تعذرت العملية.'
+  }
+  return 'تعذر الاتصال بالمحرك الخلفي. تحقق من حالة المحرك في أسفل النافذة ثم حاول مجدداً.'
+}

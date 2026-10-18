@@ -58,7 +58,7 @@ def test_dictionary_roundtrip_conflict_and_undo(ioc, tmp_path):
     )
     # locally: change one entry, delete the other
     eid = {e["word_or_phrase"]: e["id"] for e in ioc.get("/api/dictionary").json()}
-    ioc.put(f"/api/dictionary/{eid['كتاب']}", json={"diacritized_form": "كُتُبٌ"})
+    ioc.put(f"/api/dictionary/{eid['كتاب']}", json={"diacritized_form": "كِتَابٍ"})
     ioc.delete(f"/api/dictionary/{eid['علم']}")
     pv = ioc.post("/api/packs/v2/preview", json={"path": str(pack)}).json()
     d = pv["items"]["dictionary"]
@@ -68,7 +68,7 @@ def test_dictionary_roundtrip_conflict_and_undo(ioc, tmp_path):
     # default: user-locked wins
     r = ioc.post("/api/packs/v2/apply", json={"path": str(pack)}).json()
     forms = {e["word_or_phrase"]: e["diacritized_form"] for e in ioc.get("/api/dictionary").json()}
-    assert forms == {"كتاب": "كُتُبٌ", "علم": "عِلْمٌ"}
+    assert forms == {"كتاب": "كِتَابٍ", "علم": "عِلْمٌ"}
     assert r["applied"]["dictionary"]["kept_local"] == 1
     # undo removes only what the import added
     u = ioc.post(f"/api/packs/v2/undo/{r['import_id']}").json()
@@ -87,7 +87,7 @@ def test_dictionary_roundtrip_conflict_and_undo(ioc, tmp_path):
     assert forms["كتاب"] == "كِتَابٌ"
     ioc.post(f"/api/packs/v2/undo/{r2['import_id']}")
     forms = {e["word_or_phrase"]: e["diacritized_form"] for e in ioc.get("/api/dictionary").json()}
-    assert forms == {"كتاب": "كُتُبٌ"}
+    assert forms == {"كتاب": "كِتَابٍ"}
     assert len(ioc.get("/api/packs/v2/imports").json()) == 2
 
 

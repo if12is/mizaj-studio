@@ -4,6 +4,7 @@ import {
   generateApiToken,
   isAllowedExternalUrl,
   isAppUrl,
+  isPermissionAllowed,
   PathAllowlist,
   scrubSecrets
 } from './security'
@@ -140,5 +141,22 @@ describe('PathAllowlist', () => {
     for (const p of ['/1', '/2', '/3', '/4']) a.add(p)
     expect(a.has('/1')).toBe(false)
     expect(a.has('/4')).toBe(true)
+  })
+})
+
+describe('isPermissionAllowed', () => {
+  const loc = {
+    rendererUrl: null,
+    indexHtmlPath: '/opt/Mizaj/resources/app.asar/out/renderer/index.html'
+  }
+  const page = 'file:///opt/Mizaj/resources/app.asar/out/renderer/index.html'
+  it('allows only clipboard writes from the app page (copy buttons must work)', () => {
+    expect(isPermissionAllowed('clipboard-sanitized-write', page, loc)).toBe(true)
+    expect(isPermissionAllowed('clipboard-read', page, loc)).toBe(false)
+    expect(isPermissionAllowed('media', page, loc)).toBe(false)
+    expect(isPermissionAllowed('notifications', page, loc)).toBe(false)
+    expect(isPermissionAllowed('clipboard-sanitized-write', 'https://evil.example/', loc)).toBe(
+      false
+    )
   })
 })

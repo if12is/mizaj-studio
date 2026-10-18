@@ -48,7 +48,8 @@ async function doImport(ev: Event): Promise<void> {
     const entries = Array.isArray(parsed) ? parsed : parsed.entries
     if (!Array.isArray(entries)) throw new Error('bad format')
     const r = await dict.importEntries(entries)
-    notify(`تم الاستيراد: ${r.imported} جديد، ${r.updated} محدّث`, { kind: 'success' })
+    const rej = r.rejected ? `، ${r.rejected} مرفوض (حروف الصيغة المشكولة تخالف الكلمة)` : ''
+    notify(`تم الاستيراد: ${r.imported} جديد، ${r.updated} محدّث${rej}`, { kind: 'success' })
   } catch {
     notify('ملف القاموس غير صالح.')
   } finally {

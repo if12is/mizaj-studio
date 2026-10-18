@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import re
-from collections import Counter
 
 from .text import AR_LETTER, Masker
 
@@ -43,10 +42,6 @@ MSG = {
         "يُفضَّل استعمال علامتي الاقتباس العربيتين «» بدل الاقتباس المستقيم.",
     ),
     "PUNCT_BIDI_MARK": ("info", "علامة اتجاه غير مرئية (RLM/LRM) قد لا تكون مقصودة."),
-    "PUNCT_MIXED_DIGITS": (
-        "info",
-        "تُستعمل في المستند الأرقام الهندية والغربية معاً؛ يُنصح بتوحيدها.",
-    ),
 }
 
 
@@ -160,20 +155,6 @@ def check_punctuation(text: str, masker: Masker) -> list[dict]:
         s, e = m.span()
         out.append(_issue(s, e, text, "PUNCT_BIDI_MARK", [""], 0.4))
 
-    # numerals: mixed Arabic-Indic and Western digits in one document
-    nums = [m for m in _NUMBER.finditer(text) if ok(*m.span())]
-    kinds = Counter()
-    for m in nums:
-        kinds["ar" if re.search("[٠-٩۰-۹]", m.group()) else "en"] += 1
-    if len(kinds) == 2:
-        major = "ar" if kinds["ar"] >= kinds["en"] else "en"
-        for m in nums:
-            is_ar = bool(re.search("[٠-٩۰-۹]", m.group()))
-            if is_ar != (major == "ar"):
-                new = (
-                    m.group().translate(_ARABIC_INDIC)
-                    if major == "ar"
-                    else m.group().translate(_WESTERN)
-                )
-                out.append(_issue(m.start(), m.end(), text, "PUNCT_MIXED_DIGITS", [new], 0.5))
+    # Numbers are never flagged here: Western vs Arabic-Indic digits is a style choice offered
+    # only by the explicit typography/normalize tool (TYPO_DIGITS), never as a spelling hint.
     return out

@@ -32,6 +32,16 @@ export async function openFolder(path: string): Promise<boolean> {
   return err === ''
 }
 
+/** Copies text to the clipboard; false when the OS/browser refuses (never claims success). */
+export async function copyText(text: string): Promise<boolean> {
+  try {
+    await navigator.clipboard.writeText(text)
+    return true
+  } catch {
+    return false
+  }
+}
+
 /** Opens an https link in the system browser (never inside the app). */
 export function openExternal(url: string): void {
   void window.mizajAPI?.openExternal(url)

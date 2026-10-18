@@ -2,6 +2,7 @@
 import { onMounted, ref } from 'vue'
 import { useApi } from '@renderer/api'
 import { notify } from '@renderer/api/toast'
+import { copyText } from '@renderer/lib/native'
 import { useEditorStore } from '@renderer/stores/editor'
 
 interface Currency {
@@ -51,8 +52,8 @@ const text = (): string =>
   result.value ? (style.value === 'legal' ? result.value.formula : result.value.words) : ''
 const insert = (): void => editor.accessor?.insertText(text())
 async function copy(): Promise<void> {
-  await navigator.clipboard?.writeText(text())
-  notify('تم النسخ.', { kind: 'success', ms: 1500 })
+  if (await copyText(text())) notify('تم النسخ.', { kind: 'success', ms: 1500 })
+  else notify('تعذر النسخ إلى الحافظة.')
 }
 </script>
 

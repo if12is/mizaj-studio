@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useApi } from '@renderer/api'
-import { ApiError } from '@renderer/api/client'
+import { quranErrText } from '@renderer/online/helpers'
 import { openExternal, pickOpenPath } from '@renderer/lib/native'
+import { useQualityStore } from '@renderer/stores/quality'
 import { useSettingsStore } from '@renderer/stores/settings'
 
 interface QuranStatus {
@@ -19,8 +20,10 @@ interface QuranStatus {
 }
 
 const settings = useSettingsStore()
+const quality = useQualityStore()
 const status = ref<QuranStatus | null>(null)
 const busy = ref(false)
+const downloading = ref(false)
 const accepted = ref(false)
 const kind = ref('uthmani')
 const message = ref<{ ok: boolean; text: string } | null>(null)
@@ -36,32 +39,33 @@ const online = computed(() => settings.values.online_resources === 'true')
 const btn =
   'rounded border px-3 py-1 hover:bg-slate-100 disabled:opacity-50 dark:border-slate-600 dark:hover:bg-slate-700'
 
+const loadFailed = ref(false)
 async function load(): Promise<void> {
   try {
     status.value = await useApi().get<QuranStatus>('/api/quran/status', true)
+    loadFailed.value = false
   } catch {
     status.value = null
+    loadFailed.value = true
   }
 }
 onMounted(() => void load())
 
-const errText = (e: unknown): string =>
-  e instanceof ApiError
-    ? e.errorCode === 'ERR_ONLINE_DISABLED'
-      ? 'التنزيل معطّل؛ فعّل «تنزيل الموارد المجانية العامة» من تبويب الاتصال.'
-      : e.messageAr
-    : 'تعذرت العملية.'
+const errText = quranErrText
 
 async function download(): Promise<void> {
   busy.value = true
+  downloading.value = true
   message.value = null
   try {
     status.value = await useApi().request<QuranStatus>('POST', '/api/quran/download', {}, true)
+    quality.quranChanged(status.value.installed)
     message.value = { ok: true, text: 'تم تنزيل نص القرآن من Tanzil وحفظه كما هو دون تعديل.' }
   } catch (e) {
     message.value = { ok: false, text: errText(e) }
   } finally {
     busy.value = false
+    downloading.value = false
   }
 }
 async function installFile(): Promise<void> {
@@ -76,6 +80,7 @@ async function installFile(): Promise<void> {
       { kind: kind.value, source_path: path },
       true
     )
+    quality.quranChanged(status.value.installed)
     message.value = { ok: true, text: 'تم تثبيت النص من الملف.' }
   } catch (e) {
     message.value = { ok: false, text: errText(e) }
@@ -97,8 +102,17 @@ async function installFile(): Promise<void> {
         :class="status?.installed ? 'text-mizaj-emerald' : 'text-mizaj-amber'"
         data-testid="quran-state"
       >
-        {{ status?.installed ? `مثبّت (${status.verses} آية)` : 'غير مثبّت' }}
+        {{
+          status?.installed
+            ? `مثبّت (${status.verses} آية)`
+            : loadFailed
+              ? 'تعذر قراءة الحالة'
+              : 'غير مثبّت'
+        }}
       </b>
+      <button v-if="loadFailed" :class="btn" data-testid="quran-retry" @click="load">
+        إعادة المحاولة
+      </button>
     </p>
     <ul v-if="status?.installed" class="text-xs text-slate-500" dir="ltr">
       <li v-for="(t, k) in status.texts" :key="k">{{ k }}</li>
@@ -122,7 +136,7 @@ async function installFile(): Promise<void> {
         data-testid="quran-download"
         @click="download"
       >
-        تنزيل من Tanzil
+        {{ downloading ? 'جارٍ التنزيل…' : 'تنزيل من Tanzil' }}
       </button>
       <p v-if="!online" class="text-xs text-mizaj-amber" data-testid="quran-download-off">
         التنزيل معطّل لأن «تنزيل الموارد المجانية العامة» متوقف. فعّله من تبويب «الاتصال والموارد

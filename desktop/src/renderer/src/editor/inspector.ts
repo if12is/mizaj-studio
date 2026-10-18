@@ -167,7 +167,7 @@ export function inspectorExtension(cfg: InspectorConfig) {
       pos: v.from,
       end: v.to,
       above: false,
-      strictSide: true,
+      strictSide: false,
       arrow: true,
       create(view) {
         const dom = document.createElement('div')
@@ -443,7 +443,14 @@ export function inspectorExtension(cfg: InspectorConfig) {
           box.append(ask)
           dom.append(box)
         }
-        return { dom, offset: { x: 0, y: 4 } }
+        // Suggestions arrive asynchronously and grow the box; re-measure so CodeMirror flips the
+        // tooltip above the word instead of letting it run off the bottom of the window.
+        let ro: ResizeObserver | null = null
+        if (typeof ResizeObserver !== 'undefined') {
+          ro = new ResizeObserver(() => view.requestMeasure())
+          ro.observe(dom)
+        }
+        return { dom, offset: { x: 0, y: 4 }, destroy: () => ro?.disconnect() }
       }
     }
   }

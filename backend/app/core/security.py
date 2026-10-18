@@ -252,15 +252,15 @@ def safe_path(
     p = Path(s)
     resolved = _real(p)
     if _is_unc(resolved):
-        raise validation_error(
-            f"{field}: network (UNC) paths are not allowed", {"field": field}
-        )
+        raise validation_error(f"{field}: network (UNC) paths are not allowed", {"field": field})
     if exts is not None:
         allowed = {e.lower() for e in exts}
         if p.suffix.lower() not in allowed:
             raise validation_error(
                 f"{field} must end with one of: {', '.join(sorted(allowed)) or 'none'}",
                 {"field": field, "allowed": sorted(allowed)},
+                "نوع الملف غير مدعوم؛ الأنواع المقبولة: "
+                + "، ".join(sorted(allowed) or ["لا شيء"]),
             )
     st = None
     if kind == "input":
@@ -276,32 +276,36 @@ def safe_path(
         return resolved
     parent = resolved.parent
     if not parent.is_dir():
-        raise validation_error("target directory does not exist", {"field": field})
+        raise validation_error(
+            "target directory does not exist", {"field": field}, "المجلد المحدد غير موجود."
+        )
     if os.path.islink(p):
         raise validation_error(f"{field}: symbolic links are not allowed", {"field": field})
     if data_dir is not None and _within(parent, _real(Path(data_dir))):
         raise validation_error(
-            f"{field}: writing into the application data folder is not allowed", {"field": field}
+            f"{field}: writing into the application data folder is not allowed",
+            {"field": field},
+            "لا يمكن الحفظ داخل مجلد بيانات التطبيق؛ اختر مجلداً آخر.",
         )
     if resolved.exists() and not stat.S_ISREG(os.stat(resolved).st_mode):
         raise validation_error(f"{field} must be a regular file", {"field": field})
     if avoid is not None and resolved == _real(Path(avoid)):
-        raise validation_error(f"{field} must differ from the source file", {"field": field})
+        raise validation_error(
+            f"{field} must differ from the source file",
+            {"field": field},
+            "ملف الإخراج يجب أن يختلف عن الملف المصدر.",
+        )
     return resolved
 
 
-def safe_dir(
-    raw: object, field: str, *, kind: str = "input", data_dir: Path | None = None
-) -> Path:
+def safe_dir(raw: object, field: str, *, kind: str = "input", data_dir: Path | None = None) -> Path:
     """Directory variant of `safe_path` (batch folders)."""
     from app.core.errors import not_found
 
     s = _syntax_check(raw, field)
     resolved = _real(Path(s))
     if _is_unc(resolved):
-        raise validation_error(
-            f"{field}: network (UNC) paths are not allowed", {"field": field}
-        )
+        raise validation_error(f"{field}: network (UNC) paths are not allowed", {"field": field})
     if kind == "input":
         if not resolved.exists():
             raise not_found("Directory", s)
@@ -353,9 +357,7 @@ def check_zip(
 
 
 _DTD_MARKERS = tuple(
-    m.encode(enc)
-    for m in ("<!DOCTYPE", "<!ENTITY")
-    for enc in ("ascii", "utf-16-le", "utf-16-be")
+    m.encode(enc) for m in ("<!DOCTYPE", "<!ENTITY") for enc in ("ascii", "utf-16-le", "utf-16-be")
 )
 
 

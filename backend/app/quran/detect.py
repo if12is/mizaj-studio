@@ -69,7 +69,7 @@ class QuranIndex:
     def add_file(self, path: Path) -> int:
         n = 0
         rows: list[tuple[int, int, list[str]]] = []
-        for line in path.read_text(encoding="utf-8").splitlines():
+        for line in path.read_text(encoding="utf-8").lstrip("\ufeff").splitlines():
             if not line.strip() or line.startswith("#"):
                 continue
             parts = line.split("|", 2)

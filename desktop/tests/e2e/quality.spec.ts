@@ -76,6 +76,7 @@ test.beforeAll(async () => {
   await text('new-project').click()
   await text('new-project-input').fill('جودة')
   await text('new-project-input').press('Enter')
+  await expect(text('project-item')).toHaveCount(1) // list re-rendered: no detached click
   await text('new-document').first().click()
   await text('new-document-input').fill('مستند الجودة')
   await text('new-document-input').press('Enter')
@@ -263,6 +264,9 @@ test('Quran: an uninstalled text shows a one-time hint that opens the settings s
   expect(
     await page.evaluate(() => (window as unknown as { __openSettings: string[] }).__openSettings)
   ).toContain('quran')
+  // the banner button now really opens the Quran settings (it used to do nothing)
+  await expect(text('quran-settings')).toBeVisible()
+  await text('settings-close').click()
   await text('quran-hint-dismiss').click()
   await expect(text('quran-hint')).toHaveCount(0)
 })

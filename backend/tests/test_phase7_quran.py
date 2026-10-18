@@ -289,3 +289,36 @@ def test_manual_install_through_api_validates_and_is_verbatim(qc, tmp_path):
 def test_download_endpoint_disabled_by_default(qc):
     r = qc.post("/api/quran/download", json={})
     assert r.status_code == 403 and r.json()["error_code"] == "ERR_ONLINE_DISABLED"
+
+
+def test_bom_file_installs_and_is_detected(qc, tmp_path):
+    f = tmp_path / "bom.txt"
+    f.write_bytes(b"\xef\xbb\xbf" + synthetic_tanzil().encode())
+    r = qc.post("/api/quran/install", json={"kind": "uthmani", "source_path": str(f)})
+    assert r.status_code == 200 and r.json()["verses"] == 6236
+
+
+def test_quran_errors_are_specific_arabic_messages(qc, tmp_path):
+    plain = tmp_path / "plain.txt"
+    plain.write_text("بسم الله الرحمن الرحيم\n", encoding="utf-8")
+    r = qc.post("/api/quran/install", json={"kind": "uthmani", "source_path": str(plain)})
+    assert r.status_code == 422 and "with aya numbers" in r.json()["message_ar"]
+    short = tmp_path / "short.txt"
+    short.write_bytes(synthetic_tanzil(drop=500).encode())
+    r = qc.post("/api/quran/install", json={"kind": "uthmani", "source_path": str(short)})
+    assert "6236" in r.json()["message_ar"]
+
+
+def test_unreachable_tanzil_gives_actionable_arabic_not_raw_error(qc, monkeypatch):
+    enable_online(qc)
+    monkeypatch.setattr(store.time, "sleep", lambda s: None)
+
+    def down(*a, **k):
+        raise OSError("Network is unreachable")
+
+    monkeypatch.setattr(store.urllib.request, "build_opener", down)
+    r = qc.post("/api/quran/download", json={})
+    assert r.status_code == 502 and r.json()["error_code"] == "ERR_QURAN_DOWNLOAD"
+    ar = r.json()["message_ar"]
+    assert "tanzil.net" in ar and "تثبيت من ملف" in ar
+    assert "Network" not in ar

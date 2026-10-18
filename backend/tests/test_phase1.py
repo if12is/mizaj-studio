@@ -312,12 +312,21 @@ def test_dictionary_crud(client):
     assert [x["word_or_phrase"] for x in found] == ["علم"]
     assert client.get("/api/dictionary", params={"q": "zzz"}).json() == []
     assert client.get("/api/dictionary", params={"q": "%"}).json() == []
-    r = client.put(f"/api/dictionary/{e['id']}", json={"diacritized_form": "كُتُبٌ"})
-    assert r.json()["diacritized_form"] == "كُتُبٌ"
+    r = client.put(f"/api/dictionary/{e['id']}", json={"diacritized_form": "كِتَابٍ"})
+    assert r.json()["diacritized_form"] == "كِتَابٍ"
     assert client.put("/api/dictionary/9999", json={"diacritized_form": "x"}).status_code == 404
     assert client.delete(f"/api/dictionary/{e['id']}").status_code == 204
     assert client.delete(f"/api/dictionary/{e['id']}").status_code == 404
     assert len(client.get("/api/dictionary").json()) == 1
+
+
+def test_dictionary_rejects_forms_that_change_base_letters(client):
+    r = add(client, "كلب", "كِتَابٌ")
+    assert r.status_code == 422 and "نفس حروف" in r.json()["message_ar"]
+    e = add(client).json()
+    r = client.put(f"/api/dictionary/{e['id']}", json={"diacritized_form": "كُتُبٌ"})
+    assert r.status_code == 422
+    assert client.get("/api/dictionary").json()[0]["diacritized_form"] == "كِتَابٌ"
 
 
 def test_dictionary_duplicate(client):
@@ -345,7 +354,7 @@ def test_dictionary_engine_row_upgrade(client):
     assert r.status_code == 201
     assert r.json()["is_user_locked"] == 1 and r.json()["source"] == "user"
     assert r.json()["diacritized_form"] == "قَلَمُ"
-    assert add(client, "قلم", "x").status_code == 409
+    assert add(client, "قلم", "قَلَمٌ").status_code == 409
 
 
 def test_raw_duplicate_insert_integrity_error(data_dir):
@@ -359,26 +368,27 @@ def test_raw_duplicate_insert_integrity_error(data_dir):
 
 
 def test_dictionary_import_export_roundtrip(client):
-    add(client, "a", "A1")
+    add(client, "علم", "عِلْمٌ")
     body = {
         "entries": [
-            {"word_or_phrase": "a", "diacritized_form": "A2"},
-            {"word_or_phrase": "b", "diacritized_form": "B1"},
+            {"word_or_phrase": "علم", "diacritized_form": "عَلَمٌ"},
+            {"word_or_phrase": "قلم", "diacritized_form": "قَلَمٌ"},
+            {"word_or_phrase": "كلب", "diacritized_form": "كتابٌ"},  # letters differ: rejected
         ]
     }
     r = client.post("/api/dictionary/import", json=body)
     assert r.status_code == 200
-    assert r.json() == {"imported": 1, "updated": 1}
+    assert r.json() == {"imported": 1, "updated": 1, "rejected": 1}
     exp = client.get("/api/dictionary/export").json()
     assert exp["version"] == 1
     assert {(e["word_or_phrase"], e["diacritized_form"]) for e in exp["entries"]} == {
-        ("a", "A2"),
-        ("b", "B1"),
+        ("علم", "عَلَمٌ"),
+        ("قلم", "قَلَمٌ"),
     }
     for e in client.get("/api/dictionary").json():
         client.delete(f"/api/dictionary/{e['id']}")
     r = client.post("/api/dictionary/import", json=exp)
-    assert r.json() == {"imported": 2, "updated": 0}
+    assert r.json() == {"imported": 2, "updated": 0, "rejected": 0}
     assert client.get("/api/dictionary/export").json()["entries"] == exp["entries"]
 
 

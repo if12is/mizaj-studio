@@ -43,6 +43,24 @@ class TafqeetIn(BaseModel):
     gender: Literal["m", "f"] = "m"  # only for plain numbers (no currency)
 
 
+_TAFQEET_AR = (
+    ("non-negative decimal", "المبلغ يجب أن يكون رقماً صحيحاً أو عشرياً غير سالب."),
+    ("too large", "المبلغ أكبر من الحد المدعوم."),
+    ("greater than zero", "المبلغ يجب أن يكون أكبر من صفر."),
+    ("must be an integer", "الرقم بلا عملة يجب أن يكون عدداً صحيحاً؛ اختر عملة لإظهار الكسور."),
+    ("unknown currency", "عملة غير معروفة."),
+    ("year must be in", "السنة خارج نطاق التقويم الهجري المدعوم (1343–1500 هـ)؛ تأكد من التقويم."),
+    ("outside the supported", "التاريخ خارج النطاق المدعوم (1343–1500 هـ)؛ تأكد من التقويم."),
+    ("out of range", "تاريخ غير صالح؛ تحقق من اليوم والشهر والسنة."),
+    ("invalid date", "تاريخ غير صالح؛ تحقق من اليوم والشهر والسنة."),
+)
+
+
+def _legal_ar(exc: Exception) -> str | None:
+    msg = str(exc)
+    return next((ar for key, ar in _TAFQEET_AR if key in msg), None)
+
+
 @router.post("/tafqeet")
 def tafqeet(body: TafqeetIn) -> dict[str, Any]:
     try:
@@ -60,7 +78,7 @@ def tafqeet(body: TafqeetIn) -> dict[str, Any]:
             w = number_words(int(d), body.gender, body.case, spelling=body.spelling)
             r = {"words": w, "formula": f"فَقَطْ {w} لَا غَيْرُ" if body.style == "legal" else w}
     except TafqeetError as exc:
-        raise validation_error(str(exc), {"field": "amount"}) from exc
+        raise validation_error(str(exc), {"field": "amount"}, _legal_ar(exc)) from exc
     return {**r, "currency": body.currency.upper() if body.currency else None,
             "amount": str(body.amount)}  # fmt: skip
 
@@ -105,7 +123,7 @@ def date_to_words(body: DateIn) -> dict[str, Any]:
             with_day_name=body.with_day_name, claimed_day_name=body.claimed_day_name,
         )  # fmt: skip
     except TafqeetError as exc:
-        raise validation_error(str(exc), {"field": "date"}) from exc
+        raise validation_error(str(exc), {"field": "date"}, _legal_ar(exc)) from exc
 
 
 # ------------------------------------------------------------------ terms / clauses

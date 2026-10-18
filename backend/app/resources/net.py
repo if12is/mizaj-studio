@@ -13,6 +13,7 @@ import ipaddress
 import json
 import logging
 import os
+import re
 import socket
 import sqlite3
 import ssl
@@ -273,11 +274,30 @@ def download(
     return digest
 
 
+_HTTP_REASON = re.compile(r"HTTP (\d{3})")
+
+
+def _net_message_ar(reason: str) -> str:
+    """A specific, actionable Arabic message (never a raw exception string)."""
+    m = _HTTP_REASON.search(reason)
+    if m:
+        code = int(m.group(1))
+        if code in (404, 410):
+            return f"الملف غير متوفر على الخادم حالياً (HTTP {code}). جرّب لاحقاً أو استورده من ملف."
+        if code in (401, 403, 451):
+            return f"رفض الخادم الطلب (HTTP {code}). نزّل الملف بنفسك واستورده من ملف."
+        if code == 429 or code >= 500:
+            return f"الخادم مشغول أو متعطّل مؤقتاً (HTTP {code}). أعد المحاولة لاحقاً."
+    if "limit" in reason or "Content-Length" in reason:
+        return "الملف المنزَّل أكبر من الحد المسموح أو غير سليم."
+    return "تعذر الاتصال بالإنترنت. تحقق من اتصالك ثم أعد المحاولة (يُستأنف التنزيل تلقائياً)."
+
+
 def _net_error(reason: str) -> MizajError:
     return MizajError(
         "ERR_DOWNLOAD_FAILED",
         502,
-        "فشل التنزيل. أعد المحاولة لاحقاً (يُستأنف التنزيل تلقائياً).",
+        _net_message_ar(reason),
         f"Download failed: {reason}",
         {"reason": reason},
     )
