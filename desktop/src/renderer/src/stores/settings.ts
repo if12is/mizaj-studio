@@ -81,9 +81,14 @@ export const useSettingsStore = defineStore('settings', () => {
     root.style.setProperty('--editor-size', `${fontSize.value}px`)
   }
 
+  let updateSeq = 0
   async function load(): Promise<void> {
+    const seenSeq = updateSeq
     try {
-      values.value = { ...DEFAULT_SETTINGS, ...(await useApi().get<SettingsMap>('/api/settings')) }
+      const loaded = await useApi().get<SettingsMap>('/api/settings')
+      // A stale snapshot must not clobber a setting the user changed while it was in flight.
+      if (seenSeq === updateSeq) values.value = { ...DEFAULT_SETTINGS, ...loaded }
+      else values.value = { ...DEFAULT_SETTINGS, ...loaded, ...values.value }
     } catch {
       /* keep defaults */
     }
@@ -92,7 +97,6 @@ export const useSettingsStore = defineStore('settings', () => {
   }
 
   /** Applies immediately (optimistic), then persists; rolls back on failure. */
-  let updateSeq = 0
   async function update(patch: SettingsMap): Promise<void> {
     const seq = ++updateSeq
     const prev = values.value

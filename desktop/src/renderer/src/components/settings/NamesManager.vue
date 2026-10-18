@@ -16,14 +16,17 @@ const draft = ref({ id: null as number | null, term: '', diacritized: '', kind: 
 const fileInput = ref<HTMLInputElement | null>(null)
 const field = 'rounded border px-2 py-1 text-sm dark:border-slate-600 dark:bg-slate-800'
 
+let loadSeq = 0
 async function load(): Promise<void> {
+  const seq = ++loadSeq // only the newest request may write (a slow older search must not win)
   try {
-    entries.value = await useApi().get<NameEntry[]>(
+    const list = await useApi().get<NameEntry[]>(
       `/api/names${q.value.trim() ? `?q=${encodeURIComponent(q.value.trim())}` : ''}`,
       true
     )
+    if (seq === loadSeq) entries.value = list
   } catch {
-    entries.value = []
+    if (seq === loadSeq) entries.value = []
   }
 }
 onMounted(() => void load())

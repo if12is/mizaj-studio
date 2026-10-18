@@ -25,14 +25,17 @@ const draft = ref({
 const fileInput = ref<HTMLInputElement | null>(null)
 const field = 'rounded border px-2 py-1 dark:border-slate-600 dark:bg-slate-800'
 
+let loadSeq = 0
 async function load(): Promise<void> {
+  const seq = ++loadSeq // only the newest request may write
   try {
-    entries.value = await useApi().get<Entry[]>(
+    const list = await useApi().get<Entry[]>(
       `/api/legal/glossary${q.value.trim() ? `?q=${encodeURIComponent(q.value.trim())}` : ''}`,
       true
     )
+    if (seq === loadSeq) entries.value = list
   } catch {
-    entries.value = []
+    if (seq === loadSeq) entries.value = []
   }
 }
 onMounted(() => void load())

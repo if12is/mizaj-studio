@@ -12,11 +12,14 @@ export const useDictionaryStore = defineStore('dictionary', () => {
   const entries = ref<DictEntry[]>([])
   const query = ref('')
 
+  let loadSeq = 0
   async function load(): Promise<void> {
+    const seq = ++loadSeq // only the newest request may write (a slow older search must not win)
     const q = query.value.trim()
-    entries.value = await useApi().get<DictEntry[]>(
+    const list = await useApi().get<DictEntry[]>(
       `/api/dictionary${q ? `?q=${encodeURIComponent(q)}` : ''}`
     )
+    if (seq === loadSeq) entries.value = list
   }
   async function add(word: string, form: string): Promise<void> {
     await useApi().post('/api/dictionary', { word_or_phrase: word, diacritized_form: form })
