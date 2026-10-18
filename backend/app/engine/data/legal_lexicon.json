@@ -31,8 +31,6 @@
   {"tpl": "مُهَيَّئًا", "art": false, "final": "form"},
   {"tpl": "اَنْهَتْ", "art": false, "final": "form"},
   {"tpl": "اَنْهَى", "art": false, "final": "form"},
-  {"tpl": "اَخَرِين", "art": false},
-  {"tpl": "اَخَرُون", "art": false},
   {"tpl": "رَانْيَا", "art": false},
   {"tpl": "دَوْرِيّ"},
   {"tpl": "اَبُو", "art": false, "final": "form"},
