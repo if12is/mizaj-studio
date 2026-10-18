@@ -31,6 +31,52 @@ declare global {
     offline?: boolean
   }
 
+  interface GeminiConfigDto {
+    enabled: boolean
+    provider: 'api' | 'cli'
+    model: string
+    useCli: boolean
+    consentAt: string | null
+  }
+  interface GeminiStateDto {
+    config: GeminiConfigDto
+    hasKey: boolean
+    keyHint: string | null
+    encryptionAvailable: boolean
+    cli: { detected: boolean; version: string | null; path: string | null }
+  }
+  interface GeminiModelDto {
+    id: string
+    display: string
+  }
+  type GeminiOutcome<T> = ({ ok: true } & T) | { ok: false; code: string; message: string }
+  interface GeminiAskResultDto {
+    text: string
+    suggestion: string | null
+    truncated: boolean
+    provider: 'api' | 'cli'
+  }
+  interface GeminiBridge {
+    getState(): Promise<GeminiStateDto>
+    setConfig(patch: Partial<Omit<GeminiConfigDto, 'consentAt'>>): Promise<GeminiStateDto>
+    acceptConsent(): Promise<GeminiStateDto>
+    saveKey(key: string): Promise<GeminiOutcome<{ state: GeminiStateDto }>>
+    clearKey(): Promise<GeminiStateDto>
+    testKey(
+      key?: string
+    ): Promise<GeminiOutcome<{ models: GeminiModelDto[]; defaultModel: string }>>
+    models(): Promise<
+      GeminiOutcome<{ models: GeminiModelDto[]; defaultModel: string; source: 'live' | 'fallback' }>
+    >
+    detectCli(): Promise<GeminiStateDto['cli']>
+    ask(
+      req:
+        | { kind: 'document'; question: string; text: string }
+        | { kind: 'word'; question: string; word: string; sentence: string }
+        | { kind: 'selection'; question: string; text: string }
+    ): Promise<GeminiOutcome<{ result: GeminiAskResultDto }>>
+  }
+
   interface MizajAPI {
     getBackendConfig(): Promise<{
       port: number | null
@@ -69,6 +115,7 @@ declare global {
     openPath(p: string): Promise<string>
     openExternal(url: string): Promise<boolean>
     relaunchApp(): Promise<void>
+    gemini: GeminiBridge
     onBeforeQuitFlush(cb: () => Promise<void>): () => void
   }
 

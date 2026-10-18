@@ -101,7 +101,7 @@ describe('isAllowedExternalUrl', () => {
       'https://github.com/UB-Mannheim/tesseract/wiki',
       'https://learn.microsoft.com/en-us/x',
       'https://tesseract-ocr.github.io/tessdoc/',
-      'https://ollama.com/download',
+      'https://aistudio.google.com/apikey',
       'https://languagetool.org/download/',
       'https://creativecommons.org/publicdomain/zero/1.0/'
     ])

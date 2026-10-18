@@ -5,7 +5,6 @@ import { useProjectsStore } from './projects'
 import { useSettingsStore, type SettingsSection } from './settings'
 
 export interface ToolsInfo {
-  ollama?: { detected: boolean; models?: string[]; url?: string }
   languagetool?: { detected: boolean; arabic?: boolean; url?: string }
 }
 
@@ -54,15 +53,9 @@ export const useQualityStore = defineStore('quality', () => {
       tools.value = null
     }
   }
-  /** optional online/local tools: only when the switch is ON *and* the tool was detected */
-  const ollamaOn = computed(
-    () => settings.values.online_ollama === 'true' && !!tools.value?.ollama?.detected
-  )
+  /** optional local tool: only when the switch is ON *and* the tool was detected */
   const ltOn = computed(
     () => settings.values.online_languagetool === 'true' && !!tools.value?.languagetool?.detected
-  )
-  const ollamaModel = computed(
-    () => settings.values.ollama_model || tools.value?.ollama?.models?.[0] || ''
   )
 
   const review = ref({ active: false, total: 0, reviewed: 0, remaining: 0 })
@@ -100,9 +93,7 @@ export const useQualityStore = defineStore('quality', () => {
     quranProtect,
     tools,
     loadTools,
-    ollamaOn,
     ltOn,
-    ollamaModel,
     review,
     quranInstalled,
     quranRevision,

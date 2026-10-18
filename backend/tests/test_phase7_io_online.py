@@ -19,8 +19,6 @@ BLOB = bytes(range(256)) * 4000  # ~1 MB
 
 class H(BaseHTTPRequestHandler):
     log: list[str] = []
-    models = ["qwen2.5:7b"]
-    ollama_reply = "ذَهَبَ الوَلَدُ"
 
     def log_message(self, *a):
         pass
@@ -43,8 +41,6 @@ class H(BaseHTTPRequestHandler):
                 self._send(206, BLOB[start:], "application/octet-stream")
             else:
                 self._send(200, BLOB, "application/octet-stream")
-        elif self.path == "/api/tags":
-            self._send(200, json.dumps({"models": [{"name": m} for m in H.models]}).encode())
         elif self.path == "/v2/languages":
             self._send(200, json.dumps([{"name": "Arabic", "longCode": "ar"}]).encode())
         else:
@@ -54,9 +50,7 @@ class H(BaseHTTPRequestHandler):
         n = int(self.headers.get("Content-Length", 0))
         body = self.rfile.read(n)
         H.log.append(self.path)
-        if self.path == "/api/generate":
-            self._send(200, json.dumps({"response": H.ollama_reply}).encode())
-        elif self.path == "/v2/check":
+        if self.path == "/v2/check":
             q = parse_qs(body.decode())
             text = q["text"][0]
             off = text.index("الي")
@@ -73,7 +67,6 @@ def server(monkeypatch):
     srv = ThreadingHTTPServer(("127.0.0.1", 0), H)
     threading.Thread(target=srv.serve_forever, daemon=True).start()
     url = f"http://127.0.0.1:{srv.server_address[1]}"
-    monkeypatch.setenv("MIZAJ_OLLAMA_URL", url)
     monkeypatch.setenv("MIZAJ_LANGUAGETOOL_URL", url)
     yield url
     srv.shutdown()
@@ -117,14 +110,11 @@ def test_no_network_when_switches_off(ioc, monkeypatch, tmp_path):
         st = ioc.get("/api/online/status").json()
         assert st["switches"] == {
             "online_resources": False,
-            "online_ollama": False,
             "online_languagetool": False,
         }
         assert ioc.get("/api/resources").status_code == 200
         r = ioc.post("/api/resources/t1/download", json={"accept_license": True})
         assert r.status_code == 403 and r.json()["error_code"] == "ERR_ONLINE_DISABLED"
-        r = ioc.post("/api/tools/ollama/suggest", json={"text": "كتاب", "model": "m"})
-        assert r.json()["error_code"] == "ERR_ONLINE_DISABLED"
         r = ioc.post("/api/tools/languagetool/check", json={"text": "كتاب"})
         assert r.json()["error_code"] == "ERR_ONLINE_DISABLED"
         assert calls == []
@@ -238,34 +228,18 @@ def test_tools_discovery(ioc, server, monkeypatch):
     monkeypatch.setenv("MIZAJ_TESSERACT", "/nonexistent")
     monkeypatch.setattr("shutil.which", lambda *_: None)
     j = ioc.get("/api/tools").json()
-    assert j["ollama"]["detected"] and j["ollama"]["models"] == ["qwen2.5:7b"]
+    assert "ollama" not in j
     assert j["languagetool"]["detected"] and j["languagetool"]["arabic"]
     assert j["tesseract"]["detected"] is False and "Install" in j["tesseract"]["hint"]
-    monkeypatch.setenv("MIZAJ_OLLAMA_URL", "http://127.0.0.1:1")
-    assert ioc.get("/api/tools").json()["ollama"]["detected"] is False
 
 
-def test_ollama_suggest_validated(ioc, server):
-    set_setting(ioc, online_ollama="true")
-    r = ioc.post(
-        "/api/tools/ollama/suggest", json={"text": "ذهب الولد", "model": "qwen2.5:7b"}
-    ).json()
-    assert r["accepted"] and r["text"] == "ذَهَبَ الوَلَدُ"
-    H.ollama_reply = "ذهب الولدان"  # changed base letters
-    try:
-        r = ioc.post("/api/tools/ollama/suggest", json={"text": "ذهب الولد", "model": "m"}).json()
-        assert (
-            r["accepted"] is False and r["reason"] == "base_letters_changed" and r["text"] is None
-        )
-    finally:
-        H.ollama_reply = "ذَهَبَ الوَلَدُ"
-
-
-def test_ollama_down_gives_clear_error(ioc, monkeypatch):
-    monkeypatch.setenv("MIZAJ_OLLAMA_URL", "http://127.0.0.1:1")
-    set_setting(ioc, online_ollama="true")
-    r = ioc.post("/api/tools/ollama/suggest", json={"text": "كتاب", "model": "m"})
-    assert r.status_code == 503 and r.json()["error_code"] == "ERR_TOOL_UNAVAILABLE"
+def test_ollama_endpoint_removed(ioc):
+    assert ioc.post(
+        "/api/tools/ollama/suggest", json={"text": "كتاب", "model": "m"}
+    ).status_code in (
+        404,
+        405,
+    )
 
 
 def test_languagetool_maps_to_issue_shape(ioc, server):
@@ -334,3 +308,31 @@ def test_ocr_image_and_scanned_pdf(ioc, monkeypatch, tmp_path):
     monkeypatch.setattr("app.tools.discovery.tesseract_languages", lambda b: ["eng"])
     r = ioc.post("/api/ocr", json={"path": str(img)})
     assert r.json()["error_code"] == "ERR_OCR_LANG_MISSING"
+
+
+def test_migration_drops_old_ollama_keys(tmp_path):
+    import sqlite3
+
+    from app.core.migrations import DEFAULT_MIGRATIONS_DIR, run_migrations
+
+    data = tmp_path / "d"
+    data.mkdir()
+    db = data / "mizaj.db"
+    # a database that stopped at 004 and still carries the old keys
+    mig = tmp_path / "mig"
+    mig.mkdir()
+    for f in sorted(DEFAULT_MIGRATIONS_DIR.glob("00[1-4]_*.sql")):
+        (mig / f.name).write_text(f.read_text(encoding="utf-8"), encoding="utf-8")
+    run_migrations(db, data / "backups", mig)
+    conn = sqlite3.connect(db)
+    for k, v in (("online_ollama", "true"), ("ollama_model", "x"), ("theme", "light")):
+        conn.execute("INSERT INTO settings(key, value, updated_at) VALUES (?,?,'t')", (k, v))
+    conn.commit()
+    conn.close()
+    run_migrations(db, data / "backups")  # real migrations incl. 005
+    conn = sqlite3.connect(db)
+    keys = {r[0] for r in conn.execute("SELECT key FROM settings")}
+    conn.close()
+    assert "online_ollama" not in keys and "ollama_model" not in keys
+    assert "theme" in keys
+    run_migrations(db, data / "backups")  # idempotent

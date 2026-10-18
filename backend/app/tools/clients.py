@@ -1,4 +1,4 @@
-"""Ollama second opinion (7.8.2) and LanguageTool (7.9.4); loopback only, opt-in."""
+"""LanguageTool client (7.9.4); loopback only, opt-in."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any
 
 from app.core.errors import MizajError, validation_error
-from app.engine.normalize import has_arabic_letters, strip_marks
+from app.engine.normalize import has_arabic_letters
 from app.resources import net
 from app.tools import discovery
 
@@ -21,37 +21,6 @@ def _unavailable(tool: str, url: str) -> MizajError:
         f"Local tool '{tool}' was not detected at {url}.",
         {"tool": tool, "url": url},
     )
-
-
-def ollama_suggest(db_path: Path, text: str, model: str, timeout: float = 120.0) -> dict[str, Any]:
-    net.require_switch(db_path, "online_ollama")
-    if not text.strip() or len(text) > MAX_CHARS or not model.strip():
-        raise validation_error("text (<= 20000 chars) and model are required")
-    url = discovery.ollama_url()
-    prompt = (
-        "أضف التشكيل الكامل إلى النص العربي التالي دون تغيير أي حرف أو إضافة أي شرح. "
-        "أعد النص المشكول فقط.\n\n" + text
-    )
-    try:
-        data = net.local_request(
-            url,
-            "/api/generate",
-            {"model": model, "prompt": prompt, "stream": False, "options": {"temperature": 0}},
-            timeout=timeout,
-        )
-    except MizajError:
-        raise
-    except Exception as exc:  # noqa: BLE001
-        raise _unavailable("ollama", url) from exc
-    out = str(data.get("response", "")).strip()
-    base = {"model": model, "source": "ollama"}
-    if not out:
-        return {**base, "accepted": False, "text": None, "reason": "empty_response"}
-    if strip_marks(out) != strip_marks(text.strip()):
-        return {**base, "accepted": False, "text": None, "reason": "base_letters_changed"}
-    lead = text[: len(text) - len(text.lstrip())]
-    trail = text[len(text.rstrip()) :]
-    return {**base, "accepted": True, "text": lead + out + trail, "reason": None}
 
 
 def _cp_index(text: str, off16: int) -> int:

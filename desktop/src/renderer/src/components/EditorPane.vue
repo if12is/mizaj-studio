@@ -54,6 +54,7 @@ import FindBar from './FindBar.vue'
 import { useEditorQuality } from '@renderer/composables/useEditorQuality'
 import { useQuranDetect } from '@renderer/composables/useQuranDetect'
 import { useQualityStore } from '@renderer/stores/quality'
+import { useGeminiStore } from '@renderer/stores/gemini'
 import { reviewKeep, reviewStep, type ConfWord } from '@renderer/editor/confidence'
 import { openInspectorAt } from '@renderer/editor/inspector'
 import ReviewBar from './ReviewBar.vue'
@@ -75,6 +76,7 @@ let view: EditorView | null = null
 let silent = false
 
 const quality = useQualityStore()
+const gemini = useGeminiStore()
 const quranDetect = useQuranDetect(() => view)
 watch(
   () => quality.quranRevision,
@@ -707,6 +709,14 @@ const btnCls =
         @click="editor.rightPanel = editor.rightPanel === 'spelling' ? null : 'spelling'"
       >
         قائمة الأخطاء
+      </button>
+      <button
+        v-if="gemini.enabled"
+        :class="[btnCls, editor.rightPanel === 'gemini' ? 'border-mizaj-emerald' : '']"
+        data-testid="toggle-gemini-panel"
+        @click="editor.rightPanel = editor.rightPanel === 'gemini' ? null : 'gemini'"
+      >
+        اسأل عن المستند
       </button>
       <button
         :class="[btnCls, editor.rightPanel === 'legal' ? 'border-mizaj-emerald' : '']"

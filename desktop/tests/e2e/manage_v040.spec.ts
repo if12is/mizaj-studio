@@ -6,8 +6,6 @@ import {
   type Page
 } from '@playwright/test'
 import { mkdtempSync, rmSync } from 'node:fs'
-import { createServer, type Server } from 'node:http'
-import type { AddressInfo } from 'node:net'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 
@@ -15,7 +13,6 @@ const desktopDir = resolve(__dirname, '../..')
 let app: ElectronApplication
 let page: Page
 let userData: string
-let fakeOllama: Server
 
 const t = (id: string) => page.getByTestId(id)
 const api = <T = unknown>(method: string, path: string, body?: unknown): Promise<T> =>
@@ -61,16 +58,6 @@ test.describe.configure({ mode: 'serial' })
 
 test.beforeAll(async () => {
   userData = mkdtempSync(join(tmpdir(), 'mizaj-e2e-manage-'))
-  fakeOllama = createServer((req, res) => {
-    res.setHeader('Content-Type', 'application/json')
-    res.end(
-      req.url?.startsWith('/api/tags')
-        ? JSON.stringify({ models: [{ name: 'llama3:8b' }, { name: 'qwen2.5:7b' }] })
-        : '{}'
-    )
-  })
-  await new Promise<void>((ok) => fakeOllama.listen(0, '127.0.0.1', ok))
-  const port = (fakeOllama.address() as AddressInfo).port
   app = await electron.launch({
     args: ['.', '--no-sandbox', '--disable-gpu'],
     cwd: desktopDir,
@@ -78,8 +65,7 @@ test.beforeAll(async () => {
       ...process.env,
       MIZAJ_ENGINE_MODE: 'mock',
       MIZAJ_USER_DATA_DIR: userData,
-      MIZAJ_E2E_NO_SHELL: '1',
-      MIZAJ_OLLAMA_URL: `http://127.0.0.1:${port}`
+      MIZAJ_E2E_NO_SHELL: '1'
     }
   })
   page = await app.firstWindow()
@@ -88,7 +74,6 @@ test.beforeAll(async () => {
 })
 test.afterAll(async () => {
   await app?.close()
-  fakeOllama?.close()
   rmSync(userData, { recursive: true, force: true })
 })
 
@@ -148,23 +133,4 @@ test('deleting the open document clears the editor; deleting a project removes i
   await expect(projectRow('مشروع معاد تسميته')).toHaveCount(0)
   await expect(t('doc-title')).toHaveText('لم يتم اختيار مستند')
   expect(await api<unknown[]>('GET', '/api/projects')).toEqual([])
-})
-
-test('Ollama model dropdown lists detected models and saves ollama_model', async () => {
-  await t('open-settings').click()
-  await t('tab-online').click()
-  await expect(t('ollama-model-row')).toHaveCount(0) // only when Ollama is enabled
-  await t('switch-online-ollama').check()
-  const select = t('ollama-model-select')
-  await expect(select).toBeVisible()
-  await expect(select.locator('option')).toHaveText(['llama3:8b', 'qwen2.5:7b'])
-  await expect(select).toHaveValue('llama3:8b')
-  await select.selectOption('qwen2.5:7b')
-  await expect
-    .poll(async () => (await api<Record<string, string>>('GET', '/api/settings')).ollama_model)
-    .toBe('qwen2.5:7b')
-  await t('settings-close').click()
-  await t('open-settings').click()
-  await t('tab-online').click()
-  await expect(t('ollama-model-select')).toHaveValue('qwen2.5:7b')
 })

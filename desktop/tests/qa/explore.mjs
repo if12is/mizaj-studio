@@ -71,7 +71,7 @@ for (const k of Object.keys(changed))
 
 // online switches + resources catalog
 await t(page, 'tab-online').click()
-for (const sw of ['switch-online-resources', 'switch-online-ollama', 'switch-online-languagetool'])
+for (const sw of ['switch-online-resources', 'switch-online-languagetool'])
   await t(page, sw).check()
 await page.waitForTimeout(500)
 await t(page, 'tools-refresh').click()

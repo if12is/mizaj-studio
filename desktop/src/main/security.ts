@@ -103,7 +103,7 @@ export const EXTERNAL_HOST_ALLOWLIST = [
   'github.com',
   'microsoft.com', // learn.microsoft.com, support.microsoft.com, ...
   'tesseract-ocr.github.io',
-  'ollama.com',
+  'aistudio.google.com', // where the user creates a Gemini API key
   'languagetool.org',
   'creativecommons.org',
   'sourceforge.net' // license links in the resource catalog
