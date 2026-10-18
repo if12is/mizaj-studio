@@ -6,8 +6,25 @@ from dataclasses import dataclass
 
 MAX_CHARS = 256  # CATT context is 512 tokens incl. added marks and BOS/EOS
 STRONG = ".؟!؟?;؛\n"  # sentence-ending punctuation and newline
-WEAK = "،,"
+WEAK = "،,:"
 _MARKS = "ًٌٍَُِّْٰ"
+
+
+# prepositions / particles / conjunctions that must stay with the word that follows them
+PARTICLES = frozenset(
+    "من إلى الى الي عن على علي في فى و ف ب ل ك ثم أن ان إن أو او لا لم لن ما قد حتى حتي مع "
+    "بين عند لدى لدي ضد دون غير كل بعض أي اي هذا هذه ذلك تلك الذي التي".split()
+)
+
+
+def _last_word(text: str, pos: int, k: int) -> str:
+    j = k
+    while j > pos and text[j - 1].isspace():
+        j -= 1
+    i = j
+    while i > pos and not text[i - 1].isspace():
+        i -= 1
+    return "".join(c for c in text[i:j] if c not in _MARKS)
 
 
 @dataclass(frozen=True)
@@ -54,9 +71,18 @@ class ArabicSentenceSplitter:
             if k > 0:
                 return k
         # whitespace: end after a whitespace char, or right before one
+        fallback = -1
         for k in range(limit, pos, -1):
             if text[k - 1].isspace() or (k < n and text[k].isspace()):
-                return extend_ws(k) if text[k - 1].isspace() else k
+                end = extend_ws(k) if text[k - 1].isspace() else k
+                if fallback < 0:
+                    fallback = end
+                # never cut right after a preposition / particle that governs the next word
+                if k - pos > self.min_fill and _last_word(text, pos, k) in PARTICLES:
+                    continue
+                return end
+        if fallback > 0:
+            return fallback
         # lone token longer than max_chars: hard cut, but never between a letter and its marks
         k = limit
         while k > pos + 1 and text[k] in _MARKS:

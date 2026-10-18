@@ -18,7 +18,7 @@ from app.io import batch, formats, ocr
 
 router = APIRouter(tags=["io"])
 Mode = Literal["fast", "accurate"]
-Level = Literal["full", "irab_only", "minimal", "legal"]
+Level = Literal["full", "irab_only", "essential", "minimal", "legal"]
 
 
 DOC_EXTS = (".docx", ".txt", ".md", ".markdown", ".srt", ".epub", ".pdf")

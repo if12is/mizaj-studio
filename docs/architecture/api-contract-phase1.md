@@ -32,7 +32,7 @@ Extra Phase-1 codes: `ERR_NOT_FOUND` (404), `ERR_VALIDATION` (422), `ERR_DUPLICA
 - `GET /api/settings` → `{[key]: value}` merged over defaults:
   `{"engine_mode":"fast","tashkeel_level":"full","editor_font":"Amiri","editor_font_size":"20","colored_diacritics":"true","theme":"dark"}`
 - `PUT /api/settings` body `{[key]: string}` (partial upsert) → full settings map.
-  Validation: `engine_mode ∈ {fast,accurate}`, `tashkeel_level ∈ {full,irab_only,minimal}`, `theme ∈ {dark,light}`, `editor_font_size` integer 12–48, `colored_diacritics ∈ {true,false}`.
+  Validation: `engine_mode ∈ {fast,accurate}`, `tashkeel_level ∈ {full,irab_only,essential,minimal,legal}`, `theme ∈ {dark,light}`, `editor_font_size` integer 12–48, `colored_diacritics ∈ {true,false}`.
 
 ## Personal dictionary (rows of `tashkeel_cache` with `is_user_locked=1`)
 - `GET /api/dictionary?q=<search>` → `DictEntry[]`

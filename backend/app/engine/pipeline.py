@@ -8,12 +8,13 @@ protected spans. The base letters are never changed (checked at the end of every
 from __future__ import annotations
 
 import logging
+import re
 import sqlite3
 from collections import Counter
 from collections.abc import Callable
 from dataclasses import dataclass, field
 
-from app.engine import irab_rules
+from app.engine import irab_rules, legal_fix
 from app.engine.base import Engine
 from app.engine.cache import TashkeelCache
 from app.engine.chunk_map import ChunkMap
@@ -78,6 +79,18 @@ def local_spans(spans: list[Span], start: int, end: int) -> list[Span]:
     return [(max(s, start) - start, min(e, end) - start) for s, e in spans if s < end and e > start]
 
 
+def neighbour_context(cmap: ChunkMap, i: int, words: int = 4) -> tuple[str, str]:
+    """Stripped last words of chunk i-1 and first words of chunk i+1 (with their separators)."""
+    left = right = ""
+    if i > 0:
+        t = strip_marks(cmap.chunks[i - 1].text)
+        left = "".join(re.split(r"(?<=\s)", t)[-words:]) if t.strip() else ""
+    if i + 1 < len(cmap.chunks):
+        t = strip_marks(cmap.chunks[i + 1].text)
+        right = "".join(re.split(r"(?<=\s)", t)[:words])
+    return left, right
+
+
 class TashkeelPipeline:
     def __init__(
         self,
@@ -97,6 +110,8 @@ class TashkeelPipeline:
         irab_threshold: float = 0.75,
         minimal_words: frozenset[str] = frozenset(),
         protector: Callable[[str], list[Span]] | None = None,
+        fixes_on: bool = False,
+        fix_oracle=None,
     ) -> None:
         self.engine = engine
         self.level = level
@@ -113,6 +128,8 @@ class TashkeelPipeline:
         self.irab_threshold = irab_threshold
         self.minimal_words = minimal_words
         self.protector = protector
+        self.fixes_on = fixes_on
+        self.fix_oracle = fix_oracle
         self._glossary: GlossaryIndex | None = None
         self._names: GlossaryIndex | None = None
         self.splitter = splitter or ArabicSentenceSplitter()
@@ -123,8 +140,15 @@ class TashkeelPipeline:
 
     # ---- single chunk (runs in the engine executor; never on the event loop) ----
     def process_chunk(
-        self, conn: sqlite3.Connection, chunk_text: str, protected: list[Span] | None = None
+        self,
+        conn: sqlite3.Connection,
+        chunk_text: str,
+        protected: list[Span] | None = None,
+        left: str = "",
+        right: str = "",
     ) -> ChunkResult:
+        """`left` / `right`: stripped words of the neighbouring chunks (context for the grammar
+        rules only; the chunk cache and the returned text never include them)."""
         if self.keep_existing:
             stripped, lock = PartialDiacritizationLock.capture(chunk_text)
         else:
@@ -147,6 +171,8 @@ class TashkeelPipeline:
         if self.irab_rules_on:
             raw, irab_changes = self._irab(raw, spans, confs)
         raw = self._apply_names(raw, spans, conn)
+        if self.fixes_on:  # grammar + legal-lexicon corrections (legal_fix.py)
+            raw, _ = legal_fix.apply_fixes(stripped, spans, raw, self.fix_oracle, left, right)
         out = self._apply_level(raw, spans, conn, confs)
         out = self._apply_dictionary(cache, out, stripped, spans)
         out = lock.apply(out)
@@ -353,7 +379,9 @@ class TashkeelPipeline:
         words: list[tuple[int, int, float | None, float | None]] = []
         offset = 0
         for c in cmap.chunks:
-            res = self.process_chunk(conn, c.text, local_spans(prot, c.start, c.end))
+            res = self.process_chunk(
+                conn, c.text, local_spans(prot, c.start, c.end), *neighbour_context(cmap, c.index)
+            )
             outputs[c.index] = res.text
             words.extend((s + offset, e + offset, wc, ic) for s, e, wc, ic in res.word_conf)
             offset += len(res.text)

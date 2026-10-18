@@ -41,6 +41,7 @@ async def build_pipeline(
     irab_rules: bool = False,
     use_names: bool = True,
     protect_quran: bool = True,
+    grammar_fixes: bool = True,
 ) -> TashkeelPipeline:
     from app.engine.names import names_index
 
@@ -51,6 +52,11 @@ async def build_pipeline(
         morph = await run_blocking(manager.morph_filter)
     ambiguity = passive = glossary_loader = irab_noun = None
     need_oracle = level in ("minimal", "legal")
+    # the grammar fixes are off in the deterministic mock mode (AGENTS.md section 3)
+    fixes_on = grammar_fixes and engine.name != "mock"
+    fix_oracle = None
+    if fixes_on:
+        fix_oracle = await manager.ensure_key("mishkal", mode)
     if need_oracle or (irab_rules and engine.name != "mock"):
         oracle = engine if engine.name == "mock" else await manager.ensure_key("mishkal", mode)
         if need_oracle:
@@ -77,4 +83,6 @@ async def build_pipeline(
         irab_threshold=config.irab_threshold(),
         minimal_words=_minimal_words(),
         protector=quran_protector() if protect_quran else None,
+        fixes_on=fixes_on,
+        fix_oracle=fix_oracle,
     )

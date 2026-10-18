@@ -21,14 +21,14 @@ from app.engine.executor import run_blocking
 from app.engine.factory import build_pipeline
 from app.engine.manager import manager
 from app.engine.normalize import has_arabic_letters, strip_marks
-from app.engine.pipeline import TashkeelPipeline, local_spans
+from app.engine.pipeline import TashkeelPipeline, local_spans, neighbour_context
 from app.engine.splitter import ArabicSentenceSplitter
 
 log = logging.getLogger("mizaj.api.tashkeel")
 router = APIRouter(tags=["tashkeel"])
 
 Mode = Literal["fast", "accurate"]
-Level = Literal["full", "irab_only", "minimal", "legal"]
+Level = Literal["full", "irab_only", "essential", "minimal", "legal"]
 MAX_TEXT = 5_000_000
 
 
@@ -44,6 +44,7 @@ class TashkeelRequest(BaseModel):
     irab_rules: bool = False  # conservative context rules for case endings (7.1.6)
     use_names: bool = True  # proper-noun dictionary (7.4.3)
     protect_quran: bool = True  # leave Quran spans untouched when the detector is available
+    grammar_fixes: bool = True  # legal lexicon + grammar rules (engine/legal_fix.py)
     poetry: bool = False  # keep every line as its own chunk (verse structure)
 
 
@@ -83,6 +84,7 @@ async def _build_pipeline(request: Request, body: TashkeelRequest, document_id=N
         irab_rules=body.irab_rules,
         use_names=body.use_names,
         protect_quran=body.protect_quran,
+        grammar_fixes=body.grammar_fixes,
     )
     if body.poetry:
         pipeline.splitter = ArabicSentenceSplitter(line_mode=True)
@@ -187,6 +189,7 @@ async def tashkeel_stream(body: StreamRequest, request: Request) -> StreamingRes
                     conn,
                     chunk.text,
                     local_spans(protected, chunk.start, chunk.end),
+                    *neighbour_context(cmap, chunk.index),
                 )
                 words += res.words
                 cached_chunks += res.cached
