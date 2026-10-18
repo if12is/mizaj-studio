@@ -119,9 +119,20 @@ def _resolve_source(db_path: Path, body: ExportRequest) -> dict[str, Any]:
         if row["source_docx_path"]:
             # the stored path may come from a restored backup: re-validate it (no UNC/devices)
             try:
-                return {"src": _check_in(row["source_docx_path"], "source_docx_path")}
+                src = _check_in(row["source_docx_path"], "source_docx_path")
             except MizajError:
-                pass
+                src = None
+            if src is not None:
+                # what the editor holds (edits, manual marks, accepted proofreading) wins
+                # over re-running the engine on the original file
+                diac = row["diacritized_content"] or ""
+                raw = row["raw_content"] or ""
+                stored = diac if diac.strip() else raw
+                return {
+                    "src": src,
+                    "stored": stored if stored.strip() else None,
+                    "stored_diacritized": bool(diac.strip()),
+                }
         st = dict(conn.execute("SELECT key, value FROM settings").fetchall())
     finally:
         conn.close()
@@ -151,7 +162,14 @@ async def export_docx(body: ExportRequest, request: Request) -> dict[str, Any]:
 
     if "src" in src:
         stats = await diacritize_docx(
-            src["src"], target, body.mode, body.level, body.include_comments, db_path
+            src["src"],
+            target,
+            body.mode,
+            body.level,
+            body.include_comments,
+            db_path,
+            stored=src.get("stored"),
+            stored_diacritized=src.get("stored_diacritized", False),
         )
     else:
         pipeline = None
