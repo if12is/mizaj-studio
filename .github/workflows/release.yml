@@ -136,9 +136,12 @@ jobs:
       # The catalog URLs are releases/latest/download/<name> with a static sha256. The packs are
       # byte-deterministic (stored zip members, fixed timestamps), so rebuilding on this runner must
       # reproduce the committed files and the catalog checksums exactly; otherwise fail the release.
-      - name: Build domain packs (.mizajpack) and verify they match the catalog checksums
+      # The packs embed a SQLite file whose header records the SQLite version, so bytes differ
+      # between platforms: rebuild packs AND catalog here, before the engine bundles the catalog,
+      # so the shipped checksums always match the assets this release publishes.
+      - name: Build domain packs (.mizajpack) and their catalog checksums
         run: |
-          python scripts/build_domain_packs.py --no-catalog
+          python scripts/build_domain_packs.py
           python scripts/build_domain_packs.py --check
 
       # Bootloader compiled from source + VERSIONINFO: avoids the prebuilt-bootloader
