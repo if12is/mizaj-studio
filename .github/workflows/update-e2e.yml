@@ -143,7 +143,14 @@ jobs:
             Start-Sleep -Seconds 2
           }
           Push-Location desktop
-          node scripts/update-e2e.mjs "$exe" "$want" "$ud"
+          if ('${{ inputs.mode }}' -eq 'local') {
+            node scripts/update-e2e.mjs "$exe" "$want" "$ud"
+          } else {
+            # Release builds have the inspect fuse off, so Playwright cannot attach:
+            # drive the banner through Windows UI Automation instead.
+            python -m pip install --quiet pywinauto==0.6.8
+            python scripts/update-e2e-uia.py "$exe" "$want" "$ud"
+          }
           $uiExit = $LASTEXITCODE
           Pop-Location
           if ($uiExit -ne 0) { throw "updater UI flow failed ($uiExit)" }
