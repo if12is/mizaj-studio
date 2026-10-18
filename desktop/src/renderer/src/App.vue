@@ -71,6 +71,13 @@ async function selectDocument(id: number): Promise<void> {
   if (d.diacritized_content) editor.diacritizedDocs = { ...editor.diacritizedDocs, [id]: true }
 }
 
+/** The open document is being deleted: drop pending autosave and empty the editor. */
+function closeCurrent(): void {
+  switchSeq++
+  autosave.setDocument(null)
+  pane.value?.setText('')
+}
+
 const flushNow = (): void => void autosave.flush()
 let offFlush: (() => void) | undefined
 
@@ -158,7 +165,7 @@ onBeforeUnmount(() => {
       {{ editor.announcement }}
     </div>
     <div class="flex min-h-0 flex-1">
-      <Sidebar @select-document="selectDocument" />
+      <Sidebar @select-document="selectDocument" @closing-current="closeCurrent" />
       <main class="flex min-w-0 flex-1 flex-col" aria-label="المحتوى الرئيسي">
         <div
           class="flex items-center justify-between border-b border-slate-200 px-3 py-1 dark:border-slate-700"

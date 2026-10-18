@@ -39,6 +39,40 @@ export const useProjectsStore = defineStore('projects', () => {
     await loadDocuments(projectId)
     return d
   }
+  async function renameProject(id: number, name: string): Promise<void> {
+    const p = await useApi().put<Project>(`/api/projects/${id}`, { name })
+    projects.value = projects.value.map((x) => (x.id === id ? p : x))
+  }
+  async function deleteProject(id: number): Promise<void> {
+    await useApi().del(`/api/projects/${id}`)
+    projects.value = projects.value.filter((x) => x.id !== id)
+    const rest = { ...documents.value }
+    delete rest[id]
+    documents.value = rest
+    if (currentProjectId.value === id) currentProjectId.value = null
+    if (currentDocument.value?.project_id === id) currentDocument.value = null
+  }
+  async function renameDocument(id: number, title: string): Promise<void> {
+    const d = await useApi().put<DocumentFull>(`/api/documents/${id}`, { title })
+    const list = documents.value[d.project_id]
+    if (list) {
+      documents.value = {
+        ...documents.value,
+        [d.project_id]: list.map((x) => (x.id === id ? { ...x, title: d.title } : x))
+      }
+    }
+    if (currentDocument.value?.id === id) {
+      currentDocument.value = { ...currentDocument.value, title: d.title }
+    }
+  }
+  async function deleteDocument(id: number, projectId: number): Promise<void> {
+    await useApi().del(`/api/documents/${id}`)
+    const list = documents.value[projectId]
+    if (list) {
+      documents.value = { ...documents.value, [projectId]: list.filter((x) => x.id !== id) }
+    }
+    if (currentDocument.value?.id === id) currentDocument.value = null
+  }
   /** Fetch only; does not change the current document. */
   function fetchDocument(id: number): Promise<DocumentFull> {
     return useApi().get<DocumentFull>(`/api/documents/${id}`)
@@ -74,6 +108,10 @@ export const useProjectsStore = defineStore('projects', () => {
     currentDocument,
     loadProjects,
     loadDocuments,
+    renameProject,
+    deleteProject,
+    renameDocument,
+    deleteDocument,
     createProject,
     createDocument,
     selectDocument,

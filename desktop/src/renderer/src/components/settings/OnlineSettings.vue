@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, reactive } from 'vue'
+import { computed, onBeforeUnmount, onMounted, reactive } from 'vue'
 import { useOnlineStore } from '@renderer/stores/online'
 import { useSettingsStore } from '@renderer/stores/settings'
 import { openExternal } from '@renderer/lib/native'
@@ -28,6 +28,12 @@ onMounted(() => {
 onBeforeUnmount(() => online.dispose())
 
 const isOn = (k: (typeof ONLINE_KEYS)[number]): boolean => settings.values[k] === 'true'
+const ollamaModels = computed<string[]>(() => {
+  const found = online.tools?.ollama?.models ?? []
+  const saved = settings.values.ollama_model
+  return saved && !found.includes(saved) ? [saved, ...found] : found
+})
+const ollamaModel = computed(() => settings.values.ollama_model || ollamaModels.value[0] || '')
 const toolKeys = ['ollama', 'languagetool', 'tesseract'] as const
 </script>
 
@@ -58,6 +64,30 @@ const toolKeys = ['ollama', 'languagetool', 'tesseract'] as const
           {{ ONLINE_LABEL[k].title }}
         </label>
         <p class="text-xs text-slate-500">{{ ONLINE_LABEL[k].help }}</p>
+        <label
+          v-if="k === 'online_ollama' && isOn(k)"
+          class="mt-1 flex items-center gap-2 text-xs"
+          data-testid="ollama-model-row"
+        >
+          النموذج المستخدم
+          <select
+            class="rounded border px-2 py-0.5 dark:border-slate-600 dark:bg-slate-800"
+            dir="ltr"
+            data-testid="ollama-model-select"
+            :value="ollamaModel"
+            :disabled="!ollamaModels.length"
+            aria-label="نموذج Ollama"
+            @change="settings.update({ ollama_model: ($event.target as HTMLSelectElement).value })"
+          >
+            <option v-if="!ollamaModels.length" value="">
+              {{ online.tools?.ollama?.detected ? 'no models' : 'Ollama not detected' }}
+            </option>
+            <option v-for="m in ollamaModels" :key="m" :value="m">{{ m }}</option>
+          </select>
+          <button :class="btn" data-testid="ollama-model-refresh" @click="online.refreshTools()">
+            تحديث
+          </button>
+        </label>
         <p class="mt-1 text-xs" :data-testid="`leaves-${k.replace(/_/g, '-')}`">
           <b>ما يغادر جهازك:</b> {{ LEAVES_AR[k] }}
         </p>
