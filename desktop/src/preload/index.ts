@@ -87,6 +87,18 @@ const mizajAPI = {
   openPath: (p: string): Promise<string> => ipcRenderer.invoke('shell:open-path', p),
   openExternal: (url: string): Promise<boolean> => ipcRenderer.invoke('shell:open-external', url),
   relaunchApp: (): Promise<void> => ipcRenderer.invoke('app:relaunch'),
+  gemini: {
+    getState: (): Promise<unknown> => ipcRenderer.invoke('gemini:get-state'),
+    setConfig: (patch: Record<string, unknown>): Promise<unknown> =>
+      ipcRenderer.invoke('gemini:set-config', patch),
+    acceptConsent: (): Promise<unknown> => ipcRenderer.invoke('gemini:accept-consent'),
+    saveKey: (key: string): Promise<unknown> => ipcRenderer.invoke('gemini:save-key', key),
+    clearKey: (): Promise<unknown> => ipcRenderer.invoke('gemini:clear-key'),
+    testKey: (key?: string): Promise<unknown> => ipcRenderer.invoke('gemini:test-key', key),
+    models: (): Promise<unknown> => ipcRenderer.invoke('gemini:models'),
+    detectCli: (): Promise<unknown> => ipcRenderer.invoke('gemini:detect-cli'),
+    ask: (req: unknown): Promise<unknown> => ipcRenderer.invoke('gemini:ask', req)
+  },
   onBeforeQuitFlush: (cb: () => Promise<void>): (() => void) => {
     const handler = async (): Promise<void> => {
       try {

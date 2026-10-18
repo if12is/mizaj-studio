@@ -8,10 +8,15 @@ import { onMounted } from 'vue'
 import { useQualityStore } from '@renderer/stores/quality'
 import { useSettingsStore } from '@renderer/stores/settings'
 import NamesManager from './NamesManager.vue'
+import { useGeminiStore } from '@renderer/stores/gemini'
 
 const settings = useSettingsStore()
 const quality = useQualityStore()
-onMounted(() => void quality.loadTools())
+const gemini = useGeminiStore()
+onMounted(() => {
+  void quality.loadTools()
+  void gemini.load()
+})
 const on = (k: string, dflt = true): boolean => (settings.values[k] ?? String(dflt)) !== 'false'
 const set = (k: string, v: boolean): Promise<void> => settings.update({ [k]: String(v) })
 </script>
@@ -115,17 +120,11 @@ const set = (k: string, v: boolean): Promise<void> => settings.update({ [k]: Str
       </label>
       <p
         class="text-xs"
-        :class="quality.ollamaOn ? 'text-mizaj-emerald' : 'text-slate-500'"
-        data-testid="ollama-status"
+        :class="gemini.ready ? 'text-mizaj-emerald' : 'text-slate-500'"
+        data-testid="gemini-status"
       >
-        رأي Ollama المحلي في نافذة الكلمة:
-        {{
-          quality.ollamaOn
-            ? 'مفعّل'
-            : settings.values.online_ollama === 'true'
-              ? 'المفتاح مفعّل لكن Ollama غير مكتشف؛ شغّله على هذا الجهاز'
-              : 'غير مفعّل'
-        }}
+        مساعد Gemini (سؤال عن كلمة في نافذة الكلمة):
+        {{ gemini.ready ? 'مفعّل' : 'غير مفعّل (اختياري، من «الاتصال والموارد المجانية»)' }}
       </p>
     </div>
 

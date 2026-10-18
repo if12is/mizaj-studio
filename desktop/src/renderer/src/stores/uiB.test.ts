@@ -63,7 +63,7 @@ describe('settings store: openSettings + defaults', () => {
   })
   it('online features are off by default', () => {
     expect(DEFAULT_SETTINGS.online_resources).toBe('false')
-    expect(DEFAULT_SETTINGS.online_ollama).toBe('false')
+    expect(DEFAULT_SETTINGS.online_languagetool).toBe('false')
     expect(DEFAULT_SETTINGS.online_languagetool).toBe('false')
   })
 })
@@ -203,17 +203,17 @@ describe('online store', () => {
   it('turning a switch on persists it through the settings API', async () => {
     handler = (c) =>
       c.method === 'PUT'
-        ? { online_ollama: 'true' }
+        ? { online_languagetool: 'true' }
         : c.url === '/api/resources'
           ? { resources: [] }
           : {}
     const o = useOnlineStore()
-    await o.setSwitch('online_ollama', true)
+    await o.setSwitch('online_languagetool', true)
     const put = calls.find((c) => c.method === 'PUT')!
     expect(put.url).toBe('/api/settings')
-    expect(put.body).toEqual({ online_ollama: 'true' })
-    expect(useSettingsStore().values.online_ollama).toBe('true')
-    await o.setSwitch('online_ollama', false)
+    expect(put.body).toEqual({ online_languagetool: 'true' })
+    expect(useSettingsStore().values.online_languagetool).toBe('true')
+    await o.setSwitch('online_languagetool', false)
   })
   it('refuses a download without the license checkbox and makes no request', async () => {
     const o = useOnlineStore()

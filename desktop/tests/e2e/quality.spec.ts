@@ -147,11 +147,11 @@ test('proper nouns: add from the inspector, list/delete in the manager', async (
   await text('right-panel-close').click()
 })
 
-test("i'rab tab explains honestly; Ollama stays hidden when not enabled", async () => {
+test("i'rab tab explains honestly; Gemini stays hidden when not enabled", async () => {
   await setDoc('ذهب الولد إلى المدرسة', 6)
   await page.keyboard.press('Control+.')
   await expect(text('inspector')).toBeVisible()
-  await expect(text('ollama-opinion')).toHaveCount(0)
+  await expect(text('gemini-ask')).toHaveCount(0)
   await text('inspector-tab-irab').click()
   await expect(text('irab-panel')).toBeVisible()
   await expect(text('irab-panel')).toContainText('غير متأكد', { timeout: 10_000 })

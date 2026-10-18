@@ -11,6 +11,8 @@ import RightPanel from './components/RightPanel.vue'
 import FileMenu from './components/files/FileMenu.vue'
 import SplashScreen from './components/ui/SplashScreen.vue'
 import SuccessCheck from './components/ui/SuccessCheck.vue'
+import GeminiConsentDialog from './components/GeminiConsentDialog.vue'
+import { useGeminiStore } from './stores/gemini'
 import { editorReady } from './lib/boot'
 import { whenIdle } from './lib/idle'
 import { lazyDialog } from './lib/lazy'
@@ -41,6 +43,7 @@ const settings = useSettingsStore()
 const editor = useEditorStore()
 const proofread = useProofreadStore()
 const files = useFileStore()
+const gemini = useGeminiStore()
 const pane = ref<InstanceType<typeof EditorPane> | null>(null)
 
 const autosave = createAutosave({
@@ -84,6 +87,7 @@ let offFlush: (() => void) | undefined
 async function bootstrap(): Promise<void> {
   try {
     await settings.load()
+    void gemini.load()
     await projects.loadProjects()
   } catch {
     /* error toast shown by api client */
@@ -166,32 +170,35 @@ onBeforeUnmount(() => {
     </div>
     <div class="flex min-h-0 flex-1">
       <Sidebar @select-document="selectDocument" @closing-current="closeCurrent" />
-      <main class="flex min-w-0 flex-1 flex-col" aria-label="المحتوى الرئيسي">
-        <div
-          class="flex items-center justify-between border-b border-slate-200 px-3 py-1 dark:border-slate-700"
-        >
-          <div class="flex items-center gap-2">
-            <FileMenu />
-            <span class="text-sm font-semibold" data-testid="doc-title">
-              {{ projects.currentDocument?.title ?? 'لم يتم اختيار مستند' }}
-            </span>
-          </div>
-          <button
-            class="rounded px-2 py-1 text-sm hover:bg-slate-200 dark:hover:bg-slate-700"
-            data-testid="open-settings"
-            @click="settings.openSettings()"
+      <div class="flex min-w-0 flex-1 flex-col">
+        <main class="flex min-h-0 min-w-0 flex-1 flex-col" aria-label="المحتوى الرئيسي">
+          <div
+            class="flex items-center justify-between border-b border-slate-200 px-3 py-1 dark:border-slate-700"
           >
-            الإعدادات
-          </button>
-        </div>
-        <EditorPane
-          ref="pane"
-          :open-document="selectDocument"
-          :flush-save="autosave.flush"
-          @change="autosave.markDirty()"
-        />
-      </main>
-      <RightPanel :open-document="selectDocument" />
+            <div class="flex items-center gap-2">
+              <FileMenu />
+              <span class="text-sm font-semibold" data-testid="doc-title">
+                {{ projects.currentDocument?.title ?? 'لم يتم اختيار مستند' }}
+              </span>
+            </div>
+            <button
+              class="rounded px-2 py-1 text-sm hover:bg-slate-200 dark:hover:bg-slate-700"
+              data-testid="open-settings"
+              @click="settings.openSettings()"
+            >
+              الإعدادات
+            </button>
+          </div>
+          <EditorPane
+            ref="pane"
+            :open-document="selectDocument"
+            :flush-save="autosave.flush"
+            @change="autosave.markDirty()"
+          />
+        </main>
+        <RightPanel place="bottom" :open-document="selectDocument" />
+      </div>
+      <RightPanel place="side" :open-document="selectDocument" />
     </div>
     <StatusBar />
     <MotionTransition name="m-modal">
@@ -214,6 +221,7 @@ onBeforeUnmount(() => {
     </MotionTransition>
     <MotionTransition name="m-modal">
       <AboutDialog v-if="editor.aboutOpen" />
+      <GeminiConsentDialog v-if="gemini.consentOpen" />
     </MotionTransition>
     <MotionGroup
       tag="div"

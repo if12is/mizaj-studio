@@ -26,9 +26,13 @@ export const DEFAULT_SETTINGS: SettingsMap = {
   proofread_before_tashkeel: 'ask',
   ya_style: 'standard',
   theme: 'dark',
+  // side panel layout: size in px ('' = default), dock side|bottom, collapsed true|false
+  panel_width: '',
+  panel_height: '',
+  panel_dock: 'side',
+  panel_collapsed: 'false',
   // opt-in online features (AGENTS.md section 5): always off until the user turns them on
   online_resources: 'false',
-  online_ollama: 'false',
   online_languagetool: 'false'
 }
 

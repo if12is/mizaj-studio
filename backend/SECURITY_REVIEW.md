@@ -58,7 +58,7 @@ Severity is the risk before the fix. IDs are stable; tests are in `tests/test_ph
 * **SQL**: every other statement is parameterised (AST scan in `test_no_dynamic_sql_outside_vetted_sites`).
 * **Logging**: no document text, headers or tokens are logged (`test_document_text_not_logged`, `test_token_never_logged`); validation errors never echo the offending input; unhandled errors return a fixed envelope without traceback (`test_unhandled_errors_have_no_traceback_*`). Residual: `log.exception` writes a traceback to the *local* log file, and an exception message could in principle embed a text fragment.
 * **Cross-origin simple requests** (dev mode, no token): body is only parsed as JSON (`test_cross_origin_simple_requests_cannot_mutate_lock`).
-* **Local tool URLs** (Ollama, LanguageTool): `net.local_request` accepts loopback only (existing test).
+* **Local tool URLs** (LanguageTool): `net.local_request` accepts loopback only (existing test).
 
 ## 3. Residual risks / follow-ups
 

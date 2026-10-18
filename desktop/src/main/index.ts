@@ -10,6 +10,7 @@ import { cleanupUserData, restrictPermissions } from './userData'
 import { setFileIpcLogger } from './fileIpc'
 import { isPortable, resolveUserDataDir } from './paths'
 import { registerDiagnostics } from './diagnosticsIpc'
+import { registerGemini } from './gemini/ipc'
 import { PythonProcessManager, resolveSidecar, STATUS_EVENT } from './pythonManager'
 import { broadcastStatus, createMainWindow, registerIpc, requestFlush } from './window'
 import { UPDATER_STATUS_CHANNEL, UpdaterController, type UpdaterLike } from './updater'
@@ -139,6 +140,7 @@ Menu.setApplicationMenu(
 )
 
 registerDiagnostics({ manager, log, portable: isPortable(process.env), apiToken })
+registerGemini()
 
 void app.whenReady().then(() => {
   log.info('Mizaj Studio starting, userData=', app.getPath('userData'))

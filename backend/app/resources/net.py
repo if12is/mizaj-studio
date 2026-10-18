@@ -2,7 +2,7 @@
 
 * `download()` - public HTTPS downloads: requires the matching `online_*` switch, a host on the
   allowlist (re-checked on every redirect), logs every request, resumes partial files.
-* `local_request()` - loopback-only JSON calls to free local tools (Ollama, LanguageTool).
+* `local_request()` - loopback-only JSON calls to free local tools (LanguageTool).
 """
 
 from __future__ import annotations
@@ -31,7 +31,7 @@ from app.core.errors import MizajError
 
 log = logging.getLogger("mizaj.net")
 
-ONLINE_KEYS = ("online_resources", "online_ollama", "online_languagetool")
+ONLINE_KEYS = ("online_resources", "online_languagetool")
 LOOPBACK = {"127.0.0.1", "localhost", "::1"}
 ALLOWED_HOSTS: set[str] = {
     "tanzil.net",
@@ -76,7 +76,6 @@ def status(db_path: Path) -> dict[str, Any]:
         "leaves_device": {
             "online_resources": "Only the download request for the chosen public file "
             "(URL, your IP); no document text or personal data is sent.",
-            "online_ollama": "Nothing leaves the device (loopback 127.0.0.1 only).",
             "online_languagetool": "Nothing leaves the device (loopback 127.0.0.1 only).",
         },
         "recent_requests": list(REQUEST_LOG)[-20:],

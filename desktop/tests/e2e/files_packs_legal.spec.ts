@@ -297,7 +297,7 @@ test('backup export then inspect; restore needs explicit confirmation', async ()
 // ---------------------------------------------------------------- online & Quran
 test('online switches default to off and the app made no network requests', async () => {
   await openSettings('online')
-  for (const k of ['resources', 'ollama', 'languagetool']) {
+  for (const k of ['resources', 'languagetool']) {
     await expect(t(`switch-online-${k}`)).not.toBeChecked()
     await expect(t(`leaves-online-${k}`)).toContainText('ما يغادر جهازك')
   }
@@ -306,7 +306,7 @@ test('online switches default to off and the app made no network requests', asyn
     switches: Record<string, boolean>
     recent_requests: unknown[]
   }>('GET', '/api/online/status')
-  expect(Object.values(st.switches)).toEqual([false, false, false])
+  expect(Object.values(st.switches)).toEqual([false, false])
   expect(st.recent_requests).toEqual([])
 
   // resources catalog renders; downloads need the switch AND a license acceptance
@@ -329,20 +329,20 @@ test('online switches default to off and the app made no network requests', asyn
   expect(shellLog.some((e) => e.kind === 'external' && e.target.startsWith('https://'))).toBe(true)
 
   // turning one on is explicit and persisted
-  await t('switch-online-ollama').check()
+  await t('switch-online-languagetool').check()
   await expect
     .poll(
       async () =>
         (await api<{ switches: Record<string, boolean> }>('GET', '/api/online/status')).switches
-          .online_ollama
+          .online_languagetool
     )
     .toBe(true)
-  await t('switch-online-ollama').uncheck()
+  await t('switch-online-languagetool').uncheck()
   await expect
     .poll(
       async () =>
         (await api<{ switches: Record<string, boolean> }>('GET', '/api/online/status')).switches
-          .online_ollama
+          .online_languagetool
     )
     .toBe(false)
   const after = await api<{ recent_requests: unknown[] }>('GET', '/api/online/status')

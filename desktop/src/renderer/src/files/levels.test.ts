@@ -2,18 +2,18 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
-const read = (rel: string): string =>
-  readFileSync(resolve(__dirname, '..', rel), 'utf8')
+const read = (rel: string): string => readFileSync(resolve(__dirname, '..', rel), 'utf8')
 
 const LABEL = 'إلزامي: أواخر الكلمات والتنوين والشدة'
 
 describe('tashkeel level "essential"', () => {
-  it.each(['components/SettingsModal.vue', 'components/EditorPane.vue', 'components/files/BatchDialog.vue'])(
-    '%s offers the essential level with its Arabic label',
-    (file) => {
-      expect(read(file)).toContain(`<option value="essential">${LABEL}</option>`)
-    }
-  )
+  it.each([
+    'components/SettingsModal.vue',
+    'components/EditorPane.vue',
+    'components/files/BatchDialog.vue'
+  ])('%s offers the essential level with its Arabic label', (file) => {
+    expect(read(file)).toContain(`<option value="essential">${LABEL}</option>`)
+  })
 
   it('the batch form type allows it', () => {
     expect(read('files/batch.ts')).toContain("'essential'")

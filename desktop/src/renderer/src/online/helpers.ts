@@ -1,16 +1,12 @@
 import { ApiError } from '@renderer/api/client'
 
-export const ONLINE_KEYS = ['online_resources', 'online_ollama', 'online_languagetool'] as const
+export const ONLINE_KEYS = ['online_resources', 'online_languagetool'] as const
 export type OnlineKey = (typeof ONLINE_KEYS)[number]
 
 export const ONLINE_LABEL: Record<OnlineKey, { title: string; help: string }> = {
   online_resources: {
     title: 'تنزيل الموارد المجانية العامة',
     help: 'يسمح بتنزيل ملفات عامة مجانية (قواميس، نص القرآن من Tanzil، نماذج) من مضيفين محددين فقط، مع التحقق من الاختزال والترخيص.'
-  },
-  online_ollama: {
-    title: 'رأي ثانٍ من Ollama المحلي',
-    help: 'يتصل ببرنامج Ollama الذي ثبّتّه أنت على جهازك (127.0.0.1) لاقتراحات اختيارية لا تُطبَّق تلقائياً.'
   },
   online_languagetool: {
     title: 'LanguageTool المحلي',
@@ -29,7 +25,6 @@ export interface OnlineStatus {
 export const LEAVES_AR: Record<OnlineKey, string> = {
   online_resources:
     'يغادر جهازك طلب تنزيل الملف العام المختار فقط (العنوان وعنوان الـIP)؛ لا يُرسل أي نص من مستنداتك ولا بيانات شخصية.',
-  online_ollama: 'لا يغادر جهازك شيء (اتصال محلي عبر 127.0.0.1 فقط).',
   online_languagetool: 'لا يغادر جهازك شيء (اتصال محلي عبر 127.0.0.1 فقط).'
 }
 
@@ -83,7 +78,6 @@ export const RESOURCE_KIND_LABEL: Record<string, string> = {
 }
 
 export interface ToolsStatus {
-  ollama: { detected: boolean; url: string; models: string[] }
   languagetool: { detected: boolean; url: string; arabic: boolean }
   tesseract: {
     detected: boolean
@@ -95,11 +89,6 @@ export interface ToolsStatus {
 }
 
 export const TOOL_INFO = {
-  ollama: {
-    title: 'Ollama',
-    install: 'نزّل Ollama وثبّته، ثم شغّله ونزّل نموذجاً من اختيارك.',
-    url: 'https://ollama.com/download'
-  },
   languagetool: {
     title: 'LanguageTool',
     install: 'نزّل LanguageTool (نسخة الخادم)، وشغّل الخادم المحلي على المنفذ 8081.',

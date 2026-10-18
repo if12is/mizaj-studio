@@ -5,12 +5,14 @@ import { notify } from '@renderer/api/toast'
 import type { ConfConfig } from '@renderer/editor/confidence'
 import type { CorrectionInfo, InspectorConfig, IrabInfo } from '@renderer/editor/inspector'
 import { protectedSpans, type QuranConfig } from '@renderer/editor/quran'
+import { useGeminiStore } from '@renderer/stores/gemini'
 import { useQualityStore } from '@renderer/stores/quality'
 import { useSettingsStore } from '@renderer/stores/settings'
 
 /** Glue between the editor extensions (confidence, review, Quran, inspector extras) and the API. */
 export function useEditorQuality(getView: () => EditorView | null) {
   const quality = useQualityStore()
+  const gemini = useGeminiStore()
   const settings = useSettingsStore()
   const api = (): ReturnType<typeof useApi> => useApi()
 
@@ -48,8 +50,8 @@ export function useEditorQuality(getView: () => EditorView | null) {
     | 'acceptCorrection'
     | 'fetchIrab'
     | 'addProperNoun'
-    | 'ollamaEnabled'
-    | 'ollamaSuggest'
+    | 'geminiEnabled'
+    | 'geminiAsk'
     | 'protectedSpans'
   > = {
     recordCorrection: async (engineForm, userForm) => {
@@ -101,14 +103,11 @@ export function useEditorQuality(getView: () => EditorView | null) {
         if (e instanceof ApiError) notify(e.messageAr)
       }
     },
-    ollamaEnabled: () => quality.ollamaOn,
-    ollamaSuggest: (sentence) =>
-      api().request(
-        'POST',
-        '/api/tools/ollama/suggest',
-        { text: sentence, model: quality.ollamaModel },
-        true
-      ),
+    geminiEnabled: () => gemini.ready,
+    geminiAsk: async (question, word, sentence) => {
+      const r = await gemini.ask({ kind: 'word', question, word, sentence })
+      return { ok: r.ok, text: r.text, suggestion: r.suggestion, message: r.message }
+    },
     protectedSpans: (state) => protectedSpans(state)
   }
 

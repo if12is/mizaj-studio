@@ -32,11 +32,13 @@ export interface InspectorConfig {
   fetchIrab?(word: string, context: string, index: number): Promise<IrabInfo>
   /** 7.4.3 explicit action */
   addProperNoun?(bareWord: string, form: string): Promise<void>
-  /** 7.8.2 (only when enabled and detected) */
-  ollamaEnabled?(): boolean
-  ollamaSuggest?(
+  /** optional Gemini assistant (opt-in): suggests or confirms a doubt, never edits by itself */
+  geminiEnabled?(): boolean
+  geminiAsk?(
+    question: string,
+    word: string,
     sentence: string
-  ): Promise<{ accepted: boolean; text: string | null; reason: string | null }>
+  ): Promise<{ ok: boolean; text: string; suggestion: string | null; message: string | null }>
   /** 7.4.1 protected spans (apply-to-all never touches them) */
   protectedSpans?(state: EditorState): SpanLike[]
 }
@@ -380,67 +382,112 @@ export function inspectorExtension(cfg: InspectorConfig) {
           dom.append(tabs, irabBox)
         }
 
-        // 7.8.2: optional local second opinion, only when enabled and detected
-        if (cfg.ollamaEnabled?.() && cfg.ollamaSuggest) {
+        // Optional Gemini assistant: ask about a rule / confirm a doubt about this word in its sentence
+        if (cfg.geminiEnabled?.() && cfg.geminiAsk) {
           const box = document.createElement('div')
-          box.className = 'mi-ollama'
-          box.dataset.testid = 'ollama-box'
-          const ask = btn(
-            'رأي ثانٍ (Ollama محلي)',
-            'ollama-opinion',
-            () => {
-              const sb = sentenceBounds(view.state.doc, v.from)
-              const sentence = view.state.doc.sliceString(sb.from, sb.to)
-              box.append(
-                Object.assign(document.createElement('div'), { textContent: 'جاري الاستشارة...' })
-              )
-              void cfg
-                .ollamaSuggest?.(sentence)
-                .then((r) => {
-                  box.lastElementChild?.remove()
-                  if (!r.accepted || !r.text) {
-                    box.append(
-                      Object.assign(document.createElement('div'), {
-                        textContent: `لا اقتراح (${r.reason ?? 'غير مقبول'})`
-                      })
-                    )
-                    return
-                  }
-                  const out = document.createElement('div')
-                  out.dataset.testid = 'ollama-diff'
-                  out.className = 'mi-diff'
-                  out.append(renderWordDiff(sentence, r.text))
-                  const suggestion = r.text
-                  out.append(
-                    btn(
-                      'تطبيق اقتراح Ollama',
-                      'ollama-apply',
-                      () => {
-                        const cur = sentenceBounds(view.state.doc, view.state.selection.main.head)
-                        const edits = diffMarkEdits(
-                          view.state.doc.sliceString(cur.from, cur.to),
-                          suggestion,
-                          cur.from
-                        )
-                        if (edits) view.dispatch(editsToSpec(view.state, edits, 'tashkeel.ollama'))
-                      },
-                      'mi-act'
-                    )
-                  )
-                  box.append(out)
-                })
-                .catch(() => {
-                  box.lastElementChild?.remove()
-                  box.append(
+          box.className = 'mi-gemini'
+          box.dataset.testid = 'gemini-box'
+          const form = document.createElement('div')
+          form.hidden = true
+          const input = document.createElement('input')
+          input.type = 'text'
+          input.className = 'mi-gemini-input'
+          input.dataset.testid = 'gemini-word-question'
+          input.value = 'هل إعراب هذه الكلمة صحيح؟'
+          input.setAttribute('aria-label', 'سؤالك عن الكلمة')
+          const result = document.createElement('div')
+          result.dataset.testid = 'gemini-word-result'
+          const run = (): void => {
+            const question = input.value.trim()
+            if (!question) return
+            const sb = sentenceBounds(view.state.doc, v.from)
+            const sentence = view.state.doc.sliceString(sb.from, sb.to)
+            result.replaceChildren(
+              Object.assign(document.createElement('div'), { textContent: 'جاري الاستشارة...' })
+            )
+            void cfg
+              .geminiAsk?.(question, word, sentence)
+              .then((r) => {
+                result.replaceChildren()
+                if (!r.ok) {
+                  result.append(
                     Object.assign(document.createElement('div'), {
-                      textContent: 'تعذر الاتصال بـ Ollama المحلي.'
+                      textContent: r.message ?? 'تعذر الحصول على رد.',
+                      className: 'mi-gemini-err'
                     })
                   )
-                })
-            },
-            'mi-act'
+                  return
+                }
+                result.append(
+                  Object.assign(document.createElement('div'), {
+                    textContent: r.text,
+                    className: 'mi-gemini-answer'
+                  })
+                )
+                result.lastElementChild!.setAttribute('data-testid', 'gemini-word-answer')
+                const suggestion = r.suggestion
+                if (!suggestion) return
+                const out = document.createElement('div')
+                out.dataset.testid = 'gemini-diff'
+                out.className = 'mi-diff'
+                const sg = diffMarkEdits(sentence, suggestion, sb.from)
+                if (!sg) {
+                  // base letters differ: show as text only, never offer to apply
+                  out.append(
+                    Object.assign(document.createElement('div'), {
+                      textContent: `اقتراح للاطلاع فقط (يغيّر الحروف الأصلية فلا يمكن تطبيقه): ${suggestion}`
+                    })
+                  )
+                  out.dataset.textOnly = '1'
+                  result.append(out)
+                  return
+                }
+                out.append(renderWordDiff(sentence, suggestion))
+                out.append(
+                  btn(
+                    'تطبيق',
+                    'gemini-apply',
+                    () => {
+                      const cur = sentenceBounds(view.state.doc, view.state.selection.main.head)
+                      const edits = diffMarkEdits(
+                        view.state.doc.sliceString(cur.from, cur.to),
+                        suggestion,
+                        cur.from
+                      )
+                      if (edits) view.dispatch(editsToSpec(view.state, edits, 'tashkeel.gemini'))
+                    },
+                    'mi-act'
+                  )
+                )
+                result.append(out)
+              })
+              .catch(() => {
+                result.replaceChildren(
+                  Object.assign(document.createElement('div'), {
+                    textContent: 'تعذر الحصول على رد من Gemini.'
+                  })
+                )
+              })
+          }
+          input.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault()
+              run()
+            }
+          })
+          form.append(input, btn('إرسال', 'gemini-word-send', run, 'mi-act'), result)
+          box.append(
+            btn(
+              'اسأل عن قاعدة / تأكيد شك',
+              'gemini-ask',
+              () => {
+                form.hidden = !form.hidden
+                if (!form.hidden) input.focus()
+              },
+              'mi-act'
+            ),
+            form
           )
-          box.append(ask)
           dom.append(box)
         }
         // Suggestions arrive asynchronously and grow the box; re-measure so CodeMirror flips the

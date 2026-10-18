@@ -1,0 +1,71 @@
+import { existsSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
+
+export type GeminiProvider = 'api' | 'cli'
+
+/** Non-secret Gemini assistant settings; kept by the main process so it can enforce them. */
+export interface GeminiConfig {
+  enabled: boolean
+  provider: GeminiProvider
+  model: string
+  /** user opted in to the installed Gemini CLI */
+  useCli: boolean
+  /** ISO time the user accepted the "text is sent to Google" notice; null = not yet */
+  consentAt: string | null
+}
+
+export const DEFAULT_CONFIG: GeminiConfig = {
+  enabled: false,
+  provider: 'api',
+  model: '',
+  useCli: false,
+  consentAt: null
+}
+
+export function sanitizeConfig(raw: unknown): GeminiConfig {
+  const o = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>
+  return {
+    enabled: o.enabled === true,
+    provider: o.provider === 'cli' ? 'cli' : 'api',
+    model: typeof o.model === 'string' && /^[A-Za-z0-9._\-/]{0,120}$/.test(o.model) ? o.model : '',
+    useCli: o.useCli === true,
+    consentAt: typeof o.consentAt === 'string' && o.consentAt.length < 40 ? o.consentAt : null
+  }
+}
+
+export class GeminiConfigStore {
+  private cache: GeminiConfig | null = null
+  constructor(private readonly file: string) {}
+
+  get(): GeminiConfig {
+    if (this.cache) return this.cache
+    let raw: unknown = null
+    try {
+      if (existsSync(this.file)) raw = JSON.parse(readFileSync(this.file, 'utf8'))
+    } catch {
+      raw = null
+    }
+    this.cache = sanitizeConfig(raw)
+    return this.cache
+  }
+
+  /** Merge a renderer patch; `consentAt` can only be set through acceptConsent(). */
+  update(patch: unknown): GeminiConfig {
+    const p = (patch && typeof patch === 'object' ? patch : {}) as Record<string, unknown>
+    const cur = this.get()
+    const next = sanitizeConfig({ ...cur, ...p, consentAt: cur.consentAt })
+    return this.write(next)
+  }
+
+  acceptConsent(now: () => Date = () => new Date()): GeminiConfig {
+    const cur = this.get()
+    return this.write({ ...cur, consentAt: cur.consentAt ?? now().toISOString() })
+  }
+
+  private write(c: GeminiConfig): GeminiConfig {
+    this.cache = c
+    const tmp = `${this.file}.tmp`
+    writeFileSync(tmp, JSON.stringify(c), { mode: 0o600 })
+    renameSync(tmp, this.file)
+    return c
+  }
+}

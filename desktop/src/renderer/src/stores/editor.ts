@@ -70,7 +70,7 @@ export const useEditorStore = defineStore('editor', () => {
   /** Text before the last diacritization run (left side of the diff view). */
   const diffBase = ref<string | null>(null)
   const showDiff = ref(false)
-  const rightPanel = ref<'spelling' | 'legal' | 'poetry' | 'quality' | null>(null)
+  const rightPanel = ref<'spelling' | 'legal' | 'poetry' | 'quality' | 'gemini' | null>(null)
   /** The legal panel asks for extra width (side-by-side comparison). */
   const legalWide = ref(false)
   const findOpen = ref(false)

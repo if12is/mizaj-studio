@@ -1,4 +1,4 @@
-"""Detect free local tools: Ollama, LanguageTool server, Tesseract (7.8.4)."""
+"""Detect free local tools: LanguageTool server, Tesseract (7.8.4)."""
 
 from __future__ import annotations
 
@@ -10,7 +10,6 @@ from typing import Any
 
 from app.resources import net
 
-OLLAMA_DEFAULT = "http://127.0.0.1:11434"
 LT_DEFAULT = "http://127.0.0.1:8081"
 WIN_TESSERACT = [
     r"C:\Program Files\Tesseract-OCR\tesseract.exe",
@@ -24,22 +23,8 @@ INSTALL_HINT = (
 )
 
 
-def ollama_url() -> str:
-    return os.environ.get("MIZAJ_OLLAMA_URL", OLLAMA_DEFAULT)
-
-
 def languagetool_url() -> str:
     return os.environ.get("MIZAJ_LANGUAGETOOL_URL", LT_DEFAULT)
-
-
-def detect_ollama(timeout: float = 0.5) -> dict[str, Any]:
-    url = ollama_url()
-    try:
-        data = net.local_request(url, "/api/tags", timeout=timeout)
-        models = [m.get("name", "") for m in data.get("models", []) if isinstance(m, dict)]
-        return {"detected": True, "url": url, "models": models}
-    except Exception as exc:  # noqa: BLE001
-        return {"detected": False, "url": url, "models": [], "reason": type(exc).__name__}
 
 
 def detect_languagetool(timeout: float = 0.5) -> dict[str, Any]:
@@ -95,7 +80,6 @@ def detect_tesseract() -> dict[str, Any]:
 
 def detect_all() -> dict[str, Any]:
     return {
-        "ollama": detect_ollama(),
         "languagetool": detect_languagetool(),
         "tesseract": detect_tesseract(),
     }

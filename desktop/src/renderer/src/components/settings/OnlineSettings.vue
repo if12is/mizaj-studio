@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, reactive } from 'vue'
+import { onBeforeUnmount, onMounted, reactive } from 'vue'
 import { useOnlineStore } from '@renderer/stores/online'
 import { useSettingsStore } from '@renderer/stores/settings'
 import { openExternal } from '@renderer/lib/native'
+import GeminiSettings from './GeminiSettings.vue'
 import {
   LEAVES_AR,
   ONLINE_KEYS,
@@ -28,13 +29,7 @@ onMounted(() => {
 onBeforeUnmount(() => online.dispose())
 
 const isOn = (k: (typeof ONLINE_KEYS)[number]): boolean => settings.values[k] === 'true'
-const ollamaModels = computed<string[]>(() => {
-  const found = online.tools?.ollama?.models ?? []
-  const saved = settings.values.ollama_model
-  return saved && !found.includes(saved) ? [saved, ...found] : found
-})
-const ollamaModel = computed(() => settings.values.ollama_model || ollamaModels.value[0] || '')
-const toolKeys = ['ollama', 'languagetool', 'tesseract'] as const
+const toolKeys = ['languagetool', 'tesseract'] as const
 </script>
 
 <template>
@@ -46,7 +41,8 @@ const toolKeys = ['ollama', 'languagetool', 'tesseract'] as const
       <p>
         مِزَاج يعمل بالكامل دون إنترنت. الخيارات أدناه <b>اختيارية ومعطّلة افتراضياً</b>: تنزيل
         موارد مجانية عامة، أو الاستفادة من أدوات مجانية تثبّتها أنت على جهازك. لا يوجد خادم تابع
-        للمشروع ولا حسابات ولا مزامنة، ولا يُرسل نص مستنداتك إلى أي جهة.
+        للمشروع ولا حسابات ولا مزامنة، ولا يُرسل نص مستنداتك إلى أي جهة، إلا إذا فعّلتَ بنفسك «مساعد
+        Gemini» أدناه (اختياري ومعطّل افتراضياً).
       </p>
     </section>
 
@@ -64,30 +60,6 @@ const toolKeys = ['ollama', 'languagetool', 'tesseract'] as const
           {{ ONLINE_LABEL[k].title }}
         </label>
         <p class="text-xs text-slate-500">{{ ONLINE_LABEL[k].help }}</p>
-        <label
-          v-if="k === 'online_ollama' && isOn(k)"
-          class="mt-1 flex items-center gap-2 text-xs"
-          data-testid="ollama-model-row"
-        >
-          النموذج المستخدم
-          <select
-            class="rounded border px-2 py-0.5 dark:border-slate-600 dark:bg-slate-800"
-            dir="ltr"
-            data-testid="ollama-model-select"
-            :value="ollamaModel"
-            :disabled="!ollamaModels.length"
-            aria-label="نموذج Ollama"
-            @change="settings.update({ ollama_model: ($event.target as HTMLSelectElement).value })"
-          >
-            <option v-if="!ollamaModels.length" value="">
-              {{ online.tools?.ollama?.detected ? 'no models' : 'Ollama not detected' }}
-            </option>
-            <option v-for="m in ollamaModels" :key="m" :value="m">{{ m }}</option>
-          </select>
-          <button :class="btn" data-testid="ollama-model-refresh" @click="online.refreshTools()">
-            تحديث
-          </button>
-        </label>
         <p class="mt-1 text-xs" :data-testid="`leaves-${k.replace(/_/g, '-')}`">
           <b>ما يغادر جهازك:</b> {{ LEAVES_AR[k] }}
         </p>
@@ -104,6 +76,8 @@ const toolKeys = ['ollama', 'languagetool', 'tesseract'] as const
         Allowed hosts: {{ online.status.allowed_hosts.join(', ') }}
       </p>
     </section>
+
+    <GeminiSettings />
 
     <section class="space-y-1" data-testid="online-log">
       <h3 class="font-semibold">آخر الطلبات الصادرة</h3>
@@ -280,9 +254,6 @@ const toolKeys = ['ollama', 'languagetool', 'tesseract'] as const
               صفحة التنزيل (يُفتح في المتصفح)
             </button>
           </template>
-          <p v-else-if="online.tools && t === 'ollama'" class="text-xs text-slate-500" dir="ltr">
-            {{ online.tools.ollama.models.join(', ') || 'no models' }}
-          </p>
         </li>
       </ul>
     </section>
