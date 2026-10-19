@@ -24,6 +24,7 @@ from app.engine.normalize import (
     WORD_RE,
     apply_engine_marks,
     engine_letters,
+    fix_alef_marks,
     has_arabic_letters,
     join_pairs,
     reduce_level,
@@ -171,6 +172,8 @@ class TashkeelPipeline:
         if self.irab_rules_on:
             raw, irab_changes = self._irab(raw, spans, confs)
         raw = self._apply_names(raw, spans, conn)
+        if self.engine.name != "mock":  # the mock vowelizer is a fixed, documented output
+            raw = fix_alef_marks(raw)  # `لاَ` / `الاِ` / `لَاَ` -> `لَا` / `الِا` (mark on the lam)
         if self.fixes_on:  # grammar + legal-lexicon corrections (legal_fix.py)
             raw, _ = legal_fix.apply_fixes(stripped, spans, raw, self.fix_oracle, left, right)
         out = self._apply_level(raw, spans, conn, confs)

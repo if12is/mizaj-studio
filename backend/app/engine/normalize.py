@@ -56,6 +56,58 @@ def canon_marks(marks: str) -> str:
     return "".join(sorted(seen, key=lambda m: _ORDER.get(m, 1)))
 
 
+_SHORT = "َُِ"  # fatha, damma, kasra
+_TANWEEN_FATHA = "ً"
+_VOWEL_MARKS = "ًٌٍ" + _SHORT
+_SUKUN = "ْ"
+
+
+def normalize_alef_marks(pairs: list[tuple[str, str]]) -> list[tuple[str, str]]:
+    """Gold convention: a plain alef inside a word never carries a mark; the vowel sits on the
+    letter before it (`لَا`, `الِا`, `عَمَلًا`), never `لاَ` / `الاِ` / `لَاَ` / `عَمَلاً`.
+
+    Word-level (pairs of ONE word). A vowel on a non-initial plain alef is moved onto the
+    previous letter when that letter has no vowel (a sukun is replaced), and dropped when the
+    previous letter already carries the same vowel (`لَاَبَسَتْ` -> `لَابَسَتْ`). A different
+    vowel on the previous letter is left alone (it may be a hamza written as a bare alef).
+    Only marks change, never a base letter."""
+    out = list(pairs)
+    last = len(out) - 1
+    for k in range(1, len(out)):
+        base, marks = out[k]
+        if base != "ا" or not marks:
+            continue
+        pb, pm = out[k - 1]
+        if pb == "ـ" or not has_arabic_letters(pb):
+            continue
+        prev_vowels = [c for c in pm if c in _VOWEL_MARKS]
+        shadda = SHADDA if SHADDA in pm else ""
+        if marks in _SHORT:
+            if not prev_vowels:
+                out[k - 1] = (pb, canon_marks(shadda + marks))
+                out[k] = (base, "")
+            elif prev_vowels == [marks]:
+                out[k] = (base, "")
+        elif marks == _TANWEEN_FATHA and k == last:
+            if prev_vowels == [_TANWEEN_FATHA]:
+                out[k] = (base, "")
+            elif not prev_vowels or prev_vowels == ["َ"]:
+                out[k - 1] = (pb, canon_marks(shadda + _TANWEEN_FATHA))
+                out[k] = (base, "")
+    return out
+
+
+def fix_alef_marks(text: str) -> str:
+    """`normalize_alef_marks` over every Arabic word of `text` (marks only)."""
+
+    def one(m: re.Match[str]) -> str:
+        pairs = split_pairs(m.group(0), canon=False)
+        new = normalize_alef_marks(pairs)
+        return m.group(0) if new == pairs else join_pairs(new)
+
+    return WORD_RE.sub(one, text)
+
+
 def join_pairs(pairs: list[tuple[str, str]]) -> str:
     return "".join(b + m for b, m in pairs)
 

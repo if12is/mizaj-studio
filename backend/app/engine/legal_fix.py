@@ -21,7 +21,13 @@ from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from pathlib import Path
 
-from app.engine.normalize import SHADDA, canon_marks, engine_letters, split_pairs
+from app.engine.normalize import (
+    SHADDA,
+    canon_marks,
+    engine_letters,
+    normalize_alef_marks,
+    split_pairs,
+)
 
 DATA = Path(__file__).resolve().parent / "data" / "legal_lexicon.json"
 
@@ -62,6 +68,7 @@ class LexEntry:
     tpl: str  # diacritized core (same letters)
     art: bool  # may carry the article "ال"
     final: str  # "keep": the engine decides the case ending; "form": the template decides
+    lam: bool = True  # False: never read a leading ل as the attached preposition (ولاية != و+ل+اية)
 
 
 @dataclass(frozen=True)
@@ -100,6 +107,8 @@ class Lexicon:
         for e in entries:
             core = norm(e.core)
             for p in _PREFIXES:
+                if p.endswith("ل") and not e.lam:
+                    continue
                 self.words.setdefault(p + core, Variant(p, False, e))
                 if e.art:
                     key = p + ("ل" if p.endswith("ل") else "ال") + core
@@ -114,7 +123,13 @@ def load_lexicon(path: Path = DATA) -> Lexicon:
     entries: list[LexEntry] = []
     for e in raw["words"]:
         entries.append(
-            LexEntry(_letters(e["tpl"]), e["tpl"], bool(e.get("art", True)), e.get("final", "keep"))
+            LexEntry(
+                _letters(e["tpl"]),
+                e["tpl"],
+                bool(e.get("art", True)),
+                e.get("final", "keep"),
+                bool(e.get("lam", True)),
+            )
         )
     for t in raw["nisba"]:  # tpl ends with "يّ"; the alef-maqsura spelling is matched via norm()
         entries.append(LexEntry(_letters(t), t, True, "keep"))
@@ -375,7 +390,20 @@ def _lexicon(ctx: Ctx) -> None:
         v = lex.words.get(t.nb)
         if v is not None:
             ctx.put(t, compose(v.prefix, v.art, v.entry.tpl), v.entry.final)
+            if v.entry.art and v.entry.final == "keep" and v.prefix[-1:] in ("ب", "ل"):
+                ctx.set_case(t, "gen")  # بِمَحْكَمَةِ / لِجَلْسَةِ: an attached preposition governs
         i += 1
+
+
+def _alef_marks(ctx: Ctx) -> None:
+    """`لاَ` / `لَاَ` / `الاِ` / `عَمَلاً` -> `لَا` / `لَا` / `الِا` / `عَمَلًا`: the mark sits on the
+    letter before a (non-initial) plain alef, never on the alef (the gold convention)."""
+    for t in ctx.toks:
+        seg = ctx.pairs[t.start : t.end]
+        new = normalize_alef_marks(seg)
+        if new != seg:
+            ctx.pairs[t.start : t.end] = new
+            ctx.changes += 1
 
 
 def _article_alef(ctx: Ctx) -> None:
@@ -645,37 +673,95 @@ def _prep_governs_genitive(ctx: Ctx) -> None:
             ctx.set_case(nxt, "gen", False if mudaf else None)
 
 
+_ANNA_INTRO = re.compile('^[ \\t\u00a0]*[:\uff1a]?[ \\t\u00a0]*["\u201c\u00ab]?[ \\t\u00a0]*$')
+
+
 def _anna(ctx: Ctx) -> None:
     """`انِ الْمُدَّعِي` / `أَنْ الْوَزِيرَ`: أنّ / إنّ before a definite noun (the subjunctive `أَنْ`
-    takes a verb); its noun is accusative."""
+    takes a verb); its noun is accusative. A colon and / or an opening quote may sit between them
+    (`عَلَى أَنَّ : الْمَادَّةَ ...`)."""
     toks = ctx.toks
     for i, t in enumerate(toks[:-1]):
-        if t.nb not in ("ان", "وان", "فان", "بان") or not ctx.adjacent(i, i + 1):
+        if t.nb not in ("ان", "وان", "فان", "بان"):
+            continue
+        if not (ctx.adjacent(i, i + 1) or _ANNA_INTRO.match(ctx.gap_after(i))):
             continue
         nxt = toks[i + 1]
         if not ctx.is_def(nxt) or nxt.nb.startswith("الي") or ctx.has_pron(nxt):
             continue
         n = len(t.bare)
-        if ctx.marks(t, n - 1) in ("", SUKUN, K):
+        last = ctx.marks(t, n - 1)
+        if last in ("", SUKUN, K):
             ctx.setm(t, n - 1, SHADDA + F)
-            if nxt.bare[-1] not in "اى" and not nxt.nb.endswith(("ون", "ان")):
-                ctx.set_case(nxt, "acc")
+        elif SHADDA not in last:
+            continue
+        # a sound feminine plural (ـات) is accusative with a kasra: left as it is
+        if nxt.bare[-1] not in "اى" and not nxt.nb.endswith(("ون", "ان", "ات")):
+            ctx.set_case(nxt, "acc")
+
+
+# a noun right after `مبلغ` / `صندوق` that is NOT its complement: `بِمَبْلَغٍ وَقَدْرُهُ ...`
+_NON_COMPLEMENT = _norm_set("قدره وقدره قدرها وقدرها قدرهم وقدرهم مقداره ومقداره مقدارها ومقدارها")
+# heads whose complement is always a genitive noun (never an adverbial / verb homograph)
+_GEN_HEADS = _norm_set(
+    "رئيس نائب معاون وكيل مدير وحدة إدارة مكتب قلم هيئة مجلس فرع قسم محكمة قيمة مبلغ صندوق"
+)
 
 
 def _mudaf_heads(ctx: Ctx) -> None:
     """Relational nouns (فرع، صندوق، رئيس، محكمة ...): no tanween before their complement, which
-    is genitive."""
+    is genitive (`رَئِيسُ الْمَحْكَمَةُ` -> `الْمَحْكَمَةِ`, `قَلَمُ مَحْكَمَةُ` -> `مَحْكَمَةِ`)."""
     v = _variants(" ".join(MUDAF_HEADS))
+    gv = _variants(" ".join(_GEN_HEADS))
     toks = ctx.toks
     for i, t in enumerate(toks[:-1]):
-        if t.nb not in v or not ctx.has_tanween(t) or not ctx.adjacent(i, i + 1):
+        if not ctx.adjacent(i, i + 1):
             continue
         nxt = toks[i + 1]
-        if not (ctx.is_noun(nxt) or ctx.has_tanween(nxt) or nxt.nb in ("ابو", "ابي")):
+        if nxt.nb in _NON_COMPLEMENT:
             continue
-        ctx.drop_tanween(t)
-        if ctx.case_of(nxt)[0] in ("nom", "acc"):
-            ctx.set_case(nxt, "gen")
+        if t.nb in v and ctx.has_tanween(t):
+            if ctx.is_noun(nxt) or ctx.has_tanween(nxt) or nxt.nb in ("ابو", "ابي"):
+                ctx.drop_tanween(t)
+                if ctx.case_of(nxt)[0] in ("nom", "acc"):
+                    ctx.set_case(nxt, "gen")
+        elif t.nb in gv and (ctx.is_def(nxt) or nxt.nb == "محكمة"):
+            if nxt.bare[-1] in "اى" or nxt.nb.endswith(("ون", "ان")):
+                continue
+            if ctx.case_of(nxt)[0] in ("nom", "acc"):
+                mudaf = (
+                    nxt.nb == "محكمة"
+                    and i + 2 < len(toks)
+                    and ctx.adjacent(i + 1, i + 2)
+                    and ctx.is_def(toks[i + 2])
+                )
+                ctx.set_case(nxt, "gen", False if mudaf else None)
+
+
+_INDEF_HEADS = _norm_set("مبلغ صندوق أساس")
+
+
+def _indefinite_heads(ctx: Ctx) -> None:
+    """`بِمَبْلَغِ وَقَدْرُهُ` -> `بِمَبْلَغٍ`, `عَلَى أَسَاسِ مِنْ` -> `أَسَاسٍ`: a head noun that has
+    no complement (followed by `قدره` / a preposition / a comma or full stop) is indefinite and
+    takes tanween."""
+    v = _variants(" ".join(_INDEF_HEADS))
+    toks = ctx.toks
+    for i, t in enumerate(toks):
+        if t.nb not in v or ctx.has_tanween(t) or t.bare[-1] in "اىي":
+            continue
+        case = ctx.case_of(t)[0]
+        if case not in ("nom", "gen"):
+            continue
+        if i + 1 < len(toks) and ctx.adjacent(i, i + 1):
+            nxt = toks[i + 1]
+            ok = nxt.nb in _NON_COMPLEMENT or nxt.nb in PREPS
+        else:
+            ok = bool(re.search(r"[،,.؛:\n]", ctx.gap_after(i))) and not re.match(
+                rf"^\s*[{DIGITS}]", ctx.text_after(i)
+            )
+        if ok:
+            ctx.set_case(t, case, True)
 
 
 def _idafa_tanween(ctx: Ctx) -> None:
@@ -1060,7 +1146,159 @@ def _mushar(ctx: Ctx) -> None:
                 ctx.setm(t, n - 1, DT)
 
 
+_PASSIVE_NEXT2 = PASSIVE_PARTICIPLE_NEXT | _norm_set("فيهم فيهما بهما من منه منها")
+
+
+def _passive_participles(ctx: Ctx) -> None:
+    """`الْمُتَنَازِعِ عَلَيْهِ` -> `الْمُتَنَازَعِ` (the disputed thing: passive participle) and
+    `الدَّفْعُ الْمُبْدِي مِنْ` -> `الْمُبْدَى` (the defence that was raised)."""
+    nazi = _variants("متنازع", art=True)
+    mubda = _variants("مبدي", art=True)
+    toks = ctx.toks
+    for i, t in enumerate(toks):
+        nxt = toks[i + 1] if ctx.adjacent(i, i + 1) else None
+        prv = toks[i - 1] if i > 0 and ctx.adjacent(i - 1, i) else None
+        n = len(t.bare)
+        if t.nb in nazi:
+            if nxt is not None and nxt.nb in PASSIVE_PARTICIPLE_NEXT | _norm_set("فيهم فيهما"):
+                ctx.setm(t, n - 2, F)
+        elif t.nb in mubda:
+            by_next = nxt is not None and nxt.nb in _PASSIVE_NEXT2
+            by_prev = (
+                prv is not None
+                and ctx.is_def(prv)
+                and (nxt is None or nxt.nb in _PASSIVE_NEXT2)
+                and not t.nb.startswith(("ل", "ب", "ك"))
+            )
+            if by_next or by_prev:
+                ctx.setm(t, n - 2, F)
+
+
+_FA3ALI = _norm_set("دعاوى فتاوى شكاوى نجاوى بلاوى هراوى")
+_FA3ALI_RE = re.compile(r"(?:[وف]?(?:[بك]?ال|لل)|[وف]?[بكل]?)(.{2}او[ي])")
+
+
+def _fa3ali_plural(ctx: Ctx) -> None:
+    """`الدَّعَاوِى` -> `الدَّعَاوَى`: the broken plural فَعَالَى (دعاوى، فتاوى، شكاوى ...) takes a
+    fatha before its final ى (the engine reads a manqus participle). A closed list, not a
+    pattern: surnames such as `الطحاوى` end in the same letters."""
+    for t in ctx.toks:
+        m = _FA3ALI_RE.fullmatch(t.nb)
+        if m is None or m.group(1) not in _FA3ALI:
+            continue
+        n = len(t.bare)
+        if ctx.marks(t, n - 2) != F:
+            ctx.setm(t, n - 2, F)
+
+
+def _tawafur(ctx: Ctx) -> None:
+    """`تُوَافِرُ` -> `تَوَافُرُ`: the masdar after a noun / preposition or with an attached
+    preposition (`بِتَوَافُرِ`); the engine reads the verb."""
+    v = _variants("توافر")
+    toks = ctx.toks
+    for i, t in enumerate(toks):
+        hit = v.get(t.nb)
+        if hit is None:
+            continue
+        prefix = hit[0]
+        prv = toks[i - 1] if i > 0 and ctx.adjacent(i - 1, i) else None
+        heads = PREPS | IDAFA_HEADS
+        masdar = bool(prefix[-1:] in ("ب", "ل", "ك")) or (
+            prv is not None and (ctx.is_noun(prv) or _strip_wf(prv.nb, heads) in heads)
+        )
+        if masdar:
+            ctx.put(t, "تَوَافُر", "keep", offset=len(prefix))
+
+
+_SUBJECTS = _norm_set("المحكمة محكمة القاضي الدائرة الهيئة")
+_ACTIVE_STEMS = {
+    "فصل": "{p}َفْصِل",
+    "حكم": "{p}َحْكُم",
+    "نظر": "{p}َنْظُر",
+    "لزم": "{p}ُلْزِم",
+}
+_PRESENT_RE = re.compile(r"([وف]?)([يت])(فصل|حكم|نظر|لزم)")
+
+
+def _active_with_subject(ctx: Ctx) -> None:
+    """`يُفَصَّلُ الْمَحْكَمَةُ` -> `يَفْصِلُ` (also تَحْكُمَ، تَنْظُرُ، تُلْزِمُ): a verb whose subject
+    (`المحكمة`, `القاضي` ...) follows right behind it is active, never passive. `لَمْ يَقْضِ` is
+    the passive `يُقْضَ` unless such a subject follows."""
+    toks = ctx.toks
+    for i, t in enumerate(toks):
+        nxt = toks[i + 1] if ctx.adjacent(i, i + 1) else None
+        prv = toks[i - 1] if i > 0 and ctx.adjacent(i - 1, i) else None
+        m = _PRESENT_RE.fullmatch(t.nb)
+        if m is not None and nxt is not None and nxt.nb in _SUBJECTS:
+            off = len(m.group(1))
+            ctx.put(t, _ACTIVE_STEMS[m.group(3)].format(p=t.bare[off]), "keep", offset=off)
+            if ctx.is_def(nxt) and ctx.case_of(nxt)[0] in ("gen", "acc"):
+                ctx.set_case(nxt, "nom")
+        elif t.nb in ("يقض", "ويقض", "فيقض") and prv is not None and prv.nb in ("لم", "ولم", "فلم"):
+            off = len(t.nb) - 3
+            if nxt is not None and nxt.nb in _SUBJECTS:
+                ctx.put(t, "يَقْضِ", "form", offset=off)
+            else:
+                ctx.put(t, "يُقْضَ", "form", offset=off)
+
+
+SIGNATURE_HEADS = _norm_set("نائب رئيس وكيل مدير معاون مستشار")
+
+
+def _line_start(ctx: Ctx, i: int) -> bool:
+    gap = ctx.gap_before(i)
+    return "\n" in gap if i > 0 else not gap.strip()
+
+
+def _signature_line(ctx: Ctx) -> None:
+    """`نَائِبَ رَئِيسِ هَيْئَةِ ...` at the start of a line (a signature / title block) is the
+    mubtada: `نَائِبُ`."""
+    toks = ctx.toks
+    for i, t in enumerate(toks[:-1]):
+        if t.nb not in SIGNATURE_HEADS or not ctx.adjacent(i, i + 1) or not _line_start(ctx, i):
+            continue
+        nxt = toks[i + 1]
+        if not (ctx.is_noun(nxt) or nxt.nb in SIGNATURE_HEADS) or t.bare[-1] in "اىي":
+            continue
+        if ctx.case_of(t)[0] in ("gen", "acc"):
+            ctx.set_case(t, "nom", False)
+
+
+_OPEN_QUOTE = re.compile('["\u201c\u00ab]\\s*$')
+_CLAUSE_START = re.compile(r"(\n|[:\-\u2013.\u061b])\s*$")
+_ANNA_FORMS = frozenset({"ان", "وان", "فان", "بان", "وبان", "فبان", "لان", "ولان"})
+
+
+def _quote_start(ctx: Ctx) -> None:
+    """`"الرُّسُومَ الْمُسْتَحَقَّةَ ...` : a quotation that opens a clause (line start, after a colon /
+    dash / full stop) begins with a mubtada: nominative, and its adjective agrees. After أنَّ the
+    first word is its noun instead (accusative, see `_anna`)."""
+    toks = ctx.toks
+    for i, t in enumerate(toks):
+        gap = ctx.gap_before(i)
+        mq = _OPEN_QUOTE.search(gap)
+        if mq is None or not ctx.is_def(t) or ctx.has_pron(t):
+            continue
+        if t.bare[-1] in "اى" or t.nb.endswith(("ون", "ان")):
+            continue
+        before = gap[: mq.start()]
+        prev = toks[i - 1] if i > 0 else None
+        if prev is not None and prev.nb in _ANNA_FORMS and re.fullmatch(r"[\s:\uff1a]*", before):
+            continue
+        if i > 0 and not _CLAUSE_START.search(before):
+            continue
+        case = ctx.case_of(t)[0]
+        if case not in ("acc", "gen"):
+            continue
+        ctx.set_case(t, "nom")
+        if i + 1 < len(toks) and ctx.adjacent(i, i + 1):
+            adj = toks[i + 1]
+            if ctx.is_def(adj) and ctx.case_of(adj)[0] == case:
+                ctx.set_case(adj, "nom")
+
+
 RULES: list[Callable[[Ctx], None]] = [
+    _alef_marks,
     _article_alef,
     _lexicon,
     _hamza_below,
@@ -1075,6 +1313,10 @@ RULES: list[Callable[[Ctx], None]] = [
     _dhidd,
     _amr_taqdir,
     _passive_verbs,
+    _active_with_subject,
+    _passive_participles,
+    _fa3ali_plural,
+    _tawafur,
     _currency,
     _number_noun_idafa,
     _prep_governs_genitive,
@@ -1085,6 +1327,9 @@ RULES: list[Callable[[Ctx], None]] = [
     _ghayr_tanween,
     _anna,
     _mudaf_heads,
+    _indefinite_heads,
+    _signature_line,
+    _quote_start,
     _qalam_kuttab,
     _mushar,
     _nisba_case,
