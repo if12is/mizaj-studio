@@ -9,14 +9,11 @@ import EditorPane from './components/EditorPane.vue'
 import StatusBar from './components/StatusBar.vue'
 import UpdateBanner from './components/UpdateBanner.vue'
 import TabStrip from './components/TabStrip.vue'
-import CommandPalette from './components/CommandPalette.vue'
-import FeatureGuideHost from './components/ui/FeatureGuideHost.vue'
 import RightPanel from './components/RightPanel.vue'
 import FileMenu from './components/files/FileMenu.vue'
 import HistoryHost from './components/history/HistoryHost.vue'
 import SplashScreen from './components/ui/SplashScreen.vue'
 import SuccessCheck from './components/ui/SuccessCheck.vue'
-import GeminiConsentDialog from './components/GeminiConsentDialog.vue'
 import { useGeminiStore } from './stores/gemini'
 import { editorReady } from './lib/boot'
 import { whenIdle } from './lib/idle'
@@ -34,8 +31,6 @@ import { useSidecarStore } from './stores/sidecar'
 import { useUpdaterStore } from './stores/updater'
 import { useTabsStore } from './stores/tabs'
 import { usePaletteStore } from './stores/palette'
-import { registerQuickGuideTopics } from '@renderer/search/guideTopics'
-import { registerBuiltinCommands } from './commands/builtin'
 import { findCommandForKey, runCommand } from './commands/registry'
 import type { TabViewState } from './tabs/viewState'
 import { notify } from './api/toast'
@@ -47,6 +42,9 @@ const AboutDialog = lazyDialog(() => import('./components/AboutDialog.vue'))
 const BatchDialog = lazyDialog(() => import('./components/files/BatchDialog.vue'))
 const ImportPreviewDialog = lazyDialog(() => import('./components/files/ImportPreviewDialog.vue'))
 const OcrFailureDialog = lazyDialog(() => import('./components/files/OcrFailureDialog.vue'))
+const FeatureGuideHost = lazyDialog(() => import('./components/ui/FeatureGuideHost.vue'))
+const CommandPalette = lazyDialog(() => import('./components/CommandPalette.vue'))
+const GeminiConsentDialog = lazyDialog(() => import('./components/GeminiConsentDialog.vue'))
 const ProofreadDialog = lazyDialog(() => import('./components/ProofreadDialog.vue'))
 
 const sidecar = useSidecarStore()
@@ -270,6 +268,7 @@ const flushNow = (): void => void autosave.flush()
 let offFlush: (() => void) | undefined
 let offCommands: (() => void) | undefined
 let offGuide: (() => void) | undefined
+let unmounted = false
 
 async function bootstrap(): Promise<void> {
   try {
@@ -315,14 +314,20 @@ onMounted(async () => {
   window.addEventListener('beforeunload', flushNow)
   offFlush = window.mizajAPI?.onBeforeQuitFlush(() => autosave.flush())
   files.registerHooks({ flush: () => autosave.flush(), openDocument })
-  offCommands = registerBuiltinCommands({
-    editorActions: () => pane.value?.actions,
-    newTab: () => void newTab(),
-    closeActiveTab,
-    nextTab,
-    prevTab
-  })
-  offGuide = registerQuickGuideTopics()
+  // the command registry and guide topics are a separate chunk: off the startup path
+  void Promise.all([import('./commands/builtin'), import('@renderer/search/guideTopics')]).then(
+    ([{ registerBuiltinCommands }, { registerQuickGuideTopics }]) => {
+      if (unmounted) return
+      offCommands = registerBuiltinCommands({
+        editorActions: () => pane.value?.actions,
+        newTab: () => void newTab(),
+        closeActiveTab,
+        nextTab,
+        prevTab
+      })
+      offGuide = registerQuickGuideTopics()
+    }
+  )
   await sidecar.init()
   whenIdle(() => void useUpdaterStore().init(), 3000) // not needed for first interaction
   if (sidecar.isReady) void bootstrap()
@@ -336,6 +341,7 @@ watch(
 onBeforeUnmount(() => {
   window.removeEventListener('keydown', onCommandKey, true)
   window.removeEventListener('keydown', onGlobalKey)
+  unmounted = true
   offCommands?.()
   offGuide?.()
   window.removeEventListener('blur', flushNow)

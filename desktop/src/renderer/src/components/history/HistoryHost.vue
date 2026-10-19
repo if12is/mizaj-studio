@@ -6,7 +6,9 @@
 import { onBeforeUnmount, onMounted, watch } from 'vue'
 import { useEditorStore } from '@renderer/stores/editor'
 import { useHistoryStore } from '@renderer/stores/history'
-import HistoryPanel from './HistoryPanel.vue'
+import { lazyPanel } from '@renderer/lib/lazy'
+
+const HistoryPanel = lazyPanel(() => import('./HistoryPanel.vue'))
 
 const props = defineProps<{ flush: () => Promise<void> }>()
 const history = useHistoryStore()
