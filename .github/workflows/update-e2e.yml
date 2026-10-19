@@ -108,6 +108,13 @@ jobs:
             exit 1
           }
           $p = Start-Process -FilePath $inst -ArgumentList '/S' -Wait -PassThru
+          if ($p.ExitCode -eq -1073741819) {
+            # Intermittent access violation inside the stock NSIS installer on hosted runners
+            # (seen with Defender real-time scanning). Retry once and record it.
+            Write-Host "::warning title=Installer::installer crashed (0xC0000005); retrying once"
+            Start-Sleep -Seconds 10
+            $p = Start-Process -FilePath $inst -ArgumentList '/S' -Wait -PassThru
+          }
           if ($p.ExitCode -ne 0) {
             Write-Host "::error title=Install old version::installer $inst exited with code $($p.ExitCode)"
             exit 1
