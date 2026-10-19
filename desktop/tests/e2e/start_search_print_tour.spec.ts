@@ -105,9 +105,16 @@ test('first-run tour: 5 steps in RTL, next/prev, Esc skips, shown once, replay f
   await expect(t('spotlight-ring')).toBeVisible() // points at the real «ملف» button
 
   // RTL: «السابق» sits to the right of «التالي»
-  const prev = (await t('tour-prev').boundingBox())!
-  const next = (await t('tour-next').boundingBox())!
-  expect(prev.x).toBeGreaterThan(next.x)
+  // both read in one frame: the card may still be gliding to its spotlight position
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const r = (id: string): number =>
+          document.querySelector(`[data-testid="${id}"]`)!.getBoundingClientRect().x
+        return r('tour-prev') > r('tour-next')
+      })
+    )
+    .toBe(true)
 
   const order: string[] = []
   for (let i = 0; i < 4; i++) {

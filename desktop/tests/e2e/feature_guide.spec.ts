@@ -57,10 +57,18 @@ test('enabling a feature: toast says where, «أرني» closes settings and spo
   await expect(t('spotlight-tip')).toContainText('اسأل عن المستند')
 
   // the ring sits exactly on the toolbar button
-  const target = (await t('toggle-gemini-panel').boundingBox())!
-  const box = (await ring.boundingBox())!
-  expect(Math.abs(box.x - (target.x - 4))).toBeLessThan(3)
-  expect(Math.abs(box.y - (target.y - 4))).toBeLessThan(3)
+  // measured in one frame and polled: the ring may still be moving onto the button
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const r = (id: string): DOMRect =>
+          document.querySelector(`[data-testid="${id}"]`)!.getBoundingClientRect()
+        const a = r('toggle-gemini-panel')
+        const b = r('spotlight-ring')
+        return Math.abs(b.x - (a.x - 4)) < 3 && Math.abs(b.y - (a.y - 4)) < 3
+      })
+    )
+    .toBe(true)
 
   // gone after ~3 s
   await expect(ring).toHaveCount(0, { timeout: 6000 })
