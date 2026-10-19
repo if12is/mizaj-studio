@@ -12,7 +12,7 @@ in the installer: it is downloaded on an explicit user action (online switch `on
 or imported from a file the user fetched from https://tanzil.net/download/ .
 
 Download protocol (from the tanzil-downloader package): HTTP POST
-https://tanzil.net/pub/download/download.php, form fields quranType in {uthmani, uthmani-min,
+https://tanzil.net/pub/download/index.php (download.php returns 404 since 2026), form fields quranType in {uthmani, uthmani-min,
 simple, simple-enhanced, simple-min, simple-clean}, outType in {txt, txt-2}, agree=true and the
 optional booleans marks, sajdah, rub, alef. `txt-2` yields `sura|aya|text` lines followed by the
 `#` licence notice. No checksum can be pinned (Tanzil republishes), so files are validated
@@ -44,7 +44,7 @@ ATTRIBUTION_AR = (
 )
 LICENSE_URL = "https://tanzil.net/docs/text_license"
 DOWNLOAD_PAGE = "https://tanzil.net/download/"
-DOWNLOAD_ENDPOINT = "https://tanzil.net/pub/download/download.php"
+DOWNLOAD_ENDPOINT = "https://tanzil.net/pub/download/index.php"
 KINDS = ("uthmani", "uthmani-min", "simple", "simple-enhanced", "simple-min", "simple-clean")
 DEFAULT_KINDS = ("uthmani", "simple-clean")  # rasm used by writers + a clean one for matching
 META = "meta.json"

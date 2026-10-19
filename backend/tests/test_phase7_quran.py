@@ -235,7 +235,7 @@ def test_download_requires_opt_in_and_posts_documented_form(qc):
     enable_online(qc)
     out = store.download_quran_text(qc.data_dir, qc.app.state.db_path, post=post)
     assert set(out) == {"uthmani", "simple-clean"}
-    assert calls[0][0] == "https://tanzil.net/pub/download/download.php"
+    assert calls[0][0] == "https://tanzil.net/pub/download/index.php"
     assert calls[0][1] == {
         "quranType": "uthmani",
         "outType": "txt-2",
