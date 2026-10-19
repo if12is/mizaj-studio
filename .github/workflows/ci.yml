@@ -89,7 +89,16 @@ jobs:
       - name: Unit tests
         working-directory: ./desktop
         timeout-minutes: 10
-        run: npm run test:unit
+        run: |
+          set +e
+          timeout -k 10 360 npx vitest run --reporter=verbose > "$RUNNER_TEMP/vitest.log" 2>&1
+          rc=$?
+          tail -n 15 "$RUNNER_TEMP/vitest.log"
+          if [ $rc -eq 124 ] || [ $rc -eq 137 ]; then
+            msg=$(tail -n 30 "$RUNNER_TEMP/vitest.log" | sed 's/\x1b\[[0-9;]*m//g' | tr '\n' '\r' | sed 's/\r/%0A/g')
+            echo "::error title=vitest hang::$msg"
+          fi
+          exit $rc
       - name: Build
         working-directory: ./desktop
         timeout-minutes: 15
