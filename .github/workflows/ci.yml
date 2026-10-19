@@ -74,16 +74,26 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20.11.0'
-      - name: Build & Typecheck Desktop App
+      - name: Install desktop dependencies
         working-directory: ./desktop
-        run: |
-          if [ -f package.json ]; then
-            npm ci
-            npm run lint --if-present
-            npm run typecheck
-            npm run test:unit --if-present
-            npm run build
-          fi
+        timeout-minutes: 10
+        run: npm ci
+      - name: Lint
+        working-directory: ./desktop
+        timeout-minutes: 10
+        run: npm run lint
+      - name: Typecheck
+        working-directory: ./desktop
+        timeout-minutes: 10
+        run: npm run typecheck
+      - name: Unit tests
+        working-directory: ./desktop
+        timeout-minutes: 10
+        run: npm run test:unit
+      - name: Build
+        working-directory: ./desktop
+        timeout-minutes: 15
+        run: npm run build
 
   desktop-e2e:
     runs-on: ubuntu-latest
