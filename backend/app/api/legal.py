@@ -16,9 +16,11 @@ from app.legal import lint as lnt
 from app.legal import redact as rdc
 from app.legal import store
 from app.legal.amounts import check_amounts
+from app.legal.casecard import extract_case_card
 from app.legal.dates import date_words
 from app.legal.defined_terms import analyze_terms
 from app.legal.numbering import analyze_clauses
+from app.legal.refcheck import check_refs
 from app.legal.tafqeet import TafqeetError, amount_words, currencies, number_words, parse_amount
 from app.legal.templates import TemplateError, render
 
@@ -99,6 +101,18 @@ def list_currencies() -> list[dict[str, Any]]:
 def check(body: TextIn) -> dict[str, Any]:
     issues = check_amounts(body.text)
     return {"issues": issues, "count": len(issues)}
+
+
+@router.post("/case-card")
+def case_card(body: TextIn) -> dict[str, Any]:
+    """Case data card: number, type, court, sessions, parties, relief (suggestions only)."""
+    return extract_case_card(body.text)
+
+
+@router.post("/check-refs")
+def check_date_refs(body: TextIn) -> dict[str, Any]:
+    """Warnings for dates, case numbers, article references and law citations."""
+    return check_refs(body.text)
 
 
 # ------------------------------------------------------------------ dates
