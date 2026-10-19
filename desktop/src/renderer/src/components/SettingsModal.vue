@@ -35,6 +35,7 @@ const OnlineSettings = lazyPanel(() => import('./settings/OnlineSettings.vue'))
 const PacksSettings = lazyPanel(() => import('./settings/PacksSettings.vue'))
 const BackupSettings = lazyPanel(() => import('./settings/BackupSettings.vue'))
 const SystemwideSettings = lazyPanel(() => import('./settings/SystemwideSettings.vue'))
+const WordAddinSettings = lazyPanel(() => import('./settings/WordAddinSettings.vue'))
 
 // EditorQualitySettings.vue is owned by another slice; glob keeps the build working while it is absent.
 const optional = import.meta.glob('./settings/EditorQualitySettings.vue')
@@ -53,6 +54,7 @@ const tabs = computed<[SettingsSection, string][]>(() => {
   ]
   if (EditorQuality) list.push(['editor-quality', 'جودة التحرير'])
   list.push(['systemwide', 'مِزَاج في أي برنامج'])
+  list.push(['wordaddin', 'إضافة Word'])
   return list
 })
 const fontSize = ref(settings.fontSize)
@@ -683,6 +685,7 @@ const btn =
           <PacksSettings v-else-if="tab === 'packs'" />
           <BackupSettings v-else-if="tab === 'backup'" />
           <SystemwideSettings v-else-if="tab === 'systemwide'" />
+          <WordAddinSettings v-else-if="tab === 'wordaddin'" />
           <component :is="EditorQuality" v-else-if="tab === 'editor-quality' && EditorQuality" />
         </div>
       </Transition>

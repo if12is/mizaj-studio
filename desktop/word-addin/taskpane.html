@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="referrer" content="no-referrer" />
+    <title>مِزَاج</title>
+  </head>
+  <body>
+    <main class="mz-pane">
+      <header class="mz-head">
+        <h1>مِزَاج</h1>
+        <span id="conn" class="mz-chip" data-testid="conn" data-state="unknown">جارٍ الاتصال…</span>
+      </header>
+
+      <p id="banner" class="mz-banner" data-testid="banner" role="alert" hidden></p>
+
+      <p class="mz-hint">
+        حدّد نصاً عربياً في المستند ثم اختر الإجراء. تُعرض المعاينة أولاً ولا يتغير نصك إلا بزر
+        «استبدال».
+      </p>
+
+      <div class="mz-ops" role="group" aria-label="الإجراءات">
+        <button type="button" class="mz-btn" data-op="proofread" data-testid="op-proofread">
+          إملائي
+        </button>
+        <button type="button" class="mz-btn" data-op="punctuation" data-testid="op-punctuation">
+          ترقيم
+        </button>
+        <button type="button" class="mz-btn" data-op="tashkeel" data-testid="op-tashkeel">
+          تشكيل
+        </button>
+        <button type="button" class="mz-btn" data-op="all" data-testid="op-all">الكل</button>
+      </div>
+
+      <section id="result" class="mz-result" data-testid="result" hidden>
+        <h2 id="result-title"></h2>
+        <div id="preview" class="mz-preview" data-testid="preview" dir="rtl"></div>
+        <ul id="notes" class="mz-notes" data-testid="notes"></ul>
+        <div class="mz-actions">
+          <button type="button" id="apply" class="mz-btn mz-primary" data-testid="apply" disabled>
+            استبدال
+          </button>
+          <button type="button" id="cancel" class="mz-btn" data-testid="cancel">إلغاء</button>
+        </div>
+      </section>
+
+      <p id="status" class="mz-status" data-testid="status" role="status"></p>
+      <p class="mz-foot">يعمل على جهازك عبر برنامج مِزَاج دون إرسال نصك إلى أي مكان.</p>
+    </main>
+    <script type="module" src="./src/taskpane.ts"></script>
+  </body>
+</html>

@@ -131,6 +131,15 @@ const mizajAPI = {
       return () => ipcRenderer.removeListener('systemwide:popup-state', handler)
     }
   },
+  // Word add-in (settings page only; main validates every call)
+  wordAddin: {
+    getState: (): Promise<unknown> => ipcRenderer.invoke('wordaddin:get-state'),
+    setEnabled: (v: boolean): Promise<unknown> => ipcRenderer.invoke('wordaddin:set-enabled', v),
+    install: (): Promise<unknown> => ipcRenderer.invoke('wordaddin:install'),
+    uninstall: (): Promise<unknown> => ipcRenderer.invoke('wordaddin:uninstall'),
+    test: (): Promise<unknown> => ipcRenderer.invoke('wordaddin:test'),
+    openCatalog: (): Promise<string> => ipcRenderer.invoke('wordaddin:open-catalog')
+  },
   onBeforeQuitFlush: (cb: () => Promise<void>): (() => void) => {
     const handler = async (): Promise<void> => {
       try {

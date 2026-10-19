@@ -22,6 +22,7 @@ import {
   showMainWindow
 } from './window'
 import { registerSystemwide } from './systemwide/ipc'
+import { registerWordAddin } from './wordaddin/ipc'
 import { UPDATER_STATUS_CHANNEL, UpdaterController, type UpdaterLike } from './updater'
 
 // Tests only: isolate user data (must run before anything reads userData).
@@ -156,6 +157,14 @@ const systemwide = registerSystemwide({
     token: apiToken
   }),
   showMainWindow
+})
+// Word add-in (opt-in, off by default): HTTPS host on https://localhost for the ribbon add-in
+registerWordAddin({
+  log,
+  getBackend: () => ({
+    baseUrl: manager.getStatus().port ? `http://127.0.0.1:${manager.getStatus().port}` : null,
+    token: apiToken
+  })
 })
 setHideOnClose(() => systemwide.shouldHideOnClose())
 // the (hidden) popup must not keep the app alive once the main window is really closed

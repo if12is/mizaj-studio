@@ -11,7 +11,7 @@
   "scripts": {
     "dev": "electron-vite dev",
     "build": "electron-vite build",
-    "typecheck:node": "tsc --noEmit -p tsconfig.node.json",
+    "typecheck:node": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p word-addin/tsconfig.json",
     "typecheck:web": "vue-tsc --noEmit -p tsconfig.web.json",
     "typecheck": "npm run typecheck:node && npm run typecheck:web",
     "lint": "eslint .",

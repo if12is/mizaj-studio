@@ -1,0 +1,169 @@
+/* Mizaj design tokens (tailwind.config.cjs: slate #0F172A, emerald #10B981, amber #F59E0B). */
+@import '@fontsource/cairo/arabic-400.css';
+@import '@fontsource/cairo/arabic-600.css';
+
+:root {
+  --mz-slate: #0f172a;
+  --mz-emerald: #10b981;
+  --mz-emerald-dark: #047857;
+  --mz-amber: #f59e0b;
+  --mz-bg: #ffffff;
+  --mz-fg: #0f172a;
+  --mz-muted: #475569;
+  --mz-border: #cbd5e1;
+  --mz-del: #fee2e2;
+  --mz-ins: #d1fae5;
+  --mz-err: #b91c1c;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --mz-bg: #0f172a;
+    --mz-fg: #f1f5f9;
+    --mz-muted: #94a3b8;
+    --mz-border: #334155;
+    --mz-del: #7f1d1d;
+    --mz-ins: #064e3b;
+    --mz-err: #fca5a5;
+  }
+}
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+  background: var(--mz-bg);
+  color: var(--mz-fg);
+  font-family: Cairo, 'Segoe UI', system-ui, sans-serif;
+  font-size: 14px;
+  line-height: 1.7;
+}
+.mz-pane {
+  padding: 12px;
+}
+.mz-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+h1 {
+  margin: 0;
+  font-size: 20px;
+  color: var(--mz-emerald-dark);
+}
+h2 {
+  margin: 8px 0 4px;
+  font-size: 14px;
+}
+.mz-chip {
+  border: 1px solid var(--mz-border);
+  border-radius: 999px;
+  padding: 0 10px;
+  font-size: 12px;
+}
+.mz-chip[data-state='ok'] {
+  border-color: var(--mz-emerald);
+  color: var(--mz-emerald-dark);
+}
+.mz-chip[data-state='down'] {
+  border-color: var(--mz-amber);
+}
+.mz-banner {
+  margin: 8px 0;
+  padding: 8px 10px;
+  border: 1px solid var(--mz-amber);
+  border-radius: 6px;
+  font-weight: 600;
+}
+.mz-hint,
+.mz-foot {
+  color: var(--mz-muted);
+  font-size: 12px;
+}
+.mz-ops {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin: 10px 0;
+}
+.mz-btn {
+  font: inherit;
+  padding: 6px 10px;
+  border: 1px solid var(--mz-border);
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+.mz-btn:hover:not(:disabled) {
+  border-color: var(--mz-emerald);
+}
+.mz-btn:focus-visible {
+  outline: 2px solid var(--mz-emerald);
+  outline-offset: 2px;
+}
+.mz-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.mz-primary {
+  background: var(--mz-emerald-dark);
+  border-color: var(--mz-emerald-dark);
+  color: #fff;
+  font-weight: 600;
+}
+.mz-result {
+  border: 1px solid var(--mz-border);
+  border-radius: 8px;
+  padding: 8px 10px;
+}
+.mz-preview {
+  max-height: 260px;
+  overflow: auto;
+  white-space: pre-wrap;
+  font-size: 16px;
+  line-height: 2;
+}
+del {
+  background: var(--mz-del);
+  text-decoration: line-through;
+  border-radius: 3px;
+  padding: 0 2px;
+}
+ins {
+  background: var(--mz-ins);
+  text-decoration: none;
+  border-radius: 3px;
+  padding: 0 2px;
+}
+ins.mz-letters {
+  outline: 1px solid var(--mz-amber);
+}
+.mz-notes {
+  margin: 6px 0;
+  padding-inline-start: 18px;
+  color: var(--mz-muted);
+  font-size: 12px;
+}
+.mz-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+.mz-status {
+  min-height: 1.7em;
+  font-size: 13px;
+}
+.mz-err {
+  color: var(--mz-err);
+  font-weight: 600;
+}
+.mz-dialog {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  padding: 12px;
+  text-align: center;
+  font-size: 15px;
+}

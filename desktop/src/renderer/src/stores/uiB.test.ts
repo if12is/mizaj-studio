@@ -60,7 +60,8 @@ describe('settings store: openSettings + defaults', () => {
       'packs',
       'backup',
       'editor-quality',
-      'systemwide'
+      'systemwide',
+      'wordaddin'
     ])
   })
   it('online features are off by default', () => {

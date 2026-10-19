@@ -47,8 +47,23 @@ function devCspForHmr(): Plugin {
   }
 }
 
+/**
+ * Builds the Word add-in (word-addin/: task pane, ribbon commands) into out/word-addin/ once the main
+ * bundle is written, so `electron-vite build` produces everything the app serves over https://localhost.
+ */
+function buildWordAddin(): Plugin {
+  return {
+    name: 'mizaj-build-word-addin',
+    apply: 'build',
+    async closeBundle() {
+      const { build } = await import('vite')
+      await build({ configFile: resolve('word-addin/vite.config.ts'), logLevel: 'warn' })
+    }
+  }
+}
+
 export default defineConfig({
-  main: { plugins: [externalizeDepsPlugin()] },
+  main: { plugins: [externalizeDepsPlugin(), buildWordAddin()] },
   preload: { plugins: [externalizeDepsPlugin()] },
   renderer: {
     resolve: {
