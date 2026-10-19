@@ -12,6 +12,8 @@ import { addConfidence, buildConfMarks } from '@renderer/editor/confidence'
 import { quranField } from '@renderer/editor/quran'
 import { useQualityStore } from '@renderer/stores/quality'
 import { useProofreadStore } from '@renderer/stores/proofread'
+import { recordEvent } from '@renderer/stores/history'
+import { EVENT_LABELS } from '@renderer/history/logic'
 
 export const readOnlyCompartment = new Compartment()
 
@@ -63,6 +65,7 @@ export function useTashkeelRun(getView: () => EditorView | null, onApplied: () =
     const to = range.whole ? view.state.doc.length : range.to
     const text = view.state.sliceDoc(from, to)
     if (!text.trim()) return
+    const runBefore = view.state.doc.toString() // for the edit history (read-only during the run)
     const protect = quality.quranProtect
     const mine = new RunSession(view.state, from, text, {
       isProtected: (a, b) =>
@@ -124,6 +127,16 @@ export function useTashkeelRun(getView: () => EditorView | null, onApplied: () =
     // finalize (done / error / abort): one undo step for what was applied
     const sess = session === mine ? mine : null
     if (sess) commit(view)
+    if (sess?.hasChanges()) {
+      recordEvent(EVENT_LABELS.beforeTashkeel, runBefore)
+      recordEvent(
+        wantPause
+          ? EVENT_LABELS.tashkeelPartial
+          : range.whole
+            ? EVENT_LABELS.tashkeelFull
+            : EVENT_LABELS.tashkeelSelection
+      )
+    }
     setReadOnly(view, false)
     if (!sess) return
     if (wantPause) {

@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { nextTick, ref, watch } from 'vue'
 import { useEditorStore } from '@renderer/stores/editor'
+import { recordEvent } from '@renderer/stores/history'
+import { EVENT_LABELS, replaceAllLabel } from '@renderer/history/logic'
 
 const editor = useEditorStore()
 const query = ref('')
@@ -40,7 +42,12 @@ function close(): void {
   editor.findOpen = false
 }
 async function replaceAll(): Promise<void> {
+  const before = editor.accessor?.getText()
   const n = editor.accessor?.find.replaceAll() ?? 0
+  if (n > 0) {
+    recordEvent(EVENT_LABELS.beforeReplaceAll, before)
+    recordEvent(replaceAllLabel(n))
+  }
   editor.announce(`تم استبدال ${n} موضع`)
 }
 </script>

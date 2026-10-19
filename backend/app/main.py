@@ -32,6 +32,7 @@ from app.api import (
     spelling,
     tashkeel,
     tools,
+    versions,
 )
 from app.api import docx as docx_api
 from app.api import io as io_api
@@ -125,6 +126,7 @@ def create_app(
         packs2,
         resources,
         tools,
+        versions,
     ):
         app.include_router(mod.router)
     _recover_interrupted_jobs(data_dir, db_path)

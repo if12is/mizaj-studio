@@ -7,6 +7,8 @@ import { useProjectsStore } from '@renderer/stores/projects'
 import { diffMarkEdits } from '@renderer/editor/markEdits'
 import { stripMarks } from '@renderer/editor/arabic'
 import { notify } from '@renderer/api/toast'
+import { recordEvent } from '@renderer/stores/history'
+import { EVENT_LABELS } from '@renderer/history/logic'
 import { renderMarkdown } from '@renderer/lib/safeMarkdown'
 
 type Req = Parameters<ReturnType<typeof useGeminiStore>['ask']>[0]
@@ -208,6 +210,7 @@ function apply(t: Turn): void {
   if (!acc || !t.sel || !t.suggestion) return
   const edits = diffMarkEdits(t.sel.text, t.suggestion, t.sel.from)
   if (!edits) return // base letters differ: never applied
+  const before = acc.getText()
   const ok = acc.applyEdits(
     edits.map((e) => ({
       from: e.from,
@@ -216,8 +219,11 @@ function apply(t: Turn): void {
       insert: e.insert
     }))
   )
-  if (ok) t.applied = true
-  else notify('تغيّر النص منذ السؤال، لذا لم يُطبَّق الاقتراح.', { kind: 'info' })
+  if (ok) {
+    t.applied = true
+    recordEvent(EVENT_LABELS.beforeGemini, before)
+    recordEvent(EVENT_LABELS.gemini)
+  } else notify('تغيّر النص منذ السؤال، لذا لم يُطبَّق الاقتراح.', { kind: 'info' })
 }
 </script>
 

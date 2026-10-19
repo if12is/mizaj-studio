@@ -63,7 +63,7 @@ export const useFileStore = defineStore('fileio', () => {
 
   async function createFromText(title: string, text: string): Promise<void> {
     const pid = await ensureProjectId()
-    const d = await useProjectsStore().createDocument(pid, title, text)
+    const d = await useProjectsStore().createDocument(pid, title, text, 'استيراد')
     await hooks?.openDocument(d.id)
     notify('تم إنشاء المستند من الملف المستورد.', { kind: 'success' })
   }

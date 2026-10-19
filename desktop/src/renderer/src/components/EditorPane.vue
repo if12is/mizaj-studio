@@ -59,6 +59,7 @@ import { useTts } from '@renderer/composables/useTts'
 import FindBar from './FindBar.vue'
 import ToolbarToggle from './ui/ToolbarToggle.vue'
 import AppIcon from './ui/AppIcon.vue'
+import HistoryButton from './history/HistoryButton.vue'
 import { useEditorQuality } from '@renderer/composables/useEditorQuality'
 import { useQuranDetect } from '@renderer/composables/useQuranDetect'
 import { useQualityStore } from '@renderer/stores/quality'
@@ -765,6 +766,7 @@ const btnCls =
       >
         بحث واستبدال
       </ToolbarToggle>
+      <HistoryButton />
       <ToolbarToggle
         :on="tts.speaking.value"
         name="القراءة بصوت عالٍ"

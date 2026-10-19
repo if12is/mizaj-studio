@@ -32,7 +32,8 @@ export const ICON_PATHS = {
   close: 'M3.5 3.5l9 9M12.5 3.5l-9 9',
   warn: 'M8 2L1.5 13.5h13zM8 6.5v3.5M8 12h.01',
   dock: 'M2 3h12v10H2zM2 9.5h12',
-  collapse: 'M4 6l4 4 4-4'
+  collapse: 'M4 6l4 4 4-4',
+  history: 'M2.5 8a5.5 5.5 0 105.5-5.5A5.6 5.6 0 004 4.3M2.5 2v3h3M8 5v3l2 1.5'
 } as const
 export type IconName = keyof typeof ICON_PATHS
 </script>

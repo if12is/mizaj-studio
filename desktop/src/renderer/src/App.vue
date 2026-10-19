@@ -13,6 +13,7 @@ import CommandPalette from './components/CommandPalette.vue'
 import FeatureGuideHost from './components/ui/FeatureGuideHost.vue'
 import RightPanel from './components/RightPanel.vue'
 import FileMenu from './components/files/FileMenu.vue'
+import HistoryHost from './components/history/HistoryHost.vue'
 import SplashScreen from './components/ui/SplashScreen.vue'
 import SuccessCheck from './components/ui/SuccessCheck.vue'
 import GeminiConsentDialog from './components/GeminiConsentDialog.vue'
@@ -446,6 +447,7 @@ onBeforeUnmount(() => {
       <RightPanel place="side" :open-document="openDocument" />
     </div>
     <StatusBar />
+    <HistoryHost :flush="autosave.flush" />
     <MotionTransition name="m-modal">
       <CommandPalette v-if="palette.open" :open-document="openDocument" />
     </MotionTransition>

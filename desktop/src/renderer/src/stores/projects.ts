@@ -49,13 +49,15 @@ export const useProjectsStore = defineStore('projects', () => {
   async function createDocument(
     projectId: number,
     title: string,
-    content = ''
+    content = '',
+    historyLabel?: string
   ): Promise<DocumentFull> {
     touch()
     const d = await useApi().post<DocumentFull>('/api/documents', {
       project_id: projectId,
       title,
-      raw_content: content
+      raw_content: content,
+      ...(historyLabel ? { history_label: historyLabel } : {})
     })
     touch()
     await loadDocuments(projectId)

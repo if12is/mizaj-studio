@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, Response
 from pydantic import BaseModel, Field, field_validator
 
 from app.api.deps import get_db
+from app.core import versions as vs
 from app.core.database import now_iso, write
 from app.core.errors import not_found, validation_error
 
@@ -38,6 +39,8 @@ class DocumentCreate(BaseModel):
     raw_content: str = Field(default="", max_length=20_000_000)
     language: str = Field(default="ar", min_length=1, max_length=16)
     direction: Literal["rtl", "ltr"] = "rtl"
+    # label of the first history entry (e.g. «استيراد» for imported files)
+    history_label: str | None = Field(default=None, max_length=200)
 
     @field_validator("title")
     @classmethod
@@ -110,6 +113,14 @@ def create_document(body: DocumentCreate, db: Db) -> Document:
                     ts,
                 ),
             )
+            if body.raw_content:
+                vs.record_version(
+                    db,
+                    cur.lastrowid,
+                    body.raw_content,
+                    kind="initial",
+                    label=body.history_label or vs.LABEL_CREATED,
+                )
     except sqlite3.IntegrityError as exc:  # project deleted concurrently
         raise not_found("Project", body.project_id) from exc
     return Document(**dict(_row(db, cur.lastrowid)))
@@ -132,11 +143,15 @@ def update_document(did: int, body: DocumentUpdate, db: Db) -> Document:
     diac = body.diacritized_content if "diacritized_content" in sent else cur["diacritized_content"]
     wc = count_words(raw) if "raw_content" in sent else cur["word_count"]
     with write(db):
+        if "raw_content" in sent:
+            vs.ensure_baseline(db, did, cur["raw_content"])
         db.execute(
             "UPDATE documents SET title=?, raw_content=?, diacritized_content=?, word_count=?, "
             "updated_at=? WHERE id=?",
             (title, raw, diac, wc, now_iso(), did),
         )
+        if "raw_content" in sent:
+            vs.record_version(db, did, raw, kind="autosave")
     return Document(**dict(_row(db, did)))
 
 
