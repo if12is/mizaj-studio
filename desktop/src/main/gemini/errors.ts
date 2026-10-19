@@ -12,10 +12,6 @@ export type GeminiErrorCode =
   | 'empty'
   | 'bad_request'
   | 'bad_response'
-  | 'cli_missing'
-  | 'cli_login'
-  | 'cli_failed'
-  | 'cli_timeout'
   | 'unavailable'
 
 const MESSAGES: Record<GeminiErrorCode, string> = {
@@ -32,10 +28,6 @@ const MESSAGES: Record<GeminiErrorCode, string> = {
   empty: 'لم يُنتج النموذج نصاً (استنفد حدّ الإخراج في التفكير). أعد المحاولة أو اختر نموذجاً أخف.',
   bad_request: 'رفض Gemini الطلب (قد يكون النموذج المحدد غير مدعوم). جرّب نموذجاً آخر.',
   bad_response: 'ردّ Gemini بصيغة غير متوقعة.',
-  cli_missing: 'لم يُعثر على Gemini CLI على هذا الجهاز.',
-  cli_login: 'سجّل الدخول في Gemini CLI أولاً بتشغيل gemini في الطرفية',
-  cli_failed: 'فشل تشغيل Gemini CLI.',
-  cli_timeout: 'انتهت مهلة Gemini CLI قبل وصول الرد.',
   unavailable:
     'تعذر حفظ المفتاح بأمان: التشفير غير متاح على هذا الجهاز، لذلك لن يُحفظ المفتاح نصّاً صريحاً.'
 }
@@ -45,7 +37,9 @@ export class GeminiError extends Error {
     readonly code: GeminiErrorCode,
     message?: string,
     /** seconds Google asked us to wait (quota), when known */
-    readonly retryAfterSec?: number
+    readonly retryAfterSec?: number,
+    /** HTTP status of the failed call, when there was one (used by the cache logic) */
+    readonly status?: number
   ) {
     super(message ?? MESSAGES[code])
     this.name = 'GeminiError'
@@ -54,7 +48,7 @@ export class GeminiError extends Error {
 
 export function quotaMessage(sec?: number): string {
   if (!sec) return MESSAGES.quota
-  return `تجاوزتَ حدّ الاستخدام (الحصة) لدى Google. المدة المطلوبة للانتظار نحو ${Math.ceil(sec)} ثانية. يمكنك اختيار نموذج أخف (مثل flash-lite) من الإعدادات أو التبديل إلى Gemini CLI.`
+  return `تجاوزتَ حدّ الاستخدام (الحصة) لدى Google. المدة المطلوبة للانتظار نحو ${Math.ceil(sec)} ثانية. يمكنك اختيار نموذج أخف (مثل flash-lite) من الإعدادات.`
 }
 
 export function messageFor(code: GeminiErrorCode): string {

@@ -127,3 +127,32 @@ export function parseReply(raw: string, kind?: PromptKind): ParsedReply {
     suggestion: suggestion && suggestion.length <= max ? suggestion : null
   }
 }
+
+/**
+ * Chat-session prompts. The system instruction and the document turns form a STABLE prefix (never
+ * varying between questions of one session) so implicit caching can hit and an explicit cache can
+ * hold exactly this prefix. Per-question rules travel inside the user turn instead.
+ */
+export const SESSION_SYSTEM = [
+  ...BASE_RULES,
+  'المستند المفتوح يُرسل مرة واحدة في أول المحادثة، وتأتي الأسئلة التالية في سياقه. أجب عن المتابعات بالرجوع إلى ما سبق.'
+].join('\n')
+
+export function buildDocumentTurn(doc: string, max = MAX_DOC_CHARS): Truncated {
+  const t = truncateDocument(doc, max)
+  const note = t.truncated ? '\n(ملاحظة: النص مقتطع لطوله.)' : ''
+  return { truncated: t.truncated, text: `نص المستند المفتوح:${note}\n<<<\n${t.text}\n>>>` }
+}
+
+export const DOC_ACK = 'تم استلام المستند. اسألني عنه.'
+
+export function buildSessionQuestion(
+  kind: 'document' | 'selection',
+  question: string,
+  selection?: string,
+  sentence?: string
+): string {
+  const q = question.slice(0, MAX_QUESTION_CHARS)
+  if (kind === 'document') return `${NO_SUGGESTION}\nالسؤال: ${q}`
+  return `${SUGGESTION_RULES.join('\n')}\n${buildSelectionPrompt(q, selection ?? '', sentence)}`
+}

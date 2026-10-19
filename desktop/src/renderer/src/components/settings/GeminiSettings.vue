@@ -44,23 +44,6 @@ async function test(): Promise<void> {
     </label>
 
     <template v-if="gemini.enabled">
-      <label class="flex items-center gap-2">
-        المزوّد:
-        <select
-          class="rounded border px-2 py-0.5 dark:border-slate-600 dark:bg-slate-800"
-          data-testid="gemini-provider"
-          :value="gemini.provider"
-          @change="
-            gemini.setConfig({
-              provider: ($event.target as HTMLSelectElement).value as 'api' | 'cli'
-            })
-          "
-        >
-          <option value="api">مفتاح API</option>
-          <option value="cli">Gemini CLI</option>
-        </select>
-      </label>
-
       <div class="space-y-2 rounded border p-2 dark:border-slate-700" data-testid="gemini-api-box">
         <h4 class="font-semibold">مفتاح API من Google AI Studio</h4>
         <p
@@ -143,39 +126,6 @@ async function test(): Promise<void> {
         </label>
         <p v-if="gemini.modelsSource === 'fallback'" class="text-xs text-mizaj-amber">
           تعذر الاتصال بـ Google؛ تُعرض قائمة احتياطية.
-        </p>
-      </div>
-
-      <div class="space-y-2 rounded border p-2 dark:border-slate-700" data-testid="gemini-cli-box">
-        <label class="flex items-center gap-2">
-          <input
-            type="checkbox"
-            data-testid="gemini-cli-enable"
-            :checked="gemini.config?.useCli"
-            @change="gemini.setConfig({ useCli: ($event.target as HTMLInputElement).checked })"
-          />
-          استخدام Gemini CLI المثبت على الجهاز (يستخدم حسابك المسجل فيه وحدوده)
-        </label>
-        <p class="flex flex-wrap items-center gap-2 text-xs">
-          <span
-            class="rounded px-2 py-0.5 text-white"
-            :class="gemini.state?.cli.detected ? 'bg-mizaj-emerald' : 'bg-slate-500'"
-            data-testid="gemini-cli-status"
-          >
-            {{ gemini.state?.cli.detected ? 'مكتشف' : 'غير مكتشف' }}
-          </span>
-          <span v-if="gemini.state?.cli.version" dir="ltr" data-testid="gemini-cli-version">
-            {{ gemini.state.cli.version }}
-          </span>
-          <button :class="btn" data-testid="gemini-cli-redetect" @click="gemini.redetectCli()">
-            إعادة الكشف
-          </button>
-        </p>
-        <p
-          v-if="gemini.provider === 'cli' && !(gemini.config?.useCli && gemini.state?.cli.detected)"
-          class="text-xs text-mizaj-amber"
-        >
-          اختر «استخدام Gemini CLI» أعلاه وتأكد من اكتشافه ليعمل هذا المزوّد.
         </p>
       </div>
     </template>

@@ -2,10 +2,10 @@ import { app, safeStorage } from 'electron'
 import { join } from 'node:path'
 import { handleSecure } from '../ipcGuard'
 import { resolveBase } from './api'
-import { defaultDeps } from './cli'
 import { GeminiConfigStore } from './config'
 import { GeminiKeyStore, type SafeStorageLike } from './keyStore'
 import { GeminiService } from './service'
+import { SessionStore } from './sessions'
 
 /**
  * safeStorage, except that the Linux `basic_text` fallback (a hard-coded password, no keyring) is
@@ -34,7 +34,7 @@ function pickStorage(): SafeStorageLike {
 }
 
 /**
- * IPC for the Gemini assistant. All network/CLI work happens here in the main process; the renderer
+ * IPC for the Gemini assistant. All network work happens here in the main process; the renderer
  * only ever receives a masked key hint. The test-only base URL override is honoured only when
  * the app is not packaged.
  */
@@ -45,7 +45,7 @@ export function registerGemini(): GeminiService {
     config: new GeminiConfigStore(join(dir, 'gemini-config.json')),
     fetch: (...a) => fetch(...a),
     base: resolveBase(process.env, !app.isPackaged),
-    cli: defaultDeps()
+    sessions: new SessionStore(join(dir, 'gemini-sessions'))
   })
   handleSecure('gemini:get-state', () => svc.getState())
   handleSecure('gemini:set-config', (_e, patch: unknown) => svc.setConfig(patch))
@@ -54,7 +54,10 @@ export function registerGemini(): GeminiService {
   handleSecure('gemini:clear-key', () => svc.clearKey())
   handleSecure('gemini:test-key', (_e, key: unknown) => svc.testKey(key))
   handleSecure('gemini:models', () => svc.models())
-  handleSecure('gemini:detect-cli', () => svc.redetectCli())
+  handleSecure('gemini:session-get', (_e, docId: unknown, text: unknown) =>
+    svc.getSession(docId, text)
+  )
+  handleSecure('gemini:session-reset', (_e, docId: unknown) => svc.resetSession(docId))
   handleSecure('gemini:ask', (_e, req: unknown) => svc.ask(req as never))
   return svc
 }

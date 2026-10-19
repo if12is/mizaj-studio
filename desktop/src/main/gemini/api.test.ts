@@ -254,7 +254,7 @@ describe('quota delay and 5xx backoff', () => {
     expect(long.retryAfterSec).toBe(90)
     expect(long.message).toContain('90')
     expect(long.message).toContain('flash-lite')
-    expect(long.message).toContain('Gemini CLI')
+    expect(long.message).toContain('flash-lite')
   })
   it('retries 503 twice with backoff, then succeeds', async () => {
     let n = 0

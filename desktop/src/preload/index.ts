@@ -96,7 +96,10 @@ const mizajAPI = {
     clearKey: (): Promise<unknown> => ipcRenderer.invoke('gemini:clear-key'),
     testKey: (key?: string): Promise<unknown> => ipcRenderer.invoke('gemini:test-key', key),
     models: (): Promise<unknown> => ipcRenderer.invoke('gemini:models'),
-    detectCli: (): Promise<unknown> => ipcRenderer.invoke('gemini:detect-cli'),
+    sessionGet: (docId: number, text: string): Promise<unknown> =>
+      ipcRenderer.invoke('gemini:session-get', docId, text),
+    sessionReset: (docId: number): Promise<unknown> =>
+      ipcRenderer.invoke('gemini:session-reset', docId),
     ask: (req: unknown): Promise<unknown> => ipcRenderer.invoke('gemini:ask', req)
   },
   onBeforeQuitFlush: (cb: () => Promise<void>): (() => void) => {

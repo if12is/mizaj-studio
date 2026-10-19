@@ -1,23 +1,16 @@
 import { existsSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
 
-export type GeminiProvider = 'api' | 'cli'
-
 /** Non-secret Gemini assistant settings; kept by the main process so it can enforce them. */
 export interface GeminiConfig {
   enabled: boolean
-  provider: GeminiProvider
   model: string
-  /** user opted in to the installed Gemini CLI */
-  useCli: boolean
   /** ISO time the user accepted the "text is sent to Google" notice; null = not yet */
   consentAt: string | null
 }
 
 export const DEFAULT_CONFIG: GeminiConfig = {
   enabled: false,
-  provider: 'api',
   model: '',
-  useCli: false,
   consentAt: null
 }
 
@@ -25,9 +18,7 @@ export function sanitizeConfig(raw: unknown): GeminiConfig {
   const o = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>
   return {
     enabled: o.enabled === true,
-    provider: o.provider === 'cli' ? 'cli' : 'api',
     model: typeof o.model === 'string' && /^[A-Za-z0-9._\-/]{0,120}$/.test(o.model) ? o.model : '',
-    useCli: o.useCli === true,
     consentAt: typeof o.consentAt === 'string' && o.consentAt.length < 40 ? o.consentAt : null
   }
 }
@@ -45,6 +36,16 @@ export class GeminiConfigStore {
       raw = null
     }
     this.cache = sanitizeConfig(raw)
+    // The removed Gemini CLI mode: settings that chose it simply become API-key settings, and the
+    // file is rewritten without the obsolete fields.
+    const old = raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : null
+    if (old && ('provider' in old || 'useCli' in old)) {
+      try {
+        this.write(this.cache)
+      } catch {
+        /* best effort; the in-memory config is already migrated */
+      }
+    }
     return this.cache
   }
 

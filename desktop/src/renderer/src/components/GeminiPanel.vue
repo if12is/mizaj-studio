@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { computed, nextTick, ref } from 'vue'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { useEditorStore } from '@renderer/stores/editor'
 import { useGeminiStore } from '@renderer/stores/gemini'
 import { useQualityStore } from '@renderer/stores/quality'
+import { useProjectsStore } from '@renderer/stores/projects'
 import { diffMarkEdits } from '@renderer/editor/markEdits'
 import { stripMarks } from '@renderer/editor/arabic'
 import { notify } from '@renderer/api/toast'
@@ -25,11 +26,18 @@ interface Turn {
   /** selection the suggestion refers to (apply is offered only if its base letters are identical) */
   sel: { from: number; to: number; text: string } | null
   applied: boolean
+  /** the document text changed since the previous question: context was re-sent */
+  refreshed: boolean
 }
 
 const editor = useEditorStore()
 const gemini = useGeminiStore()
 const quality = useQualityStore()
+const projects = useProjectsStore()
+const docId = computed(() => projects.currentDocument?.id ?? null)
+/** this document has a saved conversation (its text sits once in the chat context) */
+const saved = ref(false)
+const staleOnLoad = ref(false)
 const question = ref('')
 const scope = ref<'doc' | 'selection'>('doc')
 const turns = ref<Turn[]>([])
@@ -58,7 +66,8 @@ async function send(): Promise<void> {
     req: null,
     suggestion: null,
     sel: null,
-    applied: false
+    applied: false,
+    refreshed: false
   }
   let req: Parameters<typeof gemini.ask>[0]
   if (scope.value === 'selection') {
@@ -73,9 +82,16 @@ async function send(): Promise<void> {
       kind: 'selection',
       question: q,
       text: s.text,
-      context: sentenceAround(acc.getText(), s)
+      context: sentenceAround(acc.getText(), s),
+      ...(docId.value ? { docId: docId.value, docText: acc.getText() } : {})
     }
-  } else req = { kind: 'document', question: q, text: acc.getText() }
+  } else
+    req = {
+      kind: 'document',
+      question: q,
+      text: acc.getText(),
+      ...(docId.value ? { docId: docId.value } : {})
+    }
   turn.req = req
   turns.value.push(turn)
   question.value = ''
@@ -109,6 +125,11 @@ async function run(id: number, req: Req, cont: boolean, retried = false): Promis
       t.error = null
       t.answer = cont ? `${prior}${/\s$/.test(prior) ? '' : ' '}${r.text}` : r.text || '(لا نص)'
       t.truncated = r.truncated
+      if (r.contextRefreshed) t.refreshed = true
+      if (docId.value) {
+        saved.value = true
+        staleOnLoad.value = false
+      }
       t.cutoff = r.cutoff
       if (!cont) t.suggestion = r.suggestion
     } else if (r.retryAfterSec !== null && r.retryAfterSec <= 30 && !retried) {
@@ -127,6 +148,46 @@ async function run(id: number, req: Req, cont: boolean, retried = false): Promis
     list.value?.scrollTo({ top: list.value.scrollHeight })
   }
 }
+
+/** Restore the persisted conversation of the open document (history lives in the main process). */
+async function loadSession(): Promise<void> {
+  turns.value = []
+  saved.value = false
+  staleOnLoad.value = false
+  const id = docId.value
+  if (!id || !gemini.ready) return
+  const r = await gemini.sessionGet(id, editor.accessor?.getText() ?? '')
+  if (!r || docId.value !== id) return
+  turns.value = r.messages.map((m) => ({
+    id: ++seq,
+    scope: m.scope,
+    question: m.q,
+    answer: m.answer.replace(/```mizaj-suggestion[^\S\n]*\n[\s\S]*?```/, '').trim() || '(لا نص)',
+    error: null,
+    truncated: false,
+    cutoff: false,
+    countdown: null,
+    req: null,
+    suggestion: null,
+    sel: null,
+    applied: false,
+    refreshed: false
+  }))
+  saved.value = r.messages.length > 0
+  staleOnLoad.value = r.stale && r.messages.length > 0
+}
+
+async function newChat(): Promise<void> {
+  const id = docId.value
+  if (!id || busy.value) return
+  await gemini.sessionReset(id)
+  turns.value = []
+  saved.value = false
+  staleOnLoad.value = false
+}
+
+onMounted(() => void loadSession())
+watch([docId, () => gemini.ready], () => void loadSession())
 
 function resume(t: Turn): void {
   if (t.req && !busy.value) void run(t.id, t.req, true)
@@ -163,6 +224,35 @@ function apply(t: Turn): void {
       </button>
     </div>
     <template v-else>
+      <div
+        v-if="docId"
+        class="flex items-center justify-between gap-2 border-b px-3 py-1 text-xs dark:border-slate-700"
+      >
+        <span
+          v-if="saved"
+          class="rounded bg-mizaj-emerald/15 px-2 py-0.5 text-mizaj-emerald"
+          data-testid="gemini-context-saved"
+        >
+          محفوظ في سياق المحادثة
+        </span>
+        <span v-else class="text-slate-500">لم يُحفظ المستند في سياق المحادثة بعد</span>
+        <button
+          type="button"
+          class="rounded border px-2 py-0.5 hover:bg-slate-100 disabled:opacity-50 dark:border-slate-600 dark:hover:bg-slate-700"
+          :disabled="busy"
+          data-testid="gemini-new-chat"
+          @click="newChat"
+        >
+          محادثة جديدة
+        </button>
+      </div>
+      <p
+        v-if="staleOnLoad"
+        class="bg-mizaj-amber/20 px-3 py-1 text-xs text-mizaj-amber"
+        data-testid="gemini-context-stale"
+      >
+        تغيّر نص المستند منذ آخر سؤال؛ سيُحدَّث سياق المحادثة عند سؤالك التالي.
+      </p>
       <div ref="list" class="min-h-0 flex-1 space-y-3 overflow-auto p-3" aria-live="polite">
         <p v-if="!turns.length" class="text-slate-500" data-testid="gemini-hint">
           اسأل عن المستند الحالي (مثل «ما الكلمات المشكوك في تشكيلها؟»). لا يُرسَل شيء إلا عند الضغط
@@ -184,6 +274,13 @@ function apply(t: Turn): void {
             تجاوزتَ حدّ الاستخدام؛ ستُعاد المحاولة تلقائياً بعد {{ t.countdown }} ثانية…
           </p>
           <p v-else-if="t.answer === null && !t.error" class="text-slate-500">جاري الاستشارة...</p>
+          <p
+            v-if="t.refreshed"
+            class="text-xs text-mizaj-amber"
+            data-testid="gemini-context-refreshed"
+          >
+            تغيّر نص المستند، فجرى تحديث سياق المحادثة قبل هذه الإجابة.
+          </p>
           <p
             v-if="t.error"
             class="rounded bg-mizaj-amber/20 p-2 text-mizaj-amber"

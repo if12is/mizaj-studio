@@ -33,9 +33,7 @@ declare global {
 
   interface GeminiConfigDto {
     enabled: boolean
-    provider: 'api' | 'cli'
     model: string
-    useCli: boolean
     consentAt: string | null
   }
   interface GeminiStateDto {
@@ -43,7 +41,6 @@ declare global {
     hasKey: boolean
     keyHint: string | null
     encryptionAvailable: boolean
-    cli: { detected: boolean; version: string | null; path: string | null }
   }
   interface GeminiModelDto {
     id: string
@@ -57,7 +54,12 @@ declare global {
     suggestion: string | null
     truncated: boolean
     cutoff: boolean
-    provider: 'api' | 'cli'
+    contextRefreshed: boolean
+    context: 'explicit' | 'inline' | 'none'
+  }
+  interface GeminiSessionDto {
+    messages: { q: string; scope: 'doc' | 'selection'; answer: string }[]
+    stale: boolean
   }
   interface GeminiBridge {
     getState(): Promise<GeminiStateDto>
@@ -71,16 +73,25 @@ declare global {
     models(): Promise<
       GeminiOutcome<{ models: GeminiModelDto[]; defaultModel: string; source: 'live' | 'fallback' }>
     >
-    detectCli(): Promise<GeminiStateDto['cli']>
+    sessionGet(docId: number, text: string): Promise<GeminiOutcome<{ session: GeminiSessionDto }>>
+    sessionReset(docId: number): Promise<GeminiOutcome<object>>
     ask(
       req:
-        | { kind: 'document'; question: string; text: string; continueFrom?: string }
+        | {
+            kind: 'document'
+            question: string
+            text: string
+            docId?: number
+            continueFrom?: string
+          }
         | { kind: 'word'; question: string; word: string; sentence: string; continueFrom?: string }
         | {
             kind: 'selection'
             question: string
             text: string
             context?: string
+            docId?: number
+            docText?: string
             continueFrom?: string
           }
     ): Promise<GeminiOutcome<{ result: GeminiAskResultDto }>>

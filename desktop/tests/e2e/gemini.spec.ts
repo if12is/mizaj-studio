@@ -220,9 +220,9 @@ test('enable, key rejected then accepted, live model list, key stored encrypted'
     false
   )
 
-  // CLI box with detection controls exists (no gemini on the test PATH)
-  await expect(t('gemini-cli-status')).toHaveText(/مكتشف|غير مكتشف/)
-  await t('gemini-cli-redetect').click()
+  // the removed CLI mode leaves no UI behind
+  await expect(t('gemini-cli-box')).toHaveCount(0)
+  await expect(t('gemini-provider')).toHaveCount(0)
   await t('settings-close').click()
 })
 

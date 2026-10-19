@@ -463,7 +463,24 @@ html.hc .cm-lowconf {
   text-decoration: none;
 }
 
-.gemini-md p { margin: 0 0 0.5rem; }
-.gemini-md ul, .gemini-md ol { margin: 0 0 0.5rem; padding-inline-start: 1.25rem; list-style: revert; }
-.gemini-md h3, .gemini-md h4, .gemini-md h5, .gemini-md h6 { margin: 0.5rem 0 0.25rem; font-weight: 700; }
-.gemini-md code { font-family: monospace; direction: ltr; unicode-bidi: isolate; }
+.gemini-md p {
+  margin: 0 0 0.5rem;
+}
+.gemini-md ul,
+.gemini-md ol {
+  margin: 0 0 0.5rem;
+  padding-inline-start: 1.25rem;
+  list-style: revert;
+}
+.gemini-md h3,
+.gemini-md h4,
+.gemini-md h5,
+.gemini-md h6 {
+  margin: 0.5rem 0 0.25rem;
+  font-weight: 700;
+}
+.gemini-md code {
+  font-family: monospace;
+  direction: ltr;
+  unicode-bidi: isolate;
+}
