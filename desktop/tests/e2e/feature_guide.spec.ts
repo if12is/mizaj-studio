@@ -40,6 +40,7 @@ test.afterAll(async () => {
 test('enabling a feature: toast says where, «أرني» closes settings and spotlights it, badge until first use', async () => {
   await expect(t('toggle-gemini-panel')).toHaveCount(0)
   await t('open-settings').click()
+  await t('settings-mode-advanced').click()
   await t('tab-online').click()
   await expect(t('gemini-state')).toHaveText('غير مفعّل')
   await t('gemini-enable').check()
@@ -72,6 +73,7 @@ test('enabling a feature: toast says where, «أرني» closes settings and spo
 
 test('resources list shows a clear status for every item', async () => {
   await t('open-settings').click()
+  await t('settings-mode-advanced').click()
   await t('tab-online').click()
   const states = t('resource-state')
   await expect(states.first()).toBeVisible()
