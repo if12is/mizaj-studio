@@ -1,5 +1,7 @@
 import {
+  CONTINUE_PROMPT,
   generate,
+  type Sleep,
   listModels,
   FALLBACK_MODELS,
   pickDefaultModel,
@@ -15,9 +17,10 @@ import {
   buildDocumentPrompt,
   buildWordPrompt,
   buildSelectionPrompt,
+  docLimit,
+  systemPromptFor,
   MAX_SELECTION_CHARS,
   parseReply,
-  SYSTEM_PROMPT,
   MAX_DOC_CHARS,
   MAX_QUESTION_CHARS,
   MAX_SENTENCE_CHARS,
@@ -34,19 +37,41 @@ export interface GeminiState {
 }
 
 export type AskRequest =
-  | { kind: 'document'; question: string; text: string }
-  | { kind: 'word'; question: string; word: string; sentence: string }
-  | { kind: 'selection'; question: string; text: string }
+  | { kind: 'document'; question: string; text: string; continueFrom?: string }
+  | { kind: 'word'; question: string; word: string; sentence: string; continueFrom?: string }
+  | {
+      kind: 'selection'
+      question: string
+      text: string
+      /** sentence containing the selection (context for word questions) */
+      context?: string
+      continueFrom?: string
+    }
 
 export interface AskResult extends ParsedReply {
   truncated: boolean
+  /** the answer stopped at the output limit: offer «متابعة» */
+  cutoff: boolean
   provider: 'api' | 'cli'
 }
 
-export type Outcome<T> = ({ ok: true } & T) | { ok: false; code: string; message: string }
+export type Outcome<T> =
+  | ({ ok: true } & T)
+  | { ok: false; code: string; message: string; retryAfterSec?: number }
 
-function fail(e: unknown): { ok: false; code: string; message: string } {
-  if (e instanceof GeminiError) return { ok: false, code: e.code, message: e.message }
+function fail(e: unknown): {
+  ok: false
+  code: string
+  message: string
+  retryAfterSec?: number
+} {
+  if (e instanceof GeminiError)
+    return {
+      ok: false,
+      code: e.code,
+      message: e.message,
+      ...(e.retryAfterSec !== undefined ? { retryAfterSec: e.retryAfterSec } : {})
+    }
   return { ok: false, code: 'bad_response', message: messageFor('bad_response') }
 }
 
@@ -56,11 +81,14 @@ export interface ServiceDeps {
   fetch: FetchLike
   base: string
   cli: CliDeps
+  /** test hook for the 500/503 backoff */
+  sleep?: Sleep
 }
 
 export class GeminiService {
   private cliStatus: CliStatus = { detected: false, version: null, path: null }
   private cliChecked = false
+  private limits = new Map<string, ModelInfo>()
   constructor(private readonly d: ServiceDeps) {}
 
   async getState(): Promise<GeminiState> {
@@ -77,6 +105,10 @@ export class GeminiService {
       encryptionAvailable: this.d.keys.encryptionAvailable(),
       cli: this.cliStatus
     }
+  }
+
+  private remember(models: ModelInfo[]): void {
+    this.limits = new Map(models.map((m) => [m.id, m]))
   }
 
   async redetectCli(): Promise<CliStatus> {
@@ -124,6 +156,7 @@ export class GeminiService {
     if (!isPlausibleKey(key)) return fail(new GeminiError('invalid_key'))
     try {
       const models = await listModels(this.d.fetch, this.d.base, key)
+      this.remember(models)
       return { ok: true, models, defaultModel: pickDefaultModel(models) }
     } catch (e) {
       return fail(e)
@@ -138,6 +171,7 @@ export class GeminiService {
     if (!key) return fail(new GeminiError('no_key'))
     try {
       const models = await listModels(this.d.fetch, this.d.base, key)
+      this.remember(models)
       return { ok: true, models, defaultModel: pickDefaultModel(models), source: 'live' }
     } catch (e) {
       if (e instanceof GeminiError && (e.code === 'offline' || e.code === 'timeout')) {
@@ -156,16 +190,18 @@ export class GeminiService {
       const q = (req as { question?: unknown }).question
       if (typeof q !== 'string' || !q.trim() || q.length > MAX_QUESTION_CHARS)
         throw new GeminiError('bad_request')
+      const cf = (req as { continueFrom?: unknown }).continueFrom
+      if (cf !== undefined && (typeof cf !== 'string' || cf.length > 200_000))
+        throw new GeminiError('bad_request')
+      const continueFrom = typeof cf === 'string' && cf ? cf : undefined
+      const model = isValidModelId(cfg.model) ? cfg.model : FALLBACK_MODELS[0]
+      const info = cfg.provider === 'api' ? this.limits.get(model) : undefined
       let prompt: string
       let truncated = false
       if (req.kind === 'document') {
-        if (
-          typeof req.text !== 'string' ||
-          !req.text.trim() ||
-          req.text.length > MAX_DOC_CHARS * 20
-        )
+        if (typeof req.text !== 'string' || !req.text.trim() || req.text.length > MAX_DOC_CHARS * 5)
           throw new GeminiError('bad_request')
-        const b = buildDocumentPrompt(q, req.text)
+        const b = buildDocumentPrompt(q, req.text, docLimit(info?.inputTokenLimit))
         prompt = b.text
         truncated = b.truncated
       } else if (req.kind === 'word') {
@@ -184,20 +220,38 @@ export class GeminiService {
           req.text.length > MAX_SELECTION_CHARS
         )
           throw new GeminiError('bad_request')
-        prompt = buildSelectionPrompt(q, req.text)
+        const ctx = (req as { context?: unknown }).context
+        prompt = buildSelectionPrompt(
+          q,
+          req.text,
+          typeof ctx === 'string' ? ctx.slice(0, MAX_SENTENCE_CHARS) : undefined
+        )
       } else throw new GeminiError('bad_request')
 
+      const system = systemPromptFor(req.kind)
       let raw: string
+      let cutoff = false
       if (cfg.provider === 'cli') {
         if (!cfg.useCli) throw new GeminiError('disabled')
-        raw = await askCli(`${SYSTEM_PROMPT}\n\n${prompt}`, this.d.cli)
+        const cont = continueFrom
+          ? `\n\nإجابتك السابقة (انقطعت):\n${continueFrom}\n\n${CONTINUE_PROMPT}`
+          : ''
+        raw = await askCli(`${system}\n\n${prompt}${cont}`, this.d.cli)
       } else {
         const key = this.d.keys.load()
         if (!key) throw new GeminiError('no_key')
-        const model = isValidModelId(cfg.model) ? cfg.model : FALLBACK_MODELS[0]
-        raw = await generate(this.d.fetch, this.d.base, key, model, SYSTEM_PROMPT, prompt)
+        const g = await generate(this.d.fetch, this.d.base, key, model, system, prompt, {
+          outputTokenLimit: info?.outputTokenLimit,
+          continueFrom,
+          sleep: this.d.sleep
+        })
+        raw = g.text
+        cutoff = g.cutoff
       }
-      return { ok: true, result: { ...parseReply(raw), truncated, provider: cfg.provider } }
+      return {
+        ok: true,
+        result: { ...parseReply(raw, req.kind), truncated, cutoff, provider: cfg.provider }
+      }
     } catch (e) {
       return fail(e)
     }

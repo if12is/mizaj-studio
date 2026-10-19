@@ -1,4 +1,4 @@
-import { GeminiError } from './errors'
+import { GeminiError, quotaMessage } from './errors'
 
 export const DEFAULT_BASE = 'https://generativelanguage.googleapis.com'
 export const ALLOWED_HOST = 'generativelanguage.googleapis.com'
@@ -11,6 +11,8 @@ export const FALLBACK_MODELS = ['gemini-flash-latest', 'gemini-pro-latest']
 export interface ModelInfo {
   id: string
   display: string
+  inputTokenLimit?: number
+  outputTokenLimit?: number
 }
 
 /**
@@ -93,20 +95,60 @@ export function parseModels(json: unknown): ModelInfo[] {
       name?: unknown
       displayName?: unknown
       supportedGenerationMethods?: unknown
+      inputTokenLimit?: unknown
+      outputTokenLimit?: unknown
     }
     if (typeof r.name !== 'string') continue
     const methods = Array.isArray(r.supportedGenerationMethods) ? r.supportedGenerationMethods : []
     if (!methods.includes('generateContent')) continue
     const id = r.name.replace(/^models\//, '')
     if (!isValidModelId(id) || NOT_TEXT.test(id)) continue
-    out.push({ id, display: typeof r.displayName === 'string' ? r.displayName : id })
+    const lim = (v: unknown): number | undefined =>
+      typeof v === 'number' && Number.isFinite(v) && v > 0 ? v : undefined
+    const info: ModelInfo = {
+      id,
+      display: typeof r.displayName === 'string' ? r.displayName : id
+    }
+    const il = lim(r.inputTokenLimit)
+    const ol = lim(r.outputTokenLimit)
+    if (il) info.inputTokenLimit = il
+    if (ol) info.outputTokenLimit = ol
+    out.push(info)
   }
   return sortModels(out)
 }
 
 export type FetchLike = typeof fetch
 
+export type Sleep = (ms: number) => Promise<void>
+const defaultSleep: Sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+/** waits before retry 1 and 2 after a 500/503 */
+export const BACKOFF_MS = [1_000, 3_000]
+
 async function request(
+  f: FetchLike,
+  base: string,
+  path: string,
+  key: string,
+  init: { method: 'GET' | 'POST'; body?: unknown },
+  timeoutMs: number,
+  sleep?: Sleep
+): Promise<unknown> {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await requestOnce(f, base, path, key, init, timeoutMs)
+    } catch (e) {
+      const transient = e instanceof GeminiError && e.message === 'transient'
+      if (!sleep || !transient || attempt >= BACKOFF_MS.length) {
+        if (transient) throw new GeminiError('bad_response')
+        throw e
+      }
+      await sleep(BACKOFF_MS[attempt])
+    }
+  }
+}
+
+async function requestOnce(
   f: FetchLike,
   base: string,
   path: string,
@@ -147,16 +189,44 @@ async function request(
   } catch {
     json = null
   }
-  if (!res.ok) throw httpError(res.status, json)
+  if (!res.ok) {
+    if (res.status === 500 || res.status === 503) throw new GeminiError('bad_response', 'transient')
+    throw httpError(res.status, json)
+  }
   if (json === null) throw new GeminiError('bad_response')
   return json
+}
+
+/** auto-retry waits at most this long (the UI shows a countdown) */
+export const MAX_AUTO_RETRY_SEC = 30
+
+/** RetryInfo.retryDelay ("27s", "1.5s") from error details, else "retry in 27.1s" in the message. */
+export function parseRetryDelay(details: unknown, message?: string): number | undefined {
+  if (Array.isArray(details)) {
+    for (const d of details) {
+      const v = (d as { retryDelay?: unknown })?.retryDelay
+      if (typeof v === 'string') {
+        const m = /^(\d+(?:\.\d+)?)s$/.exec(v.trim())
+        if (m) return parseFloat(m[1])
+      }
+    }
+  }
+  const m = /retry in (\d+(?:\.\d+)?)\s*s/i.exec(message ?? '')
+  return m ? parseFloat(m[1]) : undefined
 }
 
 export function httpError(status: number, json: unknown): GeminiError {
   const err = (json as { error?: { status?: string; message?: string; details?: unknown[] } })
     ?.error
   const blob = JSON.stringify(err?.details ?? '') + (err?.message ?? '')
-  if (status === 429 || err?.status === 'RESOURCE_EXHAUSTED') return new GeminiError('quota')
+  if (status === 429 || err?.status === 'RESOURCE_EXHAUSTED') {
+    const sec = parseRetryDelay(err?.details, err?.message)
+    return new GeminiError(
+      'quota',
+      quotaMessage(sec && sec > MAX_AUTO_RETRY_SEC ? sec : undefined),
+      sec
+    )
+  }
   if (
     status === 401 ||
     status === 403 ||
@@ -182,15 +252,53 @@ export async function listModels(f: FetchLike, base: string, key: string): Promi
   return models
 }
 
+export interface GenerateOptions {
+  /** model limits from the models list, when known */
+  outputTokenLimit?: number
+  /** the partial answer so far: ask the model to continue it */
+  continueFrom?: string
+  sleep?: Sleep
+}
+
+export interface GenerateResult {
+  text: string
+  /** the model stopped because it hit the output budget */
+  cutoff: boolean
+}
+
+export const DEFAULT_MAX_OUTPUT = 8192
+export const CONTINUE_PROMPT = 'تابع الإجابة من حيث توقفت تماماً دون تكرار ما سبق.'
+
+export function generationConfig(
+  model: string,
+  outputTokenLimit?: number
+): Record<string, unknown> {
+  const cfg: Record<string, unknown> = {
+    temperature: 0.2,
+    maxOutputTokens: Math.min(DEFAULT_MAX_OUTPUT, outputTokenLimit ?? DEFAULT_MAX_OUTPUT)
+  }
+  // 2.5 models spend the output budget on hidden "thinking": keep it modest.
+  if (/^gemini-2\.5-(flash|pro)(?!-lite)/.test(model)) cfg.thinkingConfig = { thinkingBudget: 1024 }
+  return cfg
+}
+
 export async function generate(
   f: FetchLike,
   base: string,
   key: string,
   model: string,
   system: string,
-  prompt: string
-): Promise<string> {
+  prompt: string,
+  opts: GenerateOptions = {}
+): Promise<GenerateResult> {
   if (!isValidModelId(model)) throw new GeminiError('bad_request')
+  const contents: { role: string; parts: { text: string }[] }[] = [
+    { role: 'user', parts: [{ text: prompt }] }
+  ]
+  if (opts.continueFrom) {
+    contents.push({ role: 'model', parts: [{ text: opts.continueFrom }] })
+    contents.push({ role: 'user', parts: [{ text: CONTINUE_PROMPT }] })
+  }
   const json = (await request(
     f,
     base,
@@ -200,26 +308,36 @@ export async function generate(
       method: 'POST',
       body: {
         systemInstruction: { parts: [{ text: system }] },
-        contents: [{ role: 'user', parts: [{ text: prompt }] }],
-        generationConfig: { temperature: 0.2, maxOutputTokens: 2048 }
+        contents,
+        generationConfig: generationConfig(model, opts.outputTokenLimit)
       }
     },
-    ASK_TIMEOUT_MS
+    ASK_TIMEOUT_MS,
+    opts.sleep ?? defaultSleep
   )) as {
     promptFeedback?: { blockReason?: string }
-    candidates?: { finishReason?: string; content?: { parts?: { text?: unknown }[] } }[]
+    candidates?: {
+      finishReason?: string
+      content?: { parts?: { text?: unknown; thought?: unknown }[] }
+    }[]
   }
-  if (json.promptFeedback?.blockReason) throw new GeminiError('safety')
+  if (json.promptFeedback?.blockReason) {
+    throw new GeminiError(json.promptFeedback.blockReason === 'OTHER' ? 'blocked_other' : 'safety')
+  }
   const c = json.candidates?.[0]
   const text = (c?.content?.parts ?? [])
-    .map((p) => (typeof p.text === 'string' ? p.text : ''))
+    .map((p) => (typeof p.text === 'string' && p.thought !== true ? p.text : ''))
     .join('')
     .trim()
+  const fr = c?.finishReason
   if (!text) {
-    if (c?.finishReason === 'SAFETY' || c?.finishReason === 'PROHIBITED_CONTENT')
+    if (fr === 'SAFETY' || fr === 'PROHIBITED_CONTENT' || fr === 'BLOCKLIST' || fr === 'SPII')
       throw new GeminiError('safety')
+    if (fr === 'RECITATION') throw new GeminiError('recitation')
+    if (fr === 'MAX_TOKENS') throw new GeminiError('empty')
+    if (fr === 'OTHER') throw new GeminiError('blocked_other')
     throw new GeminiError('bad_response')
   }
-  if (c?.finishReason === 'SAFETY') throw new GeminiError('safety')
-  return text
+  if (fr === 'SAFETY') throw new GeminiError('safety')
+  return { text, cutoff: fr === 'MAX_TOKENS' }
 }

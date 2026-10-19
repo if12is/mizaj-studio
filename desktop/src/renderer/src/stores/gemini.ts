@@ -8,6 +8,9 @@ export interface GeminiAnswer {
   text: string
   suggestion: string | null
   truncated: boolean
+  cutoff: boolean
+  /** quota: seconds Google asked us to wait */
+  retryAfterSec: number | null
   message: string | null
 }
 
@@ -131,18 +134,22 @@ export const useGeminiStore = defineStore('gemini', () => {
       text: '',
       suggestion: null,
       truncated: false,
+      cutoff: false,
+      retryAfterSec: null,
       message: null
     }
     if (!api()) return { ...none, message: 'هذه الميزة متاحة في تطبيق سطح المكتب فقط.' }
     if (!(await ensureConsent()))
       return { ...none, message: 'لم يُرسل شيء: لم تُوافق على الإشعار.' }
     const r = await api()!.ask(req)
-    if (!r.ok) return { ...none, message: r.message }
+    if (!r.ok) return { ...none, message: r.message, retryAfterSec: r.retryAfterSec ?? null }
     return {
       ok: true,
       text: r.result.text,
       suggestion: r.result.suggestion,
       truncated: r.result.truncated,
+      cutoff: r.result.cutoff,
+      retryAfterSec: null,
       message: null
     }
   }
