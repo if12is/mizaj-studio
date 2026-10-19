@@ -52,6 +52,22 @@ try {
 } catch {
   /* nothing remembered */
 }
+/** Fill the case fields from the document with the legal «بطاقة القضية» extractor (suggestion; editable). */
+async function fillFromDocument(): Promise<void> {
+  try {
+    const r = await useApi().post<{ fields: { key: string; value: string }[] }>(
+      '/api/legal/case-card',
+      { text: editor.accessor?.getText() ?? '' }
+    )
+    const by = Object.fromEntries(r.fields.map((f) => [f.key, f.value]))
+    if (by.case_number) caseData.number = by.case_number
+    if (by.court) caseData.court = by.court
+    if (by.parties) caseData.parties = by.parties
+    if (!r.fields.length) notify('لم يُعثر على بيانات قضية في النص.', { kind: 'info' })
+  } catch {
+    /* error toast shown by the api client */
+  }
+}
 function rememberCase(): void {
   try {
     localStorage.setItem(KEY, JSON.stringify({ on: useCase.value, ...caseData }))
@@ -196,6 +212,13 @@ const btn =
             <span>إضافة بيانات القضية إلى الترويسة</span>
           </label>
           <div v-if="useCase" class="space-y-2">
+            <button
+              class="rounded border border-slate-300 px-2 py-1 text-xs hover:bg-slate-100 dark:border-slate-500 dark:hover:bg-slate-700"
+              data-testid="print-case-fill"
+              @click="fillFromDocument"
+            >
+              استخراج من نص المستند
+            </button>
             <label class="block">
               <span class="mb-1 block">رقم القضية</span>
               <input v-model="caseData.number" :class="field" data-testid="print-case-number" />

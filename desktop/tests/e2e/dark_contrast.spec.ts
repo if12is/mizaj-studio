@@ -96,7 +96,8 @@ test('dark mode: text contrast meets WCAG AA on the main screens', async () => {
   await t('toolbar-history').click()
   await page.waitForTimeout(400)
   await expectClean('history panel')
-  await t('toolbar-history').click()
+  await page.keyboard.press('Control+Shift+h')
+  await expect(t('history-panel')).toHaveCount(0)
 
   await page.keyboard.press('Control+k')
   await t('palette-input').fill('ت')

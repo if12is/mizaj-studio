@@ -166,7 +166,7 @@ test('start screen: recent files with project, relative time and snippet; resume
   await expect(t('start-recent-empty')).toBeVisible()
 
   const p = await api<{ id: number }>('POST', '/api/projects', { name: 'قضية الإيجار' })
-  const a = await api<{ id: number }>('POST', '/api/documents', {
+  await api('POST', '/api/documents', {
     project_id: p.id,
     title: 'عقد الإيجار',
     raw_content: LINES.join('\n')

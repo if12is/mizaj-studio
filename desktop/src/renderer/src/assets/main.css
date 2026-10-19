@@ -494,9 +494,14 @@ html.hc .cm-lowconf {
 }
 
 /* ---- dark mode: muted text must stay AA (4.5:1) on slate-900/800 surfaces; slate-500 (#64748b) was 3.75:1 ---- */
-.dark .text-slate-500,
-.dark .placeholder\:text-slate-500::placeholder {
-  color: #94a3b8;
+html.dark .text-slate-500,
+html.dark .placeholder\:text-slate-500::placeholder {
+  color: #b0bccd; /* 5.9:1 even on slate-700 selected rows (#94a3b8 was 4.0:1 there) */
+}
+html.dark .text-red-600,
+html.dark .text-red-500,
+html.dark .dark\:text-red-400 {
+  color: #fca5a5;
 }
 /* white text on the brand emerald (#10B981) is only 2.5:1: filled emerald controls use emerald-700 (5.5:1) */
 .bg-mizaj-emerald.text-white {
