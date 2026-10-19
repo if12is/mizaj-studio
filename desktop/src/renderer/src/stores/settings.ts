@@ -118,6 +118,7 @@ export const useSettingsStore = defineStore('settings', () => {
   /** Applies immediately (optimistic), then persists; rolls back on failure. */
   const pending = new Map<string, { seq: number; value: string }>()
   let appliedSeq = 0
+  let putChain: Promise<void> = Promise.resolve()
   async function update(patch: SettingsMap): Promise<void> {
     const seq = ++updateSeq
     const prev = values.value
@@ -126,7 +127,13 @@ export const useSettingsStore = defineStore('settings', () => {
     values.value = { ...prev, ...patch }
     applyToDom()
     try {
-      const echo = await useApi().put<SettingsMap>('/api/settings', patch)
+      // one PUT at a time, in order: the server may run concurrent requests in any order
+      const send = putChain.then(() => useApi().put<SettingsMap>('/api/settings', patch))
+      putChain = send.then(
+        () => undefined,
+        () => undefined
+      )
+      const echo = await send
       // Requests can finish out of order (a debounced panel-size save racing a dock toggle):
       // an echo never overrides a value the user set later and the server has not confirmed.
       for (const k of Object.keys(patch)) if (pending.get(k)?.seq === seq) pending.delete(k)

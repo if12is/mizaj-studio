@@ -6,6 +6,7 @@ import { useBatchStore } from './batch'
 import { usePacksStore, type PackPreview } from './packs'
 import { useOnlineStore } from './online'
 
+type SettingsMapT = Record<string, string>
 type Call = { method: string; url: string; body: unknown }
 let calls: Call[] = []
 let handler: (c: Call) => unknown = () => ({})
@@ -223,52 +224,36 @@ describe('online store', () => {
   })
 })
 
-describe('settings store: out-of-order saves', () => {
-  it('a stale echo never undoes a newer local change that is still in flight', async () => {
+describe('settings store: saves go out one at a time, in order', () => {
+  it('a second save waits for the first, and the newest value wins locally and on the server', async () => {
     const s = useSettingsStore()
+    const sent: SettingsMapT[] = []
     const resolvers: (() => void)[] = []
-    // the server answers the dock toggle with the dock value it had before the panel-size save
+    let server: SettingsMapT = {}
     vi.stubGlobal('fetch', (_u: string, init?: RequestInit) => {
-      const body = JSON.parse(String(init?.body))
-      const echo = body.panel_dock
-        ? { panel_dock: 'side', panel_height: '300' }
-        : { panel_dock: 'bottom', panel_height: body.panel_height }
+      const body = JSON.parse(String(init?.body)) as SettingsMapT
+      sent.push(body)
       return new Promise<Response>((res) =>
-        resolvers.push(() => res(new Response(JSON.stringify(echo), { status: 200 })))
+        resolvers.push(() => {
+          server = { ...server, ...body }
+          res(new Response(JSON.stringify(server), { status: 200 }))
+        })
       )
     })
-    const dock = s.update({ panel_dock: 'side' })
-    const size = s.update({ panel_height: '316' })
-    await vi.waitFor(() => expect(resolvers).toHaveLength(2))
-    resolvers[1]() // the newer request (size) answers first, echoing the old dock
-    await size
-    expect(s.values.panel_dock).toBe('side')
-    expect(s.values.panel_height).toBe('316')
+    const a = s.update({ panel_width: '256' })
+    const b = s.update({ panel_width: '240' })
+    expect(s.values.panel_width).toBe('240')
+    await vi.waitFor(() => expect(sent).toHaveLength(1))
+    await new Promise((r) => setTimeout(r, 10))
+    expect(sent).toHaveLength(1) // the second PUT is not sent while the first is in flight
     resolvers[0]()
-    await dock
-    expect(s.values.panel_dock).toBe('side')
-    vi.stubGlobal('fetch', fakeFetch)
-  })
-})
-
-describe('settings store: late echo of an older save', () => {
-  it('is ignored once a newer save has been applied', async () => {
-    const s = useSettingsStore()
-    const resolvers: (() => void)[] = []
-    vi.stubGlobal('fetch', (_u: string, init?: RequestInit) => {
-      const body = JSON.parse(String(init?.body))
-      return new Promise<Response>((res) =>
-        resolvers.push(() => res(new Response(JSON.stringify(body), { status: 200 })))
-      )
-    })
-    const collapse = s.update({ panel_collapsed: 'true' })
-    const expand = s.update({ panel_collapsed: 'false' })
-    await vi.waitFor(() => expect(resolvers).toHaveLength(2))
+    await a
+    expect(s.values.panel_width).toBe('240') // the first echo does not undo the newer value
+    await vi.waitFor(() => expect(sent).toHaveLength(2))
     resolvers[1]()
-    await expand
-    resolvers[0]() // the collapse echo arrives last
-    await collapse
-    expect(s.values.panel_collapsed).toBe('false')
+    await b
+    expect(server.panel_width).toBe('240')
+    expect(s.values.panel_width).toBe('240')
     vi.stubGlobal('fetch', fakeFetch)
   })
 })
