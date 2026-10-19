@@ -12,7 +12,16 @@ import { isPortable, resolveUserDataDir } from './paths'
 import { registerDiagnostics } from './diagnosticsIpc'
 import { registerGemini } from './gemini/ipc'
 import { PythonProcessManager, resolveSidecar, STATUS_EVENT } from './pythonManager'
-import { broadcastStatus, createMainWindow, registerIpc, requestFlush } from './window'
+import {
+  broadcastStatus,
+  createMainWindow,
+  registerIpc,
+  requestFlush,
+  setHideOnClose,
+  setOnMainClosed,
+  showMainWindow
+} from './window'
+import { registerSystemwide } from './systemwide/ipc'
 import { UPDATER_STATUS_CHANNEL, UpdaterController, type UpdaterLike } from './updater'
 
 // Tests only: isolate user data (must run before anything reads userData).
@@ -130,7 +139,22 @@ app.on('will-quit', (e) => {
   })
 })
 
-app.on('window-all-closed', () => app.quit())
+// «مِزَاج في أي برنامج» (opt-in, off by default): global shortcuts, popup, tray / background mode
+const systemwide = registerSystemwide({
+  log,
+  getBackend: () => ({
+    baseUrl: manager.getStatus().port ? `http://127.0.0.1:${manager.getStatus().port}` : null,
+    token: apiToken
+  }),
+  showMainWindow
+})
+setHideOnClose(() => systemwide.shouldHideOnClose())
+// the (hidden) popup must not keep the app alive once the main window is really closed
+setOnMainClosed(() => systemwide.closePopup())
+
+app.on('window-all-closed', () => {
+  if (!systemwide.backgroundActive()) app.quit()
+})
 
 // Remove Electron's default menu: its accelerators (e.g. Ctrl+Shift+R "Force Reload")
 // would shadow the editor shortcuts. The window is frameless, so no menu is shown anyway.
@@ -143,14 +167,18 @@ Menu.setApplicationMenu(
 registerDiagnostics({ manager, log, portable: isPortable(process.env), apiToken })
 registerGemini()
 
-void app.whenReady().then(() => {
-  log.info('Mizaj Studio starting, userData=', app.getPath('userData'))
-  hardenSession(session.defaultSession, appLocation, log)
-  registerIpc(() => manager.getStatus(), apiToken)
-  manager.start()
-  createMainWindow()
-  updater.start()
-  app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) createMainWindow()
+if (systemwide.mustQuit) {
+  // another instance already runs in the tray: it shows its window (second-instance), this one exits
+  app.quit()
+} else
+  void app.whenReady().then(() => {
+    log.info('Mizaj Studio starting, userData=', app.getPath('userData'))
+    hardenSession(session.defaultSession, appLocation, log)
+    registerIpc(() => manager.getStatus(), apiToken)
+    manager.start()
+    createMainWindow()
+    updater.start()
+    app.on('activate', () => {
+      if (BrowserWindow.getAllWindows().length === 0) createMainWindow()
+    })
   })
-})

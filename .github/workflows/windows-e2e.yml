@@ -176,3 +176,49 @@ jobs:
             ${{ runner.temp }}\win-e2e-userdata\logs
             ${{ runner.temp }}\win-e2e-userdata\*.png
             desktop/test-results
+
+  # «مِزَاج في أي برنامج»: the REAL Windows automation (PowerShell helper, SendInput, clipboard, Word COM)
+  # against Notepad (and Word when the runner has it). No installer and no Python are needed: the
+  # backend is a deterministic fake, this job is about the OS side. Spec: desktop/src/main/systemwide/winSmoke.test.ts
+  systemwide-smoke:
+    name: System-wide (Notepad round trip, clipboard restore, Word if installed)
+    runs-on: windows-latest
+    timeout-minutes: 25
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20.11.0'
+          cache: npm
+          cache-dependency-path: desktop/package-lock.json
+
+      - name: Parse the helper scripts with Windows PowerShell 5.1 (what users run)
+        shell: powershell
+        run: |
+          $bad = 0
+          foreach ($f in (Get-ChildItem desktop/resources/systemwide/*.ps1), (Get-Item desktop/tests/win-smoke/word-fixture.ps1)) {
+            $errs = $null; $tok = $null
+            [void][System.Management.Automation.Language.Parser]::ParseFile($f.FullName, [ref]$tok, [ref]$errs)
+            if ($errs.Count) { $errs | ForEach-Object { Write-Host "::error file=$($f.FullName),line=$($_.Extent.StartLineNumber)::$($_.Message)" }; $bad++ }
+            else { Write-Host "OK $($f.Name)" }
+          }
+          if ($bad) { exit 1 }
+
+      - name: Install desktop dependencies
+        working-directory: desktop
+        run: npm ci
+
+      - name: Run the system-wide smoke test
+        working-directory: desktop
+        env:
+          MIZAJ_WIN_SMOKE: '1'
+        run: npx vitest run src/main/systemwide/winSmoke.test.ts --reporter verbose
+
+      - name: Stop leftover processes
+        if: always()
+        run: |
+          Get-Process notepad, WINWORD -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue

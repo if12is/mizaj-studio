@@ -59,7 +59,8 @@ describe('settings store: openSettings + defaults', () => {
       'online',
       'packs',
       'backup',
-      'editor-quality'
+      'editor-quality',
+      'systemwide'
     ])
   })
   it('online features are off by default', () => {

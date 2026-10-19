@@ -22,6 +22,11 @@ extraResources:
     to: models/catt_eo
     filter:
       - '**/*.onnx'
+  # «مِزَاج في أي برنامج»: Windows helpers (PowerShell / Word COM) and the tray icon
+  - from: resources/systemwide
+    to: systemwide
+  - from: build/icon.png
+    to: tray.png
   - from: build/THIRD_PARTY_LICENSES.txt
     to: THIRD_PARTY_LICENSES.txt
   - from: ../LICENSE

@@ -104,6 +104,23 @@ const mizajAPI = {
       ipcRenderer.invoke('gemini:session-reset', docId),
     ask: (req: unknown): Promise<unknown> => ipcRenderer.invoke('gemini:ask', req)
   },
+  // «مِزَاج في أي برنامج»: settings page and the floating popup (main validates every call)
+  systemwide: {
+    getState: (): Promise<unknown> => ipcRenderer.invoke('systemwide:get-state'),
+    setConfig: (patch: unknown): Promise<unknown> =>
+      ipcRenderer.invoke('systemwide:set-config', patch),
+    popupReady: (): Promise<unknown> => ipcRenderer.invoke('systemwide:popup-ready'),
+    popupRun: (op: string): Promise<void> => ipcRenderer.invoke('systemwide:popup-run', op),
+    popupApply: (): Promise<void> => ipcRenderer.invoke('systemwide:popup-apply'),
+    popupCancel: (): Promise<void> => ipcRenderer.invoke('systemwide:popup-cancel'),
+    popupResize: (height: number): Promise<void> =>
+      ipcRenderer.invoke('systemwide:popup-resize', height),
+    onPopupState: (cb: (s: unknown) => void): (() => void) => {
+      const handler = (_e: unknown, s: unknown): void => cb(s)
+      ipcRenderer.on('systemwide:popup-state', handler)
+      return () => ipcRenderer.removeListener('systemwide:popup-state', handler)
+    }
+  },
   onBeforeQuitFlush: (cb: () => Promise<void>): (() => void) => {
     const handler = async (): Promise<void> => {
       try {
