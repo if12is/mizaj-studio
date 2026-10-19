@@ -286,8 +286,9 @@ test('search across all files: normalized, highlighted, grouped by document, ope
 function pdfInfo(file: string): { pages: number; text: string } {
   const head = readFileSync(file).subarray(0, 5).toString('latin1')
   expect(head).toBe('%PDF-')
-  const py = resolve(desktopDir, '../backend/.venv/bin/python')
-  expect(existsSync(py), 'backend venv is needed to read the PDF text').toBe(true)
+  // the same interpreter that runs the sidecar (CI: MIZAJ_PYTHON=python); pdfminer is a backend dep
+  const venv = resolve(desktopDir, '../backend/.venv/bin/python')
+  const py = process.env.MIZAJ_PYTHON || (existsSync(venv) ? venv : 'python')
   const out = execFileSync(
     py,
     [
