@@ -22,7 +22,7 @@ from docx.oxml import parse_xml
 from lxml import etree
 
 from app.core.errors import docx_corrupt
-from app.docx.extractor import PLACEHOLDER, apply_unit, iter_units
+from app.docx.extractor import PLACEHOLDER
 from app.engine.normalize import MARKS, has_arabic_letters, split_pairs
 
 W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
@@ -929,38 +929,6 @@ def _lift(unit_text: str, line: str) -> str | None:
     return "".join(out) if k == len(pairs) else None
 
 
-def apply_lines(root, lines: list[str]) -> dict[str, int]:
-    """Apply diacritized flow-text lines (same order/split as `extract_plain_text`) to the
-    body tree, run-by-run via `apply_unit`. Paragraphs that do not align stay unchanged."""
-    from app.docx.service import _plain  # lazy: circular import
-
-    applied = skipped = 0
-    pos = 0
-    for unit in iter_units(root, "body"):
-        if unit.category not in ("body", "sdt"):
-            continue
-        plain = _plain(unit)
-        n = plain.count("\n") + 1
-        chunk = "\n".join(lines[pos : pos + n])
-        pos += n
-        if pos > len(lines) + n - 1 and not chunk:
-            skipped += 1
-            continue
-        if unit.skipped_code_runs or not unit.t_nodes:
-            skipped += 1
-            continue
-        lifted = _lift(unit.text, chunk)
-        if lifted is None:
-            skipped += 1
-            continue
-        try:
-            apply_unit(unit, lifted)
-            applied += 1
-        except ValueError:
-            skipped += 1
-    return {"applied": applied, "skipped": skipped, "lines": len(lines), "consumed": pos}
-
-
 # ------------------------------------------------------------------ page
 def _page(root, doc) -> tuple[str, dict[str, Any]]:
     body = root.find(_w("body"))
@@ -1014,7 +982,11 @@ def _page(root, doc) -> tuple[str, dict[str, Any]]:
     )
 
 
-def render_docx(src, diacritized_text: str | None = None) -> dict[str, Any]:
+def _marked(text: str | None) -> bool:
+    return bool(text) and any(c in MARKS for c in text)
+
+
+def render_docx(src, stored: str | None = None) -> dict[str, Any]:
     """Blocking. `src`: path of an already-guarded .docx (see `service.open_source`)."""
     from app.docx.service import open_source  # lazy: circular import
 
@@ -1026,11 +998,14 @@ def render_docx(src, diacritized_text: str | None = None) -> dict[str, Any]:
     except (KeyError, etree.XMLSyntaxError, zipfile.BadZipFile) as exc:
         raise docx_corrupt(str(exc)) from exc
     mapping = None
-    if diacritized_text is not None and diacritized_text.strip():
-        mapping = apply_lines(root, diacritized_text.replace("\r\n", "\n").split("\n"))
+    if stored is not None and stored.strip():
+        from app.docx.stored import apply_stored  # lazy: circular import
+
+        # the SAME tree the export writes (service.process_docx -> stored.apply_stored)
+        mapping = apply_stored(root, stored)
     st = Styles(doc)
     rd = Renderer(doc, st)
-    rd.diacritized = bool(mapping and mapping["applied"])
+    rd.diacritized = bool(mapping and mapping["applied"] and _marked(stored))
     head, info = _page(root, doc)
     body = root.find(_w("body"))
     inner = rd.block_children(body) if body is not None else ""

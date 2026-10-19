@@ -164,12 +164,12 @@ def test_diacritized_text_lands_in_same_runs(tmp_path):
     assert "كِتَابٌ" in h
 
 
-def test_misaligned_diacritized_paragraph_is_left_unchanged(tmp_path):
+def test_changed_letters_render_the_editor_text(tmp_path):
     src = make_docx(tmp_path / "a.docx")
-    text = _diac(src).replace("الْوَقَائِعُ", "الوقايع")  # base letters changed -> reject
+    text = _diac(src).replace("الْوَقَائِعُ", "الوقايع")
     res = render_docx(src, text)
-    assert res["stats"]["diacritics"]["skipped"] >= 1
-    assert "الوقائع" in res["html"] and "الوقايع" not in res["html"]
+    assert res["stats"]["diacritics"]["edited"] >= 1
+    assert "الوقايع" in res["html"] and "الوقائع" not in res["html"]
 
 
 def test_render_text_fallback_escapes():

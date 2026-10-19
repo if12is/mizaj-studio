@@ -9,7 +9,7 @@ interface RenderResult {
   stats: {
     images: number
     truncated: boolean
-    diacritics: { applied: number; skipped: number } | null
+    diacritics: { applied: number; added: number; removed: number } | null
   }
   source: 'docx' | 'text'
 }
@@ -43,10 +43,7 @@ async function load(): Promise<void> {
     if (my !== seq) return
     html.value = sanitizePageHtml(r.html)
     const d = r.stats.diacritics
-    note.value =
-      d && d.skipped > 0
-        ? `تعذّر تطبيق التشكيل على ${d.skipped} فقرة (تغيّر نصها)؛ تظهر كما في الأصل.`
-        : ''
+    note.value = d && d.added > 0 ? `أُضيفت ${d.added} فقرة جديدة من المحرر` : ''
     if (r.stats.truncated) note.value += ' العرض مقتطع لكبر المستند.'
   } catch (e) {
     if (my === seq) error.value = e instanceof Error ? e.message : 'تعذّر عرض الصفحة'

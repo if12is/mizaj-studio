@@ -209,13 +209,15 @@ def _render_sync(db_path: Path, body: RenderRequest) -> dict[str, Any]:
     finally:
         conn.close()
     diac = (row["diacritized_content"] or "") if body.diacritized else ""
+    # what the export would write: diacritized text when asked for and present, else raw
+    stored = diac if diac.strip() else (row["raw_content"] or "")
     if row["source_docx_path"]:
         try:
             src = _check_in(row["source_docx_path"], "source_docx_path")
         except MizajError:
             src = None
         if src is not None and src.is_file():
-            return render.render_docx(src, diac if diac.strip() else None)
+            return render.render_docx(src, stored if stored.strip() else None)
     try:
         size = int(st.get("editor_font_size", DEFAULTS["editor_font_size"]))
     except ValueError:

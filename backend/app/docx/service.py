@@ -26,14 +26,12 @@ from app.docx.extractor import (
     W_T,
     W_TAB,
     apply_unit,
-    build_unit,
     discover_parts,
     iter_units,
     owner_paragraph,
 )
 from app.docx.mixed import verify_mixed
-from app.docx.stored import apply_text
-from app.docx.stored import plan as stored_plan
+from app.docx.stored import apply_stored
 from app.engine.executor import run_blocking
 from app.engine.factory import build_pipeline
 from app.engine.normalize import MARKS, WORD_RE, has_arabic_letters
@@ -154,8 +152,8 @@ def process_docx(
     `stored`: the editor's text of the document (flow text of the body). Paragraphs it covers
     are written from it, run by run, instead of being diacritized again: when
     `stored_diacritized` the stored text is final; otherwise it is the user's edited raw text
-    and the engine still runs on top. Paragraphs that do not align fall back to the engine and
-    are counted in `stats["engine_fallback"]`."""
+    and the engine still runs on top. Heavily edited paragraphs carry the editor text too;
+    lines with no source paragraph are added, deleted lines remove their paragraph."""
     src, dst = Path(src), Path(dst)
     if not src.is_file():
         raise FileNotFoundError(str(src))
@@ -178,35 +176,32 @@ def process_docx(
                 except (KeyError, etree.XMLSyntaxError, zipfile.BadZipFile) as exc:
                     raise docx_corrupt(f"{name}: {exc}") from exc
                 changed_part = False
-                units = list(iter_units(root, kind))
-                use_stored = stored is not None and kind == "body"
-                plan = stored_plan(units, stored) if use_stored else {}
-                for ui, unit in enumerate(units):
+                from_editor = stored is not None and kind == "body"
+                if from_editor:  # the same call the page view makes: view == export
+                    st = apply_stored(root, stored)
+                    changed_part = True
+                    n_from = st["applied"] if stored_diacritized else st["edited"]
+                    touched = False
+                    for key, val in (
+                        ("from_editor", n_from),
+                        ("edited_text", st["edited"]),
+                        ("added_paragraphs", st["added"]),
+                        ("removed_paragraphs", st["removed"]),
+                    ):
+                        if val or stored_diacritized:
+                            stats[key] = stats.get(key, 0) + val
+                            touched = True
+                    if touched:
+                        stats.setdefault("engine_fallback", 0)
+                for unit in iter_units(root, kind):
                     stats["skipped_code_runs"] += unit.skipped_code_runs
                     if not unit.t_nodes:
                         continue
                     stats["paragraphs"] += 1
                     stats["parts"][unit.category] += 1
-                    if use_stored and unit.category in ("body", "sdt"):
-                        if not stored_diacritized and plan.get(ui) == _plain(unit):
-                            plan.pop(ui, None)  # untouched raw paragraph: engine as before
-                        how = apply_text(unit, plan[ui]) if ui in plan else None
-                        if how is None:
-                            if stored_diacritized:
-                                stats["engine_fallback"] += 1
-                        else:
-                            changed_part = True
-                            for key in ("from_editor", "edited_text", "engine_fallback"):
-                                stats.setdefault(key, 0)
-                            stats["from_editor"] += 1
-                            stats["edited_text"] += how == "edited"
-                            if stored_diacritized:
-                                stats["words_diacritized"] += _marked_words(plan[ui])
-                                continue
-                            rebuilt = build_unit(unit.p, kind)  # edited raw text: engine on top
-                            if rebuilt is None:
-                                continue
-                            unit = rebuilt
+                    if from_editor and stored_diacritized and unit.category in ("body", "sdt"):
+                        stats["words_diacritized"] += _marked_words(unit.text)
+                        continue  # final editor text: the engine never touches it
                     if not has_arabic_letters(unit.text):
                         continue
                     out = pipeline.run_text(conn, unit.text)

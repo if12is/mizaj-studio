@@ -136,6 +136,28 @@ test('page view shows bold / centered / image from the imported DOCX and follows
   await expect(page.locator('.cm-content')).toBeVisible()
 })
 
+test('page view after editing the text shows the edit, no warning banner', async () => {
+  await importDocx(fixture)
+  const docState = (): Promise<string> =>
+    page.evaluate(() =>
+      (document.querySelector('.cm-content') as unknown as CM).cmView.view.state.doc.toString()
+    )
+  // wait for the freshly imported (not yet diacritized) copy to replace the previous test's doc
+  await expect.poll(docState).toContain('الوقائع')
+  const before = await docState()
+  const lines = before.split('\n')
+  lines[0] = 'الحقائق' // heavily rewritten first paragraph
+  await setDocText(lines.join('\n'))
+  await t('toggle-page-view').click()
+  const pv = t('page-view-page')
+  await expect(pv.locator('.dp-page')).toBeVisible()
+  await expect(pv).toContainText('الحقائق')
+  await expect(pv).not.toContainText(/وقائع/)
+  await expect(t('page-view-note')).toHaveCount(0)
+  await expect(page.getByText('تعذّر تطبيق التشكيل')).toHaveCount(0)
+  await t('toggle-page-view').click()
+})
+
 test('page view of a document without a source DOCX uses the editor font', async () => {
   await t('new-document').first().click()
   await t('new-document-input').fill('نص حر')
