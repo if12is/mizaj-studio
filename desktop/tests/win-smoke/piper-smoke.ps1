@@ -77,7 +77,9 @@ try {
   if ($b.Length -le 44) { throw "WAV too small: $($b.Length)" }
   if ([Text.Encoding]::ASCII.GetString($b, 0, 4) -ne 'RIFF' -or [Text.Encoding]::ASCII.GetString($b, 8, 4) -ne 'WAVE') { throw 'not a RIFF/WAVE file' }
   $fmt = [BitConverter]::ToUInt16($b, 20); $ch = [BitConverter]::ToUInt16($b, 22); $rate = [BitConverter]::ToUInt32($b, 24); $bits = [BitConverter]::ToUInt16($b, 34)
-  $voiceRate = (Get-Content -Raw -Encoding UTF8 $cfg | ConvertFrom-Json).audio.sample_rate
+  # the voice config's phoneme map has keys differing only in case (X / x), which ConvertFrom-Json
+  # in Windows PowerShell 5.1 rejects; read just the sample rate
+  $voiceRate = [int][regex]::Match((Get-Content -Raw -Encoding UTF8 $cfg), '"sample_rate"\s*:\s*(\d+)').Groups[1].Value
   if ($fmt -ne 1 -or $bits -ne 16) { throw "unexpected WAV format fmt=$fmt bits=$bits" }
   if ($rate -ne $voiceRate) { throw "sample rate $rate != voice config $voiceRate" }
   $seconds = ($b.Length - 44) / ($rate * $ch * ($bits / 8))
