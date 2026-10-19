@@ -1,6 +1,6 @@
 import { ApiError } from '@renderer/api/client'
 
-export type ExportId = 'docx' | 'docx-track' | 'txt' | 'md' | 'srt' | 'pdf'
+export type ExportId = 'docx' | 'docx-track-edits' | 'docx-track' | 'txt' | 'md' | 'srt' | 'pdf'
 
 export interface ExportFormat {
   id: ExportId
@@ -11,12 +11,32 @@ export interface ExportFormat {
 
 export const EXPORT_FORMATS: ExportFormat[] = [
   { id: 'docx', label: 'Word (‎.docx‎)', ext: 'docx', filterName: 'Word' },
+  {
+    id: 'docx-track-edits',
+    label: 'تصدير Word مع تعقّب التغييرات',
+    ext: 'docx',
+    filterName: 'Word'
+  },
   { id: 'docx-track', label: 'تصدير بتتبع التغييرات', ext: 'docx', filterName: 'Word' },
   { id: 'txt', label: 'نص عادي (‎.txt‎)', ext: 'txt', filterName: 'Text' },
   { id: 'md', label: 'Markdown (‎.md‎)', ext: 'md', filterName: 'Markdown' },
   { id: 'srt', label: 'ترجمة SRT (‎.srt‎)', ext: 'srt', filterName: 'SubRip' },
   { id: 'pdf', label: 'PDF (‎.pdf‎)', ext: 'pdf', filterName: 'PDF' }
 ]
+
+/** What «تصدير Word مع تعقّب التغييرات» records as Word revisions. */
+export type TrackScope = 'both' | 'proofread' | 'diacritics'
+export type TrackGranularity = 'word' | 'char'
+export interface TrackedOptions {
+  scope: TrackScope
+  granularity: TrackGranularity
+}
+export const TRACK_SCOPES: [TrackScope, string][] = [
+  ['both', 'التدقيق والتشكيل معاً'],
+  ['proofread', 'التدقيق فقط'],
+  ['diacritics', 'التشكيل فقط']
+]
+export const DEFAULT_TRACKED: TrackedOptions = { scope: 'both', granularity: 'word' }
 
 export const IMPORT_EXTENSIONS = [
   'txt',

@@ -13,6 +13,7 @@ import {
   ocrErrorMessage,
   stem,
   type ExportId,
+  type TrackedOptions,
   type OcrPage
 } from '@renderer/files/formats'
 import { pickOpenPath, pickSavePath } from '@renderer/lib/native'
@@ -49,6 +50,18 @@ export const useFileStore = defineStore('fileio', () => {
   const preview = ref<ImportPreview | null>(null)
   const ocrFailure = ref<OcrFailure | null>(null)
   const batchOpen = ref(false)
+  /** options dialog of «تصدير Word مع تعقّب التغييرات»; resolves with the choice or null */
+  const trackedOptions = ref<{ resolve: (o: TrackedOptions | null) => void } | null>(null)
+  function askTracked(): Promise<TrackedOptions | null> {
+    return new Promise((resolve) => {
+      trackedOptions.value = { resolve }
+    })
+  }
+  function answerTracked(o: TrackedOptions | null): void {
+    const t = trackedOptions.value
+    trackedOptions.value = null
+    t?.resolve(o)
+  }
 
   function registerHooks(h: Hooks | null): void {
     hooks = h
@@ -75,8 +88,19 @@ export const useFileStore = defineStore('fileio', () => {
     const settings = useSettingsStore()
     const doc = projects.currentDocument
     if (!fmt || !doc) return void notify('افتح مستنداً أولاً.', { kind: 'info' })
+    let tracked: TrackedOptions | null = null
+    if (id === 'docx-track-edits') {
+      const base = useEditorStore().diffBase
+      if (!doc.source_docx_path && base === null)
+        return void notify('لا يوجد أصل للمقارنة: افتح ملف Word أو شغّل التشكيل أولاً.', {
+          kind: 'info'
+        })
+      tracked = await askTracked()
+      if (!tracked) return
+    }
     busy.value = true
     try {
+      let doneMsg = ''
       let source: string | null = null
       if (id === 'docx-track') {
         // tracked changes need the original Word file to compare against
@@ -107,6 +131,20 @@ export const useFileStore = defineStore('fileio', () => {
           },
           true
         )
+      } else if (id === 'docx-track-edits' && tracked) {
+        const r = await api.request<{ stats: { revisions: number } }>(
+          'POST',
+          '/api/docx/export-tracked',
+          {
+            document_id: doc.id,
+            target_path: target,
+            scope: tracked.scope,
+            granularity: tracked.granularity,
+            ...(doc.source_docx_path ? {} : { original_text: useEditorStore().diffBase })
+          },
+          true
+        )
+        doneMsg = `تم التصدير: ${target} — ${r.stats.revisions} تغييراً يمكن قبوله أو رفضه في Word`
       } else if (id === 'docx-track') {
         await api.request(
           'POST',
@@ -128,7 +166,7 @@ export const useFileStore = defineStore('fileio', () => {
           true
         )
       }
-      notify(`تم التصدير: ${target}`, { kind: 'success', ms: 7000 })
+      notify(doneMsg || `تم التصدير: ${target}`, { kind: 'success', ms: 7000 })
     } catch (e) {
       notify(exportErrorMessage(e))
     } finally {
@@ -230,6 +268,8 @@ export const useFileStore = defineStore('fileio', () => {
     preview,
     ocrFailure,
     batchOpen,
+    trackedOptions,
+    answerTracked,
     registerHooks,
     exportAs,
     importFile,

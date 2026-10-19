@@ -106,6 +106,7 @@ export const EVENT_LABELS = {
   tashkeelPartial: 'تشكيل جزئي',
   beforeProofread: 'قبل تطبيق التدقيق',
   autoPunct: 'تصحيح الترقيم تلقائياً',
+  oneStep: 'تطبيق التدقيق (تدقيق وتشكيل)',
   beforeGemini: 'قبل اقتراح Gemini',
   gemini: 'قبول اقتراح Gemini',
   beforeReplaceAll: 'قبل استبدال الكل',

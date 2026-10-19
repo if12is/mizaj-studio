@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Any, Literal
 
 from fastapi import APIRouter, Request
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app.api.documents import count_words
 from app.api.settings import DEFAULTS
@@ -158,9 +158,7 @@ async def export_docx(body: ExportRequest, request: Request) -> dict[str, Any]:
     _check_path(body.target_path, "target_path")
     db_path = request.app.state.db_path
     src = await run_blocking(_resolve_source, db_path, body)
-    target = _check_out(
-        body.target_path, "target_path", request.app.state.data_dir, src.get("src")
-    )
+    target = _check_out(body.target_path, "target_path", request.app.state.data_dir, src.get("src"))
     from app.docx.service import diacritize_docx, process_text_docx  # lazy (startup time)
 
     if "src" in src:
@@ -188,6 +186,87 @@ async def export_docx(body: ExportRequest, request: Request) -> dict[str, Any]:
             src["font"],
             src["size_px"],
         )
+    return {"target_path": str(target), "stats": stats}
+
+
+class TrackedExportRequest(BaseModel):
+    document_id: int
+    target_path: str
+    scope: Literal["both", "proofread", "diacritics"] = "both"
+    granularity: Literal["word", "char"] = "word"
+    # the text before proofreading/tashkeel; only used when the document has no source .docx
+    original_text: str | None = Field(default=None, max_length=20_000_000)
+
+
+def _source_of(db_path: Path, document_id: int) -> str | None:
+    conn = connect(db_path)
+    try:
+        row = conn.execute(
+            "SELECT source_docx_path FROM documents WHERE id=? AND is_deleted=0", (document_id,)
+        ).fetchone()
+    finally:
+        conn.close()
+    if row is None:
+        raise not_found("Document", document_id)
+    return row["source_docx_path"] or None
+
+
+def _tracked_sync(
+    db_path: Path, body: TrackedExportRequest, target: Path, data_dir: Path, src: Path | None
+) -> dict[str, Any]:
+    import tempfile
+
+    from app.docx.service import _atomic_write, build_docx_from_text
+    from app.docx.tracked import process_docx_edits_tracked
+
+    conn = connect(db_path)
+    try:
+        row = conn.execute(
+            "SELECT title, raw_content, diacritized_content FROM documents "
+            "WHERE id=? AND is_deleted=0",
+            (body.document_id,),
+        ).fetchone()
+        if row is None:
+            raise not_found("Document", body.document_id)
+        st = dict(conn.execute("SELECT key, value FROM settings").fetchall())
+    finally:
+        conn.close()
+    diac = row["diacritized_content"] or ""
+    stored = diac if diac.strip() else (row["raw_content"] or "")
+    if src is not None:
+        return process_docx_edits_tracked(src, target, stored, body.scope, body.granularity)
+    if body.original_text is None:
+        raise validation_error("this document has no source .docx: original_text is required")
+    try:
+        size = int(st.get("editor_font_size", DEFAULTS["editor_font_size"]))
+    except ValueError:
+        size = int(DEFAULTS["editor_font_size"])
+    doc, _n = build_docx_from_text(
+        row["title"], body.original_text, st.get("editor_font") or DEFAULTS["editor_font"], size
+    )
+    with tempfile.TemporaryDirectory(dir=data_dir) as tmp:
+        base = Path(tmp) / "original.docx"
+        _atomic_write(base, lambda fh: doc.save(fh))
+        return process_docx_edits_tracked(base, target, stored, body.scope, body.granularity)
+
+
+@router.post("/export-tracked")
+async def export_tracked(body: TrackedExportRequest, request: Request) -> dict[str, Any]:
+    """The document as Word revisions (w:ins / w:del, author «مِزَاج») over its ORIGINAL file:
+    proofreading changes, diacritization changes or both; accept-all = the editor text and
+    reject-all = the original."""
+    _check_path(body.target_path, "target_path")
+    db_path = request.app.state.db_path
+    data_dir = request.app.state.data_dir
+    src_raw = await run_blocking(_source_of, db_path, body.document_id)
+    src = None
+    if src_raw:
+        try:
+            src = _check_in(src_raw, "source_docx_path")
+        except MizajError:
+            src = None
+    target = _check_out(body.target_path, "target_path", data_dir, src)
+    stats = await run_blocking(_tracked_sync, db_path, body, target, data_dir, src)
     return {"target_path": str(target), "stats": stats}
 
 

@@ -12,6 +12,7 @@ import { registerCommands, type Command } from './registry'
 export interface EditorActions {
   tashkeel(): void | Promise<void>
   proofreadThenTashkeel(): void | Promise<void>
+  proofreadAndTashkeel(): void | Promise<void>
   paragraphRun(): void | Promise<void>
   spellCheck(): void | Promise<void>
   togglePageView(): void
@@ -147,6 +148,14 @@ export function registerBuiltinCommands(ctx: BuiltinContext): () => void {
       keywords: ['proofread'],
       enabled: hasDoc,
       run: () => act()?.proofreadThenTashkeel()
+    },
+    {
+      id: 'edit.proofread-onestep',
+      title: 'تدقيق وتشكيل بنقرة واحدة',
+      group: G.edit,
+      keywords: ['proofread', 'one step', 'تدقيق', 'تشكيل'],
+      enabled: hasDoc,
+      run: () => act()?.proofreadAndTashkeel()
     },
     {
       id: 'edit.paragraph',
