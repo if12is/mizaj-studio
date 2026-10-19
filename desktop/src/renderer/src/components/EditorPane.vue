@@ -43,7 +43,13 @@ import {
   setFind,
   findField
 } from '@renderer/editor/find'
-import { acceptAll, addPending, rejectAll, type PendingItem } from '@renderer/editor/pending'
+import {
+  acceptAll,
+  addPending,
+  pendingField,
+  rejectAll,
+  type PendingItem
+} from '@renderer/editor/pending'
 import { paragraphsFor } from '@renderer/editor/paragraphs'
 import { LONG_LINE_THRESHOLD, longestLine, splitLongLineEdits } from '@renderer/editor/longLines'
 import { richPasteHandler } from '@renderer/editor/paste'
@@ -58,6 +64,7 @@ import { useGeminiStore } from '@renderer/stores/gemini'
 import { reviewKeep, reviewStep, type ConfWord } from '@renderer/editor/confidence'
 import { openInspectorAt } from '@renderer/editor/inspector'
 import ReviewBar from './ReviewBar.vue'
+import type { TabViewState } from '@renderer/tabs/viewState'
 import { normalizeSpec } from '@renderer/editor/normalizeEdits'
 
 const props = defineProps<{
@@ -334,8 +341,47 @@ function setText(text: string, notifyChange = false): void {
   quality.review = { active: false, total: 0, reviewed: 0, remaining: 0 }
   editor.diffBase = null
   editor.showDiff = false
+  editor.pendingCount = 0
+  pageView.value = false
   refreshStats()
   if (notifyChange) emit('change')
+}
+
+function captureState(): TabViewState | null {
+  if (!view) return null
+  return {
+    state: view.state,
+    scrollTop: view.scrollDOM.scrollTop,
+    pageView: pageView.value,
+    pageZoom: pageZoom.value,
+    diffBase: editor.diffBase,
+    showDiff: editor.showDiff
+  }
+}
+/** Switch to a tab's saved editor state (keeps its undo history, selection and scroll). */
+function restoreState(snap: TabViewState): void {
+  if (!view) return
+  run.reset()
+  silent = true
+  view.setState(snap.state)
+  silent = false
+  pageView.value = snap.pageView
+  pageZoom.value = snap.pageZoom
+  if (snap.pageView) pageTick.value++
+  editor.diffBase = snap.diffBase
+  editor.showDiff = snap.showDiff
+  editor.cursorLine = snap.state.doc.lineAt(snap.state.selection.main.head).number
+  editor.pendingCount = snap.state.field(pendingField).length
+  editor.findInfo = { count: 0, current: -1 }
+  spelling.marks = []
+  spell.schedule()
+  quranDetect.schedule()
+  quality.review = { active: false, total: 0, reviewed: 0, remaining: 0 }
+  refreshStats()
+  const v = view
+  requestAnimationFrame(() => {
+    if (view === v) v.scrollDOM.scrollTop = snap.scrollTop
+  })
 }
 
 async function loadSample(): Promise<void> {
@@ -497,7 +543,24 @@ onBeforeUnmount(() => {
   editor.register(null)
   view?.destroy()
 })
-defineExpose({ setText, loadSample })
+defineExpose({
+  setText,
+  loadSample,
+  captureState,
+  restoreState,
+  /** actions the command registry drives (same as the toolbar buttons) */
+  actions: {
+    tashkeel: () => run.start(),
+    proofreadThenTashkeel: () => run.proofreadThenStart(),
+    paragraphRun,
+    spellCheck: () => spell.checkNow(true),
+    togglePageView,
+    toggleReview,
+    exportDocx,
+    toggleTts: () => tts.toggle(editor.accessor?.getReadText() ?? ''),
+    focus: () => view?.focus()
+  }
+})
 
 const selectCls = 'rounded border px-1 py-0.5 dark:border-slate-600 dark:bg-slate-800'
 const btnCls =

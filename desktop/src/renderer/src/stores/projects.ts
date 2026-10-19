@@ -111,6 +111,10 @@ export const useProjectsStore = defineStore('projects', () => {
     currentProjectId.value = d.project_id
     currentDocument.value = d
   }
+  /** No document is open (an empty tab is active). */
+  function clearCurrentDocument(): void {
+    currentDocument.value = null
+  }
   /** Fetch a document and make it current (caller flushes autosave first). */
   async function selectDocument(id: number): Promise<DocumentFull> {
     const d = await useApi().get<DocumentFull>(`/api/documents/${id}`)
@@ -147,6 +151,7 @@ export const useProjectsStore = defineStore('projects', () => {
     selectDocument,
     fetchDocument,
     setCurrentDocument,
+    clearCurrentDocument,
     saveContent
   }
 })

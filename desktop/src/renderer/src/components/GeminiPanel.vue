@@ -3,6 +3,7 @@ import { computed, nextTick, ref } from 'vue'
 import { useEditorStore } from '@renderer/stores/editor'
 import { useGeminiStore } from '@renderer/stores/gemini'
 import { useQualityStore } from '@renderer/stores/quality'
+import { useProjectsStore } from '@renderer/stores/projects'
 import { diffMarkEdits } from '@renderer/editor/markEdits'
 import { stripMarks } from '@renderer/editor/arabic'
 import { notify } from '@renderer/api/toast'
@@ -12,6 +13,8 @@ type Req = Parameters<ReturnType<typeof useGeminiStore>['ask']>[0]
 
 interface Turn {
   id: number
+  /** the document (tab) the question was asked about; turns of other tabs are hidden */
+  docId: number
   scope: 'doc' | 'selection'
   question: string
   answer: string | null
@@ -32,7 +35,12 @@ const gemini = useGeminiStore()
 const quality = useQualityStore()
 const question = ref('')
 const scope = ref<'doc' | 'selection'>('doc')
-const turns = ref<Turn[]>([])
+const projects = useProjectsStore()
+const allTurns = ref<Turn[]>([])
+// each document (tab) has its own conversation: the panel only shows the active tab's turns
+const turns = computed(() =>
+  allTurns.value.filter((t) => t.docId === (projects.currentDocument?.id ?? 0))
+)
 const busy = ref(false)
 const list = ref<HTMLElement | null>(null)
 let seq = 0
@@ -48,6 +56,7 @@ async function send(): Promise<void> {
   if (!q || !acc) return
   const turn: Turn = {
     id: ++seq,
+    docId: projects.currentDocument?.id ?? 0,
     scope: scope.value,
     question: q,
     answer: null,
@@ -65,7 +74,7 @@ async function send(): Promise<void> {
     const s = acc.selectionInfo()
     const hasSel = s.to > s.from
     if (!hasSel) {
-      turns.value.push({ ...turn, error: 'حدّد نصاً في المحرر أولاً، أو اختر «المستند كله».' })
+      allTurns.value.push({ ...turn, error: 'حدّد نصاً في المحرر أولاً، أو اختر «المستند كله».' })
       return
     }
     turn.sel = s
@@ -77,7 +86,7 @@ async function send(): Promise<void> {
     }
   } else req = { kind: 'document', question: q, text: acc.getText() }
   turn.req = req
-  turns.value.push(turn)
+  allTurns.value.push(turn)
   question.value = ''
   await run(turn.id, req, false)
 }
@@ -101,7 +110,7 @@ const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms
 
 async function run(id: number, req: Req, cont: boolean, retried = false): Promise<void> {
   busy.value = true
-  const t = turns.value.find((x) => x.id === id)!
+  const t = allTurns.value.find((x) => x.id === id)!
   try {
     const prior = cont ? t.answer ?? '' : ''
     const r = await gemini.ask(cont ? ({ ...req, continueFrom: prior } as Req) : req)
