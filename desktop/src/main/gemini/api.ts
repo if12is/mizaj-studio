@@ -224,7 +224,8 @@ export function httpError(status: number, json: unknown): GeminiError {
     return new GeminiError(
       'quota',
       quotaMessage(sec && sec > MAX_AUTO_RETRY_SEC ? sec : undefined),
-      sec
+      sec,
+      status
     )
   }
   if (
@@ -232,9 +233,9 @@ export function httpError(status: number, json: unknown): GeminiError {
     status === 403 ||
     /API_KEY_INVALID|API key not valid|PERMISSION_DENIED/i.test(`${err?.status}${blob}`)
   )
-    return new GeminiError('invalid_key')
-  if (status === 400) return new GeminiError('bad_request')
-  if (status === 404) return new GeminiError('bad_request')
+    return new GeminiError('invalid_key', undefined, undefined, status)
+  if (status === 400 || status === 404)
+    return new GeminiError('bad_request', undefined, undefined, status)
   return new GeminiError('bad_response')
 }
 
@@ -282,23 +283,40 @@ export function generationConfig(
   return cfg
 }
 
-export async function generate(
+export interface Content {
+  role: 'user' | 'model'
+  parts: { text: string }[]
+}
+
+export interface GenerateInput {
+  /** omitted when `cachedContent` is used (the cache already holds the system instruction) */
+  system?: string
+  contents: Content[]
+  /** resource name of an explicit cache ("cachedContents/abc") */
+  cachedContent?: string
+}
+
+export interface ChatResult extends GenerateResult {
+  /** tokens served from a cache (implicit or explicit), when Google reports them */
+  cachedTokens: number
+}
+
+export function userContent(text: string): Content {
+  return { role: 'user', parts: [{ text }] }
+}
+export function modelContent(text: string): Content {
+  return { role: 'model', parts: [{ text }] }
+}
+
+export async function generateChat(
   f: FetchLike,
   base: string,
   key: string,
   model: string,
-  system: string,
-  prompt: string,
+  input: GenerateInput,
   opts: GenerateOptions = {}
-): Promise<GenerateResult> {
+): Promise<ChatResult> {
   if (!isValidModelId(model)) throw new GeminiError('bad_request')
-  const contents: { role: string; parts: { text: string }[] }[] = [
-    { role: 'user', parts: [{ text: prompt }] }
-  ]
-  if (opts.continueFrom) {
-    contents.push({ role: 'model', parts: [{ text: opts.continueFrom }] })
-    contents.push({ role: 'user', parts: [{ text: CONTINUE_PROMPT }] })
-  }
   const json = (await request(
     f,
     base,
@@ -307,8 +325,12 @@ export async function generate(
     {
       method: 'POST',
       body: {
-        systemInstruction: { parts: [{ text: system }] },
-        contents,
+        ...(input.cachedContent
+          ? { cachedContent: input.cachedContent }
+          : input.system
+            ? { systemInstruction: { parts: [{ text: input.system }] } }
+            : {}),
+        contents: input.contents,
         generationConfig: generationConfig(model, opts.outputTokenLimit)
       }
     },
@@ -316,6 +338,7 @@ export async function generate(
     opts.sleep ?? defaultSleep
   )) as {
     promptFeedback?: { blockReason?: string }
+    usageMetadata?: { cachedContentTokenCount?: unknown }
     candidates?: {
       finishReason?: string
       content?: { parts?: { text?: unknown; thought?: unknown }[] }
@@ -339,5 +362,64 @@ export async function generate(
     throw new GeminiError('bad_response')
   }
   if (fr === 'SAFETY') throw new GeminiError('safety')
-  return { text, cutoff: fr === 'MAX_TOKENS' }
+  const ct = json.usageMetadata?.cachedContentTokenCount
+  return { text, cutoff: fr === 'MAX_TOKENS', cachedTokens: typeof ct === 'number' ? ct : 0 }
+}
+
+/** Stateless single-turn call (word questions; continuation of a stateless answer). */
+export async function generate(
+  f: FetchLike,
+  base: string,
+  key: string,
+  model: string,
+  system: string,
+  prompt: string,
+  opts: GenerateOptions = {}
+): Promise<GenerateResult> {
+  const contents: Content[] = [userContent(prompt)]
+  if (opts.continueFrom) {
+    contents.push(modelContent(opts.continueFrom), userContent(CONTINUE_PROMPT))
+  }
+  const r = await generateChat(f, base, key, model, { system, contents }, opts)
+  return { text: r.text, cutoff: r.cutoff }
+}
+
+export const CACHE_TTL_SEC = 3600
+
+export interface CreatedCache {
+  name: string
+  /** epoch ms after which the cache is considered gone (client clock, with a safety margin) */
+  expiresAt: number
+}
+
+/** Explicit context cache holding the system instruction + the document turns. */
+export async function createCache(
+  f: FetchLike,
+  base: string,
+  key: string,
+  model: string,
+  system: string,
+  contents: Content[],
+  now: () => number = Date.now
+): Promise<CreatedCache> {
+  if (!isValidModelId(model)) throw new GeminiError('bad_request')
+  const json = (await request(
+    f,
+    base,
+    '/v1beta/cachedContents',
+    key,
+    {
+      method: 'POST',
+      body: {
+        model: `models/${model}`,
+        systemInstruction: { parts: [{ text: system }] },
+        contents,
+        ttl: `${CACHE_TTL_SEC}s`
+      }
+    },
+    ASK_TIMEOUT_MS
+  )) as { name?: unknown }
+  if (typeof json.name !== 'string' || !/^cachedContents\/[A-Za-z0-9_-]{1,128}$/.test(json.name))
+    throw new GeminiError('bad_response')
+  return { name: json.name, expiresAt: now() + (CACHE_TTL_SEC - 120) * 1000 }
 }

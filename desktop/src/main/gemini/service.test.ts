@@ -1,12 +1,12 @@
-import { chmodSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { DEFAULT_BASE } from './api'
-import { defaultDeps } from './cli'
 import { GeminiConfigStore, sanitizeConfig } from './config'
 import { GeminiKeyStore } from './keyStore'
 import { GeminiService } from './service'
+import { SessionStore } from './sessions'
 
 const KEY = 'AIzaSyDUMMYKEYFORTESTS1234567890abcd'
 const storage = {
@@ -25,17 +25,11 @@ beforeEach(() => {
 afterEach(() => rmSync(dir, { recursive: true, force: true }))
 
 function svc(): GeminiService {
-  const cliPath = join(dir, 'gemini')
-  writeFileSync(
-    cliPath,
-    `#!${process.execPath}\nprocess.stdin.resume();process.stdin.on('end',()=>console.log('رد من CLI'))`
-  )
-  chmodSync(cliPath, 0o755)
   return new GeminiService({
     keys: new GeminiKeyStore(join(dir, 'k.bin'), storage),
     config: new GeminiConfigStore(join(dir, 'c.json')),
     base: DEFAULT_BASE,
-    cli: { ...defaultDeps(), env: { PATH: dir } },
+    sessions: new SessionStore(join(dir, 'sessions')),
     fetch: (async (url: string, init: RequestInit) => {
       calls.push({
         url,
@@ -50,11 +44,25 @@ const docReq = { kind: 'document', question: 'ما الخطأ؟', text: 'نص ا
 
 describe('config sanitising', () => {
   it('is off by default and drops junk', () => {
-    expect(sanitizeConfig(null)).toMatchObject({ enabled: false, provider: 'api', consentAt: null })
-    expect(sanitizeConfig({ model: '../x y', provider: 'evil' })).toMatchObject({
+    expect(sanitizeConfig(null)).toMatchObject({ enabled: false, consentAt: null })
+    expect(sanitizeConfig({ model: '../x y', provider: 'evil' })).toEqual({
+      enabled: false,
       model: '',
-      provider: 'api'
+      consentAt: null
     })
+  })
+  it('migrates a former Gemini CLI config to API mode and rewrites the file', () => {
+    const f = join(dir, 'old.json')
+    writeFileSync(
+      f,
+      JSON.stringify({ enabled: true, provider: 'cli', useCli: true, model: 'gemini-2.5-flash' })
+    )
+    const c = new GeminiConfigStore(f).get()
+    expect(c).toMatchObject({ enabled: true, model: 'gemini-2.5-flash' })
+    expect(c).not.toHaveProperty('provider')
+    const disk = JSON.parse(readFileSync(f, 'utf8'))
+    expect(disk).not.toHaveProperty('useCli')
+    expect(disk).not.toHaveProperty('provider')
   })
 })
 
@@ -78,7 +86,7 @@ describe('GeminiService', () => {
   it('API provider: key only in the header, state never contains the key', async () => {
     const s = svc()
     s.saveKey(KEY)
-    s.setConfig({ enabled: true, provider: 'api', model: 'gemini-2.5-flash' })
+    s.setConfig({ enabled: true, model: 'gemini-2.5-flash' })
     s.acceptConsent()
     await s.ask(docReq)
     expect(calls[0].headers['x-goog-api-key']).toBe(KEY)
@@ -94,20 +102,6 @@ describe('GeminiService', () => {
     s.acceptConsent()
     expect(await s.ask(docReq)).toMatchObject({ ok: false, code: 'no_key' })
   })
-  it.runIf(process.platform !== 'win32')(
-    'CLI provider is used instead of the API and needs opt-in',
-    async () => {
-      const s = svc()
-      s.saveKey(KEY)
-      s.setConfig({ enabled: true, provider: 'cli' })
-      s.acceptConsent()
-      expect(await s.ask(docReq)).toMatchObject({ ok: false, code: 'disabled' }) // useCli not ticked
-      s.setConfig({ useCli: true })
-      const r = await s.ask(docReq)
-      expect(r).toMatchObject({ ok: true, result: { text: 'رد من CLI', provider: 'cli' } })
-      expect(calls).toHaveLength(0) // API not touched
-    }
-  )
   it('flags truncated documents and parses the suggestion block', async () => {
     const s = svc()
     s.saveKey(KEY)
@@ -148,7 +142,7 @@ describe('GeminiService', () => {
       keys: new GeminiKeyStore(join(dir, 'k.bin'), storage),
       config: new GeminiConfigStore(join(dir, 'c.json')),
       base: DEFAULT_BASE,
-      cli: { ...defaultDeps(), env: { PATH: dir } }, // never probe the real PATH
+      sessions: new SessionStore(join(dir, 'sessions')),
       fetch: (async () => {
         throw new TypeError('fetch failed')
       }) as unknown as typeof fetch

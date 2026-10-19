@@ -9,6 +9,8 @@ export interface GeminiAnswer {
   suggestion: string | null
   truncated: boolean
   cutoff: boolean
+  /** the document text changed since the last question, so the context was re-sent */
+  contextRefreshed: boolean
   /** quota: seconds Google asked us to wait */
   retryAfterSec: number | null
   message: string | null
@@ -30,13 +32,8 @@ export const useGeminiStore = defineStore('gemini', () => {
 
   const config = computed(() => state.value?.config ?? null)
   const enabled = computed(() => config.value?.enabled === true)
-  const provider = computed(() => config.value?.provider ?? 'api')
-  /** enabled AND the chosen provider is usable */
-  const ready = computed(() => {
-    const s = state.value
-    if (!s || !s.config.enabled) return false
-    return s.config.provider === 'cli' ? s.config.useCli && s.cli.detected : s.hasKey
-  })
+  /** enabled AND an API key is saved */
+  const ready = computed(() => !!state.value?.config.enabled && state.value.hasKey)
 
   async function load(): Promise<void> {
     try {
@@ -104,9 +101,18 @@ export const useGeminiStore = defineStore('gemini', () => {
     }
   }
 
-  async function redetectCli(): Promise<void> {
-    const cli = await api()?.detectCli()
-    if (cli && state.value) state.value = { ...state.value, cli }
+  async function sessionGet(docId: number, text: string): Promise<GeminiSessionDto | null> {
+    try {
+      const r = await api()?.sessionGet(docId, text)
+      return r?.ok ? r.session : null
+    } catch {
+      return null
+    }
+  }
+
+  async function sessionReset(docId: number): Promise<boolean> {
+    const r = await api()?.sessionReset(docId)
+    return r?.ok === true
   }
 
   /** First use: show the notice (once, ever); resolves true if consent exists/was given. */
@@ -135,6 +141,7 @@ export const useGeminiStore = defineStore('gemini', () => {
       suggestion: null,
       truncated: false,
       cutoff: false,
+      contextRefreshed: false,
       retryAfterSec: null,
       message: null
     }
@@ -149,6 +156,7 @@ export const useGeminiStore = defineStore('gemini', () => {
       suggestion: r.result.suggestion,
       truncated: r.result.truncated,
       cutoff: r.result.cutoff,
+      contextRefreshed: r.result.contextRefreshed,
       retryAfterSec: null,
       message: null
     }
@@ -163,7 +171,6 @@ export const useGeminiStore = defineStore('gemini', () => {
     consentOpen,
     config,
     enabled,
-    provider,
     ready,
     load,
     setConfig,
@@ -171,7 +178,8 @@ export const useGeminiStore = defineStore('gemini', () => {
     saveKey,
     clearKey,
     testKey,
-    redetectCli,
+    sessionGet,
+    sessionReset,
     ensureConsent,
     answerConsent,
     ask
