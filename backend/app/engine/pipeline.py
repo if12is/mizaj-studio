@@ -40,6 +40,9 @@ Span = tuple[int, int]
 CONF_SEP = "\x1e"
 
 
+_DOUBLE_FATHATAN = re.compile("\u064b([\u0651\u064e\u0652]*)(\u0627[\u0651]*\u064b)")
+
+
 @dataclass
 class ChunkResult:
     text: str
@@ -176,6 +179,8 @@ class TashkeelPipeline:
         out = self._apply_level(raw, spans, conn, confs)
         out = self._apply_dictionary(cache, out, stripped, spans)
         out = lock.apply(out)
+        # the user's own «اً» plus the engine's «قًا» would read «وَفْقًاً»: keep the user's
+        out = _DOUBLE_FATHATAN.sub(r"\1\2", out)
         if protected:
             out = self._restore_protected(out, chunk_text, protected)
         if strip_marks(out) != strip_marks(chunk_text):  # safety net: never alter base text

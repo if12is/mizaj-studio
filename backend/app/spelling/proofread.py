@@ -774,7 +774,15 @@ def punctuation_items(text: str, masker: Masker, opt: ProofreadOptions) -> list[
         if mark in "،؛:" and (_AR_CH.match(nxt) or nxt in '"«“('):
             # «بأن :"النص» -> «بأن: "النص»: move the space after the mark, never glue words
             out.append(
-                _pi(text, s, e + 1, mark + " ", "PUNCT_SPACE_BEFORE", MSG_P["PUNCT_SPACE_BEFORE"], 0.9)
+                _pi(
+                    text,
+                    s,
+                    e + 1,
+                    mark + " ",
+                    "PUNCT_SPACE_BEFORE",
+                    MSG_P["PUNCT_SPACE_BEFORE"],
+                    0.9,
+                )
             )
             continue
         out.append(_pi(text, s, e, "", "PUNCT_SPACE_BEFORE", MSG_P["PUNCT_SPACE_BEFORE"], 0.9))

@@ -421,3 +421,11 @@ def test_morph_filter_rule():
     # unknown word / short word untouched
     assert mf3.refine_word("زززز", "زَزَزَزُ") == "زَزَزَزُ"
     assert mf.refine_word("في", "فَي") == "فَي"
+
+
+def test_user_fathatan_on_alef_is_not_doubled():
+    from app.engine.pipeline import _DOUBLE_FATHATAN
+
+    # engine «قًا» + the user's locked «اً» must not read «وَفْقًاً»
+    assert _DOUBLE_FATHATAN.sub(r"\1\2", "وَفْقًاً نِهَائِيًّاً") == "وَفْقاً نِهَائِيّاً"
+    assert _DOUBLE_FATHATAN.sub(r"\1\2", "وَفْقًا") == "وَفْقًا"
