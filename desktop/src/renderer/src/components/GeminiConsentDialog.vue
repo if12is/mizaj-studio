@@ -21,7 +21,9 @@ useFocusTrap(el, () => void gemini.answerConsent(false))
       <h2 id="gemini-consent-title" class="mb-2 text-lg font-bold">إشعار قبل استخدام Gemini</h2>
       <ul class="mb-3 list-disc space-y-1 pr-5 text-sm">
         <li>
-          عند طرح سؤال، يُرسَل <b>النص المحدد أو مقتطف من المستند</b> مع سؤالك إلى Google (Gemini).
+          عند طرح سؤال عن المستند أو عن نص محدد، يُرسَل <b>نص المستند كاملاً</b> مع سؤالك إلى Google
+          (Gemini)، ومعه المحادثة السابقة. وفي المستندات الطويلة قد يحفظه Google مؤقتاً لساعة لتسريع
+          الإجابة.
         </li>
         <li>لا يُرسَل أي شيء آخر، ولا يُرسَل شيء إطلاقاً ما لم تطرح سؤالاً بنفسك.</li>
         <li>
