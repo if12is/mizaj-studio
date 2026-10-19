@@ -120,6 +120,7 @@ jobs:
 
       - name: Quality gate - lint, typecheck, unit tests
         working-directory: desktop
+        timeout-minutes: 15
         run: |
           npm run lint
           npm run typecheck
