@@ -204,6 +204,7 @@ test('export a document that was not imported from Word', async () => {
 
 test('settings shows the models version section', async () => {
   await text('open-settings').click()
+  await text('settings-mode-advanced').click()
   await expect(text('settings-modal')).toBeVisible()
   await expect(text('pack-version')).toBeVisible()
   await expect(text('pack-apply')).toBeVisible()
@@ -336,6 +337,7 @@ test('legal: template renders live and creates a document', async () => {
 test('settings: glossary manager and legal level', async () => {
   await text('right-panel-close').click()
   await text('open-settings').click()
+  await text('settings-mode-advanced').click()
   await text('tab-glossary').click()
   await text('gloss-term').fill('الغبن')
   await text('gloss-avoid').fill('الغبن العادي')

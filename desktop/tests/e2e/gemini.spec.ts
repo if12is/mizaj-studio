@@ -171,6 +171,7 @@ test('Gemini is off by default: no toolbar button, no network, no word-box', asy
 
 test('enable, key rejected then accepted, live model list, key stored encrypted', async () => {
   await t('open-settings').click()
+  await t('settings-mode-advanced').click()
   await t('tab-online').click()
   await expect(t('gemini-settings')).toBeVisible()
   await expect(t('gemini-enable')).not.toBeChecked()
@@ -401,6 +402,7 @@ test('quota errors are shown in Arabic; clearing the key turns the assistant off
   failStatus = null
   await t('right-panel-close').click()
   await t('open-settings').click()
+  await t('settings-mode-advanced').click()
   await t('tab-online').click()
   await t('gemini-key-clear').click()
   await expect(t('gemini-message')).toContainText('حُذف المفتاح')

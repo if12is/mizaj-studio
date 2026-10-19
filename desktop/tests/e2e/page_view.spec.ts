@@ -246,6 +246,7 @@ test('popups are opaque: spelling tooltip, inspector, file menu, dialogs, toast'
   await page.screenshot({ path: join(popupShots, 'shortcuts-dialog.png') })
   await page.keyboard.press('Escape')
   await t('open-settings').click()
+  await t('settings-mode-advanced').click()
   await expect(t('settings-modal')).toBeVisible()
   await expectOpaque(page.getByRole('dialog').first())
   await page.screenshot({ path: join(popupShots, 'settings-dialog.png') })

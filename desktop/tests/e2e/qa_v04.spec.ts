@@ -141,6 +141,7 @@ test('a wrong Quran file gives a specific Arabic message, never a raw error', as
   writeFileSync(join(work, 'plain.txt'), 'بسم الله الرحمن الرحيم\n')
   await setEnv('MIZAJ_E2E_OPEN_PATH', join(work, 'plain.txt'))
   await text('open-settings').click()
+  await text('settings-mode-advanced').click()
   await text('tab-quran').click()
   await text('quran-install').click()
   const msg = text('quran-message')
@@ -151,6 +152,7 @@ test('a wrong Quran file gives a specific Arabic message, never a raw error', as
 
 test('personal dictionary refuses a form that changes the base letters', async () => {
   await text('open-settings').click()
+  await text('settings-mode-advanced').click()
   await text('tab-dictionary').click()
   await text('dict-new-word').fill('كلب')
   await text('dict-new-form').fill('كِتَابٌ')

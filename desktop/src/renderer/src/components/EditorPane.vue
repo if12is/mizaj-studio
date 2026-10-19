@@ -51,6 +51,8 @@ import { stripMarks } from '@renderer/editor/arabic'
 import { isolateHistory } from '@codemirror/commands'
 import { useTts } from '@renderer/composables/useTts'
 import FindBar from './FindBar.vue'
+import ToolbarToggle from './ui/ToolbarToggle.vue'
+import AppIcon from './ui/AppIcon.vue'
 import { useEditorQuality } from '@renderer/composables/useEditorQuality'
 import { useQuranDetect } from '@renderer/composables/useQuranDetect'
 import { useQualityStore } from '@renderer/stores/quality'
@@ -499,6 +501,26 @@ onBeforeUnmount(() => {
 })
 defineExpose({ setText, loadSample })
 
+const runBusy = computed(() => editor.runState === 'running' || editor.runState === 'waiting')
+function startTashkeel(): void {
+  if (runBusy.value) return void notify('التشكيل جارٍ بالفعل، انتظر حتى ينتهي.', { kind: 'info' })
+  void run.start()
+}
+async function onLoadSample(): Promise<void> {
+  await loadSample()
+  notify('تم تحميل النص التجريبي في المحرر', { kind: 'success', ms: 2000 })
+}
+const spellBusy = ref(false)
+async function runSpell(): Promise<void> {
+  spellBusy.value = true
+  try {
+    await spell.checkNow(true)
+    notify('اكتمل التدقيق الإملائي', { kind: 'success', ms: 1800 })
+  } finally {
+    spellBusy.value = false
+  }
+}
+
 const selectCls = 'rounded border px-1 py-0.5 dark:border-slate-600 dark:bg-slate-800'
 const btnCls =
   'rounded border px-2 py-1 hover:bg-slate-200 dark:border-slate-600 dark:hover:bg-slate-700'
@@ -520,21 +542,33 @@ const btnCls =
       <button
         class="rounded bg-mizaj-emerald px-3 py-1 font-semibold text-white disabled:opacity-50"
         data-testid="toolbar-tashkeel"
-        :disabled="editor.runState === 'running' || editor.runState === 'waiting'"
-        title="Ctrl+Shift+T"
-        @click="run.start()"
+        title="تشكيل المحدد أو كامل النص (Ctrl+Shift+T)"
+        :aria-busy="editor.runState === 'running' || editor.runState === 'waiting'"
+        :aria-disabled="editor.runState === 'running' || editor.runState === 'waiting' || undefined"
+        @click="startTashkeel"
       >
-        تشكيل
+        <span
+          v-if="editor.runState === 'running' || editor.runState === 'waiting'"
+          class="me-1 inline-block h-3 w-3 animate-spin rounded-full border-2 border-white border-t-transparent align-middle"
+          aria-hidden="true"
+          data-testid="tashkeel-spinner"
+        />
+        <AppIcon v-else name="tashkeel" :size="14" class="me-1 inline align-middle" />
+        {{
+          editor.runState === 'running' || editor.runState === 'waiting' ? 'جارٍ التشكيل…' : 'تشكيل'
+        }}
       </button>
-      <button
-        :class="btnCls"
+      <ToolbarToggle
+        action
+        icon="proofread"
+        name="تدقيق ثم تشكيل"
+        message="جارٍ التدقيق ثم التشكيل…"
         data-testid="toolbar-proofread"
-        :disabled="editor.runState === 'running' || editor.runState === 'waiting'"
-        title="مراجعة الهمزات والإملاء والياء والترقيم ثم التشكيل"
+        :disabled-reason="runBusy ? 'التشكيل جارٍ الآن، انتظر حتى ينتهي' : undefined"
         @click="run.proofreadThenStart()"
       >
         تدقيق ثم تشكيل
-      </button>
+      </ToolbarToggle>
       <select
         :class="selectCls"
         :value="settings.values.engine_mode"
@@ -569,14 +603,15 @@ const btnCls =
         <option value="legal">قانوني (حيث يزيل اللبس)</option>
       </select>
 
-      <button
-        :class="[btnCls, settings.colored ? 'border-mizaj-emerald' : '']"
+      <ToolbarToggle
+        :on="settings.colored"
+        name="تلوين الحركات"
+        icon="color"
         data-testid="color-toggle"
-        :aria-pressed="settings.colored"
         @click="settings.update({ colored_diacritics: String(!settings.colored) })"
       >
         تلوين الحركات: {{ settings.colored ? 'مفعّل' : 'معطّل' }}
-      </button>
+      </ToolbarToggle>
       <select
         :class="selectCls"
         :value="settings.values.diacritic_color"
@@ -590,15 +625,16 @@ const btnCls =
       </select>
 
       <span class="mx-1 h-4 border-s dark:border-slate-600" />
-      <button
-        :class="[btnCls, pageView ? 'border-mizaj-emerald' : '']"
+      <ToolbarToggle
+        :on="pageView"
+        name="عرض الصفحة"
+        icon="page"
         data-testid="toggle-page-view"
-        :aria-pressed="pageView"
-        :disabled="!projects.currentDocument"
+        :disabled-reason="projects.currentDocument ? undefined : 'افتح مستنداً أولاً'"
         @click="togglePageView"
       >
         {{ pageView ? 'تحرير النص' : 'عرض الصفحة' }}
-      </button>
+      </ToolbarToggle>
       <template v-if="pageView">
         <button
           :class="btnCls"
@@ -613,123 +649,174 @@ const btnCls =
           +
         </button>
       </template>
-      <button
-        :class="btnCls"
+      <ToolbarToggle
+        :on="editor.showDiff"
+        name="مقارنة"
+        icon="diff"
         data-testid="toggle-diff"
-        :disabled="editor.diffBase === null"
+        :disabled-reason="
+          editor.diffBase === null ? 'لا توجد نسخة سابقة للمقارنة؛ شكّل النص أولاً' : undefined
+        "
         @click="editor.showDiff = !editor.showDiff"
       >
         مقارنة
-      </button>
-      <button
-        :class="btnCls"
+      </ToolbarToggle>
+      <ToolbarToggle
+        :on="editor.showStats"
+        name="إحصائيات"
+        icon="stats"
         data-testid="toggle-stats"
         @click="editor.showStats = !editor.showStats"
       >
         إحصائيات
-      </button>
-      <button
-        :class="btnCls"
+      </ToolbarToggle>
+      <ToolbarToggle
+        action
+        icon="export"
+        name="تصدير DOCX"
+        message="جارٍ تجهيز ملف Word…"
         data-testid="export-docx"
-        :disabled="!projects.currentDocument"
+        :disabled-reason="projects.currentDocument ? undefined : 'افتح مستنداً أولاً'"
         @click="exportDocx"
       >
         تصدير DOCX
-      </button>
-      <button
-        :class="btnCls"
+      </ToolbarToggle>
+      <ToolbarToggle
+        action
+        icon="tashkeel"
+        name="تشكيل الفقرة"
+        shortcut="Ctrl+Alt+T"
+        message="جارٍ تشكيل الفقرة الحالية…"
         data-testid="toolbar-tashkeel-paragraph"
-        title="Ctrl+Alt+T"
         @click="paragraphRun"
       >
         تشكيل الفقرة (مراجعة)
-      </button>
-      <button
-        :class="btnCls"
+      </ToolbarToggle>
+      <ToolbarToggle
+        :on="editor.findOpen"
+        name="بحث واستبدال"
+        icon="find"
+        shortcut="Ctrl+F"
         data-testid="toolbar-find"
-        title="Ctrl+F"
         @click="editor.findOpen = !editor.findOpen"
       >
         بحث واستبدال
-      </button>
-      <button
-        :class="[btnCls, tts.speaking.value ? 'border-mizaj-emerald' : '']"
+      </ToolbarToggle>
+      <ToolbarToggle
+        :on="tts.speaking.value"
+        name="القراءة بصوت عالٍ"
+        icon="read"
         data-testid="tts-read"
-        :aria-pressed="tts.speaking.value"
         @click="tts.toggle(editor.accessor?.getReadText() ?? '')"
       >
         {{ tts.speaking.value ? 'إيقاف القراءة' : 'قراءة بصوت عالٍ' }}
-      </button>
-      <button
-        :class="[btnCls, quality.review.active ? 'border-mizaj-amber' : '']"
+      </ToolbarToggle>
+      <ToolbarToggle
+        :on="quality.review.active"
+        name="وضع المراجعة"
+        icon="review"
+        shortcut="F7"
         data-testid="toolbar-review"
-        title="F7"
-        :aria-pressed="quality.review.active"
         @click="toggleReview"
       >
         وضع المراجعة
-      </button>
-      <button :class="btnCls" data-testid="toolbar-normalize" @click="quality.normalizeOpen = true">
+      </ToolbarToggle>
+      <ToolbarToggle
+        action
+        icon="normalize"
+        name="توحيد النص"
+        message="فُتحت نافذة توحيد النص"
+        data-testid="toolbar-normalize"
+        @click="quality.normalizeOpen = true"
+      >
         توحيد النص
-      </button>
-      <button
-        :class="[btnCls, quality.poetryOn ? 'border-mizaj-emerald' : '']"
+      </ToolbarToggle>
+      <ToolbarToggle
+        :on="quality.poetryOn"
+        name="وضع الشعر"
+        icon="poetry"
         data-testid="poetry-toggle"
-        :aria-pressed="quality.poetryOn"
-        :disabled="!projects.currentDocument"
+        :disabled-reason="projects.currentDocument ? undefined : 'افتح مستنداً أولاً'"
         @click="quality.setPoetry(!quality.poetryOn)"
       >
         وضع الشعر
-      </button>
-      <button
-        :class="[btnCls, editor.rightPanel === 'quality' ? 'border-mizaj-emerald' : '']"
+      </ToolbarToggle>
+      <ToolbarToggle
+        panel
+        :on="editor.rightPanel === 'quality'"
+        name="جودة التحرير"
+        icon="quality"
+        shortcut="Esc للإغلاق"
         data-testid="toggle-quality-panel"
         @click="editor.rightPanel = editor.rightPanel === 'quality' ? null : 'quality'"
       >
         جودة التحرير
-      </button>
-      <button
-        :class="[btnCls, editor.rightPanel === 'poetry' ? 'border-mizaj-emerald' : '']"
+      </ToolbarToggle>
+      <ToolbarToggle
+        panel
+        :on="editor.rightPanel === 'poetry'"
+        name="تحليل البحر"
+        icon="poetry"
+        shortcut="Esc للإغلاق"
         data-testid="toggle-poetry-panel"
         @click="editor.rightPanel = editor.rightPanel === 'poetry' ? null : 'poetry'"
       >
         تحليل البحر
-      </button>
-      <button
-        :class="btnCls"
+      </ToolbarToggle>
+      <ToolbarToggle
+        action
+        quiet
+        icon="spell"
+        name="تدقيق إملائي"
+        shortcut="Ctrl+Shift+L"
+        :busy="spellBusy"
+        :disabled-reason="spellBusy ? 'التدقيق جارٍ الآن' : undefined"
         data-testid="toolbar-spell"
-        title="Ctrl+Shift+L"
-        @click="spell.checkNow(true)"
+        @click="runSpell"
       >
-        تدقيق إملائي
-      </button>
-      <button
-        :class="[btnCls, editor.rightPanel === 'spelling' ? 'border-mizaj-emerald' : '']"
+        {{ spellBusy ? 'جارٍ التدقيق…' : 'تدقيق إملائي' }}
+      </ToolbarToggle>
+      <ToolbarToggle
+        panel
+        :on="editor.rightPanel === 'spelling'"
+        name="قائمة الأخطاء"
+        icon="list"
+        shortcut="Esc للإغلاق"
         data-testid="toggle-spell-panel"
         @click="editor.rightPanel = editor.rightPanel === 'spelling' ? null : 'spelling'"
       >
         قائمة الأخطاء
-      </button>
-      <button
+      </ToolbarToggle>
+      <ToolbarToggle
         v-if="gemini.enabled"
-        :class="[btnCls, editor.rightPanel === 'gemini' ? 'border-mizaj-emerald' : '']"
+        panel
+        :on="editor.rightPanel === 'gemini'"
+        name="اسأل عن المستند"
+        icon="gemini"
+        shortcut="Esc للإغلاق"
         data-testid="toggle-gemini-panel"
         @click="editor.rightPanel = editor.rightPanel === 'gemini' ? null : 'gemini'"
       >
         اسأل عن المستند
-      </button>
-      <button
-        :class="[btnCls, editor.rightPanel === 'legal' ? 'border-mizaj-emerald' : '']"
+      </ToolbarToggle>
+      <ToolbarToggle
+        panel
+        :on="editor.rightPanel === 'legal'"
+        name="أدوات قانونية"
+        icon="legal"
+        shortcut="Esc للإغلاق"
         data-testid="toggle-legal-panel"
         @click="editor.rightPanel = editor.rightPanel === 'legal' ? null : 'legal'"
       >
         أدوات قانونية
-      </button>
+      </ToolbarToggle>
       <button
         class="rounded bg-mizaj-amber/20 px-2 py-1 text-mizaj-amber hover:bg-mizaj-amber/30"
         data-testid="load-sample"
-        @click="loadSample"
+        title="تحميل نص تجريبي طويل لتجربة التشكيل"
+        @click="onLoadSample"
       >
+        <AppIcon name="sample" :size="14" class="me-1 inline align-middle" />
         تحميل النص التجريبي
       </button>
     </div>

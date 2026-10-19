@@ -106,6 +106,7 @@ async function openFileMenu(item: string): Promise<void> {
 }
 async function openSettings(tab: string): Promise<void> {
   if (!(await t('settings-modal').isVisible())) await t('open-settings').click()
+  await t('settings-mode-advanced').click()
   await t(`tab-${tab}`).click()
 }
 const closeSettings = async (): Promise<void> => {
@@ -359,6 +360,7 @@ test('Quran tab: status, attribution and the download stays disabled while offli
   await closeSettings()
   await t('settings-modal').waitFor({ state: 'detached' })
   await t('open-settings').click()
+  await t('settings-mode-advanced').click()
   await t('open-about').click()
   await expect(t('about-quran-attribution')).toContainText('Tanzil')
   await t('about-close').click()

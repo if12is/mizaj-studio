@@ -53,6 +53,25 @@ export const useSettingsStore = defineStore('settings', () => {
   const prefersContrast = ref(false)
   const settingsOpen = ref(false)
   const settingsSection = ref<SettingsSection>('general')
+  // «إعدادات متقدمة» tab: remembered per device (never affects what a setting does)
+  const ADV_KEY = 'mizaj.settings.advanced'
+  const readAdvanced = (): boolean => {
+    try {
+      return localStorage.getItem(ADV_KEY) === '1'
+    } catch {
+      return false
+    }
+  }
+  const settingsAdvanced = ref(readAdvanced())
+  function setAdvanced(v: boolean): void {
+    settingsAdvanced.value = v
+    if (!v) settingsSection.value = 'general'
+    try {
+      localStorage.setItem(ADV_KEY, v ? '1' : '0')
+    } catch {
+      /* storage unavailable: still works for this session */
+    }
+  }
   const highContrast = computed(() =>
     values.value.high_contrast === 'auto'
       ? prefersContrast.value
@@ -126,6 +145,8 @@ export const useSettingsStore = defineStore('settings', () => {
     settingsSection.value = (SETTINGS_SECTIONS as readonly string[]).includes(section)
       ? section
       : 'general'
+    // a request for a specialised section (e.g. «install Quran») needs the advanced view
+    if (settingsSection.value !== 'general') settingsAdvanced.value = true
     settingsOpen.value = true
   }
   function closeSettings(): void {
@@ -135,6 +156,8 @@ export const useSettingsStore = defineStore('settings', () => {
   return {
     settingsOpen,
     settingsSection,
+    settingsAdvanced,
+    setAdvanced,
     openSettings,
     closeSettings,
     values,
