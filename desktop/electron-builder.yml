@@ -11,6 +11,9 @@ files:
   - out/**
   - package.json
 extraResources:
+  # Offline user guide (python docs/guide/build.py docs/guide/dist --offline) -> <resources>/guide
+  - from: ../docs/guide/dist
+    to: guide
   # Frozen Python engine (PyInstaller onedir) -> <resources>/engine
   - from: ../backend/dist/mizaj-engine
     to: engine

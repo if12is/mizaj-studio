@@ -75,6 +75,10 @@ jobs:
       - name: Build frozen engine
         run: python scripts/build_backend.py
 
+      - name: Build the offline user guide
+        run: |
+          python -m pip install markdown==3.7
+          python docs/guide/build.py docs/guide/dist --offline
       - name: Build app and package the installer (no publish)
         working-directory: desktop
         env:

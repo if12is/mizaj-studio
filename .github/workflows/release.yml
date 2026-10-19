@@ -159,6 +159,10 @@ jobs:
       - name: Smoke-test frozen engine
         run: ./desktop/scripts/smoke-engine.ps1 -DataDir "$env:RUNNER_TEMP\smoke"
 
+      - name: Build the offline user guide
+        run: |
+          python -m pip install markdown==3.7
+          python docs/guide/build.py docs/guide/dist --offline
       - name: Build app
         working-directory: desktop
         run: npm run build

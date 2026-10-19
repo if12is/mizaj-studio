@@ -44,6 +44,7 @@ const mizajAPI = {
     return () => ipcRenderer.removeListener('sidecar:status-changed', handler)
   },
   windowMinimize: (): Promise<void> => ipcRenderer.invoke('window:minimize'),
+  openGuide: (page: 'quick' | 'guide'): Promise<boolean> => ipcRenderer.invoke('guide:open', page),
   windowToggleMaximize: (): Promise<void> => ipcRenderer.invoke('window:toggle-maximize'),
   getPathForFile: (file: File): string => {
     try {

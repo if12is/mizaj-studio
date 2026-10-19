@@ -30,6 +30,11 @@ jobs:
         run: python scripts/download_models.py --dry-run
       - name: Verify domain packs and catalog checksums are up to date
         run: python scripts/build_domain_packs.py --check
+      - name: Build the user guide (quick and full)
+        run: |
+          python -m pip install markdown==3.7
+          python docs/guide/build.py docs/guide/dist --offline
+          python docs/guide/build.py docs/guide/dist-online
       - name: Run Pytest Suite (Mock Mode)
         working-directory: ./backend
         run: |

@@ -172,6 +172,10 @@ jobs:
         working-directory: desktop
         run: npm ci
 
+      - name: Build the offline user guide
+        run: |
+          python -m pip install markdown==3.7
+          python docs/guide/build.py docs/guide/dist --offline
       - name: Build app
         if: inputs.build
         working-directory: desktop

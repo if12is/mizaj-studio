@@ -1,0 +1,350 @@
+<title>{{TITLE}}</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+{{HEAD}}
+<style>
+/* Layout: a manuscript-like reading column with a right-hand (RTL) chapter index that sticks; on phones the index folds into a disclosure. */
+:root {
+  --bg: #F6F8F7;          /* page: slate-50 nudged toward emerald */
+  --paper: #FFFFFF;       /* reading surface */
+  --ink: #0F172A;         /* slate 900 */
+  --ink-2: #475569;       /* slate 600 */
+  --rule: #DCE3E0;
+  --nib: #059669;         /* emerald 600: graphics on light */
+  --shadda: #D97706;      /* amber 600: graphics on light */
+  --accent: #047857;      /* emerald 700: text on light */
+  --amber-text: #B45309;  /* amber 700 */
+  --try-bg: #ECF7F2;
+  --note-bg: #FBF4E8;
+  --code-bg: #EEF2F1;
+  --band: #0F172A;        /* header band stays slate in both themes */
+  --band-ink: #F8FAFC;
+  --band-sub: #94A3B8;
+  --band-nib: #10B981;
+  --band-shadda: #F59E0B;
+  --pattern: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='88' height='88' viewBox='0 0 88 88'%3E%3Cg fill='none' stroke='%2310B981' stroke-opacity='.16' stroke-width='1.2'%3E%3Crect x='22' y='22' width='44' height='44'/%3E%3Crect x='22' y='22' width='44' height='44' transform='rotate(45 44 44)'/%3E%3Ccircle cx='44' cy='44' r='9'/%3E%3Cpath d='M0 0 22 22M88 0 66 22M0 88 22 66M88 88 66 66'/%3E%3C/g%3E%3C/svg%3E");
+  --f-display: "Amiri", "Noto Naskh Arabic", "Traditional Arabic", serif;
+  --f-body: "Cairo", "Noto Naskh Arabic", "Segoe UI", Tahoma, sans-serif;
+  --f-read: "Noto Naskh Arabic", "Amiri", "Traditional Arabic", serif;
+  --f-mono: ui-monospace, "Cascadia Mono", Consolas, "Courier New", monospace;
+  --measure: 70ch;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0B1220; --paper: #111A2B; --ink: #E8EEF4; --ink-2: #A3B1C2; --rule: #24324A;
+    --nib: #10B981; --shadda: #F59E0B; --accent: #34D399; --amber-text: #FBBF24;
+    --try-bg: #0F2A24; --note-bg: #2A2112; --code-bg: #18233A;
+    --band: #0A101C; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0B1220; --paper: #111A2B; --ink: #E8EEF4; --ink-2: #A3B1C2; --rule: #24324A;
+  --nib: #10B981; --shadda: #F59E0B; --accent: #34D399; --amber-text: #FBBF24;
+  --try-bg: #0F2A24; --note-bg: #2A2112; --code-bg: #18233A;
+  --band: #0A101C; color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; scroll-padding-top: 16px; }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+body {
+  background: var(--bg); color: var(--ink);
+  font-family: var(--f-body); font-size: 16.5px; line-height: 1.95;
+  direction: rtl; text-align: start;
+}
+a { color: var(--accent); text-underline-offset: 3px; }
+a:focus-visible, button:focus-visible, input:focus-visible, summary:focus-visible, .tw:focus-visible {
+  outline: 2px solid var(--shadda); outline-offset: 2px; border-radius: 4px;
+}
+
+/* ───── header band ───── */
+.band {
+  background: var(--band) var(--pattern);
+  color: var(--band-ink);
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  border-bottom: 3px solid var(--band-shadda);
+}
+.band-in {
+  max-width: 1180px; margin-inline: auto; padding-block: 44px 38px;
+  display: grid; grid-template-columns: auto 1fr; gap: 28px; align-items: center;
+}
+.band .mark { width: 112px; height: 112px; --nib: var(--band-nib); --shadda: var(--band-shadda); }
+.band .wordmark { height: 84px; width: auto; --ink: var(--band-ink); --nib: var(--band-nib); display: block; }
+.band .studio { font-family: var(--f-body); font-weight: 600; color: var(--band-sub); letter-spacing: .02em; margin: 2px 0 0; font-size: 15px; }
+.band h1 {
+  font-family: var(--f-display); font-weight: 700; font-size: clamp(30px, 4.4vw, 46px);
+  line-height: 1.35; margin: 14px 0 6px; text-wrap: balance;
+}
+.band h1 span { color: var(--band-shadda); }
+.band p.sub { margin: 0; color: #CBD5E1; max-width: 62ch; font-size: 16px; }
+.facts { display: flex; flex-wrap: wrap; gap: 8px 10px; margin-top: 18px; padding: 0; list-style: none; }
+.facts li {
+  border: 1px solid rgba(148, 163, 184, .35); border-radius: 999px; padding: 2px 12px;
+  font-size: 13.5px; color: #E2E8F0; background: rgba(15, 23, 42, .55);
+}
+.facts b { color: var(--band-nib); font-weight: 700; }
+
+/* ───── frame ───── */
+.frame {
+  max-width: 1180px; margin-inline: auto;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 28px 80px;
+  display: grid; grid-template-columns: 290px minmax(0, 1fr); gap: 36px; align-items: start;
+}
+
+/* ───── index (TOC) ───── */
+.index { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 14px); max-height: calc(100vh - 28px); display: flex; flex-direction: column; min-width: 0; }
+.index-head { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.index-head .mark { width: 30px; height: 30px; flex: none; }
+.index-head strong { font-family: var(--f-display); font-size: 21px; }
+.find { position: relative; margin-bottom: 10px; }
+.find input {
+  width: 100%; font: inherit; font-size: 14.5px; padding: 7px 12px; border-radius: 8px;
+  border: 1px solid var(--rule); background: var(--paper); color: var(--ink);
+}
+.find small { display: block; color: var(--ink-2); font-size: 12.5px; margin-top: 4px; min-height: 1.4em; }
+.toc-scroll { overflow: auto; padding-inline-end: 4px; min-height: 0; }
+.toc, .subs { list-style: none; margin: 0; padding: 0; }
+.tc { border-bottom: 1px solid var(--rule); }
+.tca { display: flex; gap: 10px; align-items: baseline; padding: 7px 4px; text-decoration: none; color: var(--ink); font-weight: 600; font-size: 15px; line-height: 1.6; }
+.tn { font-family: var(--f-display); color: var(--shadda); min-width: 1.6em; font-size: 17px; text-align: center; }
+.tc.on > .tca { color: var(--accent); }
+.tc.on > .tca .tt { text-decoration: underline; text-decoration-color: var(--shadda); text-underline-offset: 6px; }
+.subs { display: none; padding: 0 2.2em 8px 0; }
+.tc.on .subs, .index.searching .subs { display: block; }
+.subs a { display: block; text-decoration: none; color: var(--ink-2); font-size: 13.5px; line-height: 1.7; padding: 2px 0; }
+.subs a:hover, .tca:hover .tt { color: var(--accent); }
+.index.searching .tc[hidden], .index.searching .subs li[hidden] { display: none; }
+.index-fold { display: none; }
+
+/* ───── reading column ───── */
+main { min-width: 0; }
+.chapter {
+  background: var(--paper); border: 1px solid var(--rule); border-radius: 14px;
+  padding: 34px clamp(18px, 4vw, 52px) 30px; margin-bottom: 26px; min-width: 0;
+}
+.chapter > * { max-width: var(--measure); }
+.chapter.lead, .chapter.intro { background: transparent; border-style: dashed; }
+.ch-head { display: grid; grid-template-columns: auto 1fr; column-gap: 16px; align-items: center; margin-bottom: 18px; max-width: none; }
+.medallion { grid-row: span 2; width: 64px; height: 64px; position: relative; display: grid; place-items: center; }
+.medallion svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.medallion path { fill: none; stroke: var(--shadda); stroke-width: 3.2; stroke-linejoin: round; }
+.medallion b { position: relative; font-family: var(--f-display); font-size: 27px; color: var(--accent); line-height: 1; margin-top: 4px; }
+.ch-kicker { font-size: 13px; color: var(--amber-text); font-weight: 700; letter-spacing: .03em; }
+h2 { font-family: var(--f-display); font-weight: 700; font-size: clamp(26px, 3.2vw, 34px); line-height: 1.4; margin: 0; text-wrap: balance; }
+.chapter.intro h2 { margin-bottom: 10px; }
+h3 {
+  font-family: var(--f-display); font-weight: 700; font-size: 23px; line-height: 1.5;
+  margin: 34px 0 8px; padding-top: 16px; border-top: 1px solid var(--rule); text-wrap: balance;
+  display: flex; gap: 10px; align-items: baseline;
+}
+.sec-n { font-family: var(--f-body); font-size: 14px; font-weight: 700; color: var(--shadda); flex: none; }
+h4 { font-size: 17px; margin: 22px 0 4px; }
+p { margin: 10px 0; }
+ul, ol { padding-inline-start: 1.4em; margin: 8px 0; }
+li { margin: 3px 0; }
+li::marker { color: var(--shadda); }
+strong { font-weight: 700; }
+blockquote {
+  margin: 12px 0; padding: 10px 16px; border-inline-start: 4px solid var(--nib);
+  background: var(--try-bg); border-radius: 0 8px 8px 0; color: var(--ink);
+}
+blockquote p { margin: 4px 0; }
+code {
+  font-family: var(--f-mono); font-size: .88em; background: var(--code-bg);
+  border: 1px solid var(--rule); border-radius: 5px; padding: 0 5px; unicode-bidi: isolate;
+  overflow-wrap: anywhere;
+}
+pre { background: var(--code-bg); border: 1px solid var(--rule); border-radius: 8px; padding: 12px 14px; overflow-x: auto; direction: ltr; text-align: left; }
+pre code { border: 0; padding: 0; background: none; }
+/* Arabic sample sentences in code spans read better in naskh */
+code:lang(ar), code.ar { font-family: var(--f-read); font-size: 1em; }
+
+.card {
+  position: relative; margin: 20px 0; padding: 18px 20px 16px; border-radius: 16px;
+  border: 1px solid color-mix(in srgb, var(--c) 22%, var(--rule));
+  background:
+    radial-gradient(120% 140% at 100% 0%, color-mix(in srgb, var(--c) 9%, transparent) 0%, transparent 55%),
+    var(--paper);
+  box-shadow: 0 1px 2px rgba(15,23,42,.04), 0 8px 24px -12px color-mix(in srgb, var(--c) 35%, transparent);
+}
+.card.try { --c: var(--nib); --ct: var(--accent); }
+.card.note { --c: var(--shadda); --ct: var(--amber-text); }
+.card-h { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+.card-h b { color: var(--ct); font-size: 17px; letter-spacing: 0; }
+.card .ic {
+  inline-size: 34px; block-size: 34px; border-radius: 10px; display: grid; place-items: center; flex: none;
+  background: color-mix(in srgb, var(--c) 14%, transparent); color: var(--ct);
+}
+.card .ic svg { inline-size: 19px; block-size: 19px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.card > p { margin: 4px 0 0; }
+.steps { list-style: none; counter-reset: st; padding: 0; margin: 6px 0 0; display: grid; gap: 8px; }
+.steps li { counter-increment: st; position: relative; padding-inline-start: 38px; margin: 0; min-block-size: 30px; }
+.steps li::before {
+  content: counter(st, arabic-indic); position: absolute; inset-inline-start: 0; top: 4px; inline-size: 26px; block-size: 26px; border-radius: 50%;
+  display: grid; place-items: center; font-size: 13px; font-weight: 700; line-height: 1;
+  color: var(--ct); background: color-mix(in srgb, var(--c) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--c) 30%, transparent);
+}
+.expect {
+  margin-top: 12px; padding: 10px 14px; border-radius: 12px;
+  background: color-mix(in srgb, var(--shadda) 9%, transparent);
+  }
+.steps li.exp {
+  padding: 8px 14px 8px 14px; padding-inline-start: 38px; border-radius: 12px;
+  background: color-mix(in srgb, var(--shadda) 9%, transparent);
+}
+.steps li.exp::before { content: "✓"; top: 9px; inset-inline-start: 8px; color: var(--amber-text); background: color-mix(in srgb, var(--shadda) 16%, transparent); border-color: color-mix(in srgb, var(--shadda) 35%, transparent); }
+.steps li.exp { counter-increment: none; }
+.steps .lbl, .expect .lbl { display: inline-block; font-size: 12.5px; font-weight: 700; color: var(--amber-text); margin-bottom: 2px; }
+.expect p { margin: 0; }
+strong.exp { color: var(--amber-text); }
+
+.tw { overflow-x: auto; margin: 14px 0; border: 1px solid var(--rule); border-radius: 10px; max-width: 100%; }
+table { border-collapse: collapse; width: 100%; font-size: 14.5px; line-height: 1.7; }
+th, td { padding: 8px 12px; text-align: start; vertical-align: top; border-bottom: 1px solid var(--rule); }
+th { background: var(--code-bg); font-weight: 700; white-space: nowrap; }
+tr:last-child td { border-bottom: 0; }
+
+.colophon {
+  margin-top: 8px; padding: 20px 4px; color: var(--ink-2); font-size: 14px;
+  display: flex; gap: 14px; align-items: center; flex-wrap: wrap; border-top: 1px solid var(--rule);
+}
+.colophon .mark { width: 34px; height: 34px; }
+.top {
+  position: fixed; left: max(16px, calc(env(safe-area-inset-left, 0px) + 16px));
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 16px);
+  font: inherit; font-size: 14px; font-weight: 600; padding: 6px 14px; border-radius: 999px;
+  border: 1px solid var(--rule); background: var(--paper); color: var(--accent); cursor: pointer;
+  box-shadow: 0 4px 14px rgba(15, 23, 42, .12);
+}
+
+/* ───── phones / narrow ───── */
+@media (max-width: 900px) {
+  .frame { grid-template-columns: minmax(0, 1fr); gap: 18px; }
+  .index { position: static; max-height: none; }
+  .index-fold { display: block; border: 1px solid var(--rule); border-radius: 10px; background: var(--paper); }
+  .index-fold > summary { cursor: pointer; padding: 10px 14px; font-weight: 700; list-style: none; display: flex; justify-content: space-between; }
+  .index-fold > summary::after { content: "▾"; color: var(--shadda); }
+  .index-fold[open] > summary::after { content: "▴"; }
+  .index-fold .toc-scroll { max-height: 60vh; padding: 0 12px 10px; }
+  .index-desk { display: none; }
+  .band-in { grid-template-columns: 1fr; gap: 14px; padding-block: 30px 26px; }
+  .band .mark { width: 72px; height: 72px; }
+  .band .wordmark { height: 60px; }
+  .brand-row { display: flex; align-items: center; gap: 14px; }
+}
+@media (min-width: 901px) { .brand-row { display: contents; } }
+@media print { .index, .top { display: none; } .frame { display: block; } }
+</style>
+
+<header class="band">
+  <div class="band-in">
+    <div class="brand-row">
+      {{MARK_HERO}}
+    </div>
+    <div>
+      {{WORDMARK}}
+      <p class="studio">Mizaj Studio · استوديو التشكيل</p>
+      <h1>{{H1}}</h1>
+      <p class="sub">{{SUB}}</p>
+      <ul class="facts" aria-label="عن هذا الدليل">
+        <li>الإصدار <b>{{VERSION}}</b></li>{{SWITCH}}
+        <li><b>{{CHAPTERS}}</b> فصلاً</li>
+        <li>يعمل <b>دون إنترنت</b> ودون حسابات</li>
+        <li>للمحامين والكتّاب والمحررين والمدققين</li>
+      </ul>
+    </div>
+  </div>
+</header>
+
+<div class="frame">
+  <nav class="index" id="index" aria-label="فهرس الدليل">
+    <div class="index-head">{{MARK_NAV}}<strong>الفهرس</strong></div>
+    <div class="find">
+      <label for="q" class="sr" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)">ابحث في عناوين الدليل</label>
+      <input id="q" type="search" placeholder="ابحث في العناوين: التفقيط، القرآن، الهمزات…" autocomplete="off">
+      <small id="qinfo" aria-live="polite"></small>
+    </div>
+    <details class="index-fold" id="fold"><summary>فهرس الفصول</summary><div class="toc-scroll" id="toc-m"></div></details>
+    <div class="toc-scroll index-desk" id="toc-d">{{TOC}}</div>
+  </nav>
+
+  <main id="main">
+    {{BODY}}
+    <footer class="colophon">
+      {{MARK_NAV}}
+      <span>مِزَاج ستوديو — برنامج حر مفتوح المصدر (GPL-3.0). نص القرآن الكريم من Tanzil بترخيص CC BY 3.0. الخطان «أميري» و«القاهرة» بترخيص SIL OFL.</span>
+    </footer>
+  </main>
+</div>
+<button class="top" id="top" type="button">↑ أعلى الصفحة</button>
+
+<script>
+(() => {
+  const desk = document.getElementById('toc-d');
+  const mob = document.getElementById('toc-m');
+  mob.innerHTML = desk.innerHTML;
+  const index = document.getElementById('index');
+  const q = document.getElementById('q');
+  const info = document.getElementById('qinfo');
+  const strip = (s) => s.replace(/[ً-ْٰـ]/g, '').replace(/[أإآ]/g, 'ا').replace(/ى/g, 'ي').replace(/ة/g, 'ه').toLowerCase();
+
+  // headings text for search (chapter + section titles + first words of section)
+  const chapters = [...document.querySelectorAll('section.chapter[id]')];
+  q.addEventListener('input', () => {
+    const term = strip(q.value.trim());
+    const lists = [desk, mob];
+    if (!term) {
+      index.classList.remove('searching');
+      lists.forEach((l) => l.querySelectorAll('[hidden]').forEach((e) => (e.hidden = false)));
+      info.textContent = '';
+      return;
+    }
+    index.classList.add('searching');
+    let hits = 0;
+    lists.forEach((l, li) => {
+      l.querySelectorAll('.tc').forEach((tc) => {
+        const sec = document.getElementById(tc.dataset.id);
+        const inTitle = strip(tc.querySelector('.tt').textContent).includes(term);
+        let anySub = false;
+        tc.querySelectorAll('.subs li').forEach((s) => {
+          const target = document.getElementById(s.querySelector('a').getAttribute('href').slice(1));
+          let txt = s.textContent;
+          // include the section's own text so a word in the body finds it
+          let n = target && target.nextElementSibling, k = 0;
+          while (n && n.tagName !== 'H3' && k < 40) { txt += ' ' + n.textContent; n = n.nextElementSibling; k++; }
+          const ok = strip(txt).includes(term);
+          s.hidden = !ok; if (ok) { anySub = true; if (li === 0) hits++; }
+        });
+        tc.hidden = !(inTitle || anySub);
+        if (inTitle && !anySub) tc.querySelectorAll('.subs li').forEach((s) => (s.hidden = false));
+        if (inTitle && li === 0 && !anySub) hits++;
+      });
+    });
+    info.textContent = hits ? `${hits.toLocaleString('ar-EG')} نتيجة — اضغط Enter للانتقال إلى أولها` : 'لا نتائج؛ جرّب كلمة أخرى.';
+  });
+  q.addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter') return;
+    const first = desk.querySelector('.tc:not([hidden]) .subs li:not([hidden]) a, .tc:not([hidden]) .tca');
+    if (first) { e.preventDefault(); location.hash = first.getAttribute('href'); document.getElementById('fold').open = false; }
+  });
+
+  // close the phone index after choosing
+  mob.addEventListener('click', (e) => { if (e.target.closest('a')) document.getElementById('fold').open = false; });
+
+  // highlight the chapter being read
+  const marks = (id) => [desk, mob].forEach((l) => l.querySelectorAll('.tc').forEach((tc) => tc.classList.toggle('on', tc.dataset.id === id)));
+  if ('IntersectionObserver' in window) {
+    const io = new IntersectionObserver((ents) => {
+      ents.forEach((en) => { if (en.isIntersecting) marks(en.target.id); });
+    }, { rootMargin: '-35% 0px -60% 0px' });
+    chapters.forEach((c) => io.observe(c));
+  }
+  document.getElementById('top').addEventListener('click', () => window.scrollTo({ top: 0, behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' }));
+
+  // mark Arabic code spans so they use the naskh face
+  document.querySelectorAll('code').forEach((c) => { if (/[؀-ۿ]/.test(c.textContent)) c.classList.add('ar'); });
+})();
+</script>

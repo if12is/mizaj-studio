@@ -4,6 +4,7 @@ import type { SidecarStatus } from './pythonManager'
 import { registerFileIpc, dialogPaths } from './fileIpc'
 import { handleSecure, isTrustedSender } from './ipcGuard'
 import { MAX_NAME_LENGTH } from './security'
+import { openGuide } from './guide'
 
 export const FLUSH_TIMEOUT_MS = 2000
 
@@ -91,6 +92,9 @@ export function registerIpc(getStatus: () => SidecarStatus, apiToken: string): v
     else w.maximize()
   })
   handleSecure('window:close', (e) => winOf(e)?.close())
+  handleSecure('guide:open', (e, page: unknown) =>
+    openGuide(page === 'guide' ? 'guide' : 'quick', winOf(e))
+  )
   handleSecure('dialog:open-pack', async (e) => {
     if (process.env.MIZAJ_E2E_PACK_PATH)
       return dialogPaths.addAndReturn(process.env.MIZAJ_E2E_PACK_PATH)
