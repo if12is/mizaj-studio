@@ -211,8 +211,36 @@ ONLINE_HEAD = (
 # Inside the app the guide opens offline in its own sandboxed window: nothing leaves the device.
 OFFLINE_HEAD = (
     '<meta http-equiv="Content-Security-Policy" content="default-src \'none\'; '
-    "style-src 'unsafe-inline'; script-src 'unsafe-inline'; img-src data:\">"
+    "style-src 'unsafe-inline'; script-src 'unsafe-inline'; img-src data:; font-src data:\">"
 )
+FONTS = [  # the app's own @fontsource fonts (OFL), embedded so the offline guide looks the same
+    ("Amiri", "amiri", "arabic", 400),
+    ("Amiri", "amiri", "arabic", 700),
+    ("Cairo", "cairo", "arabic", 400),
+    ("Cairo", "cairo", "arabic", 600),
+    ("Cairo", "cairo", "arabic", 700),
+    ("Cairo", "cairo", "latin", 400),
+    ("Cairo", "cairo", "latin", 700),
+]
+
+
+def embedded_fonts() -> str:
+    import base64
+
+    root = HERE.parent.parent / "desktop" / "node_modules" / "@fontsource"
+    out = []
+    for family, pkg, subset, weight in FONTS:
+        f = root / pkg / "files" / f"{pkg}-{subset}-{weight}-normal.woff2"
+        if not f.exists():
+            continue  # without desktop/node_modules the page falls back to system fonts
+        b64 = base64.b64encode(f.read_bytes()).decode()
+        out.append(
+            f"@font-face{{font-family:'{family}';font-weight:{weight};font-display:swap;"
+            f"src:url(data:font/woff2;base64,{b64}) format('woff2')}}"
+        )
+    return "<style>" + "".join(out) + "</style>" if out else ""
+
+
 PAGES = {
     "guide": {
         "src": "guide.md",
@@ -248,7 +276,9 @@ def render(name: str, version: str, offline: bool) -> str:
     switch = f'<li><a href="{href}">{label} ←</a></li>' if offline else ""
     tpl = (HERE / "template.html").read_text(encoding="utf-8")
     return (
-        tpl.replace("{{HEAD}}", OFFLINE_HEAD if offline else ONLINE_HEAD)
+        tpl.replace(
+            "{{HEAD}}", OFFLINE_HEAD + embedded_fonts() if offline else ONLINE_HEAD
+        )
         .replace("{{TITLE}}", cfg["title"])
         .replace("{{H1}}", cfg["h1"])
         .replace("{{SUB}}", cfg["sub"])
