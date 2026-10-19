@@ -1,0 +1,28 @@
+name: Resource hashes
+
+# Downloads public resource files and reports their size and sha256 as annotations, so the
+# resource catalog can pin them (the dev sandbox cannot reach every host).
+on:
+  workflow_dispatch:
+    inputs:
+      urls:
+        description: 'Space-separated URLs'
+        required: true
+
+jobs:
+  hash:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download and hash
+        env:
+          URLS: ${{ inputs.urls }}
+        run: |
+          for u in $URLS; do
+            code=$(curl -sSL -o f -w '%{http_code}' "$u" || echo ERR)
+            if [ "$code" = 200 ]; then
+              echo "::notice title=$(basename "$u")::size=$(stat -c %s f) sha256=$(sha256sum f | cut -d' ' -f1) url=$u"
+              case "$u" in *MODEL_CARD|*.json) echo "::notice title=head $(basename "$u")::$(head -c 600 f | tr '\n' ' ')";; esac
+            else
+              echo "::warning title=$(basename "$u")::HTTP $code url=$u"
+            fi
+          done
