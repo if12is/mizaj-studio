@@ -37,6 +37,8 @@ class ProofreadIn(BaseModel):
     text: str = Field(max_length=5_000_000)
     # None -> the saved setting «الياء آخر الكلمة» (standard unless the user chose Egyptian)
     ya_style: Literal["standard", "egyptian"] | None = None
+    # the document's project: its own ya_style (if set) beats the global setting
+    project_id: int | None = Field(default=None, ge=1)
     categories: list[Category] | None = None
     quotes: Literal["keep", "guillemets"] = "keep"
     max_items: int = Field(default=5000, ge=1, le=20_000)
@@ -54,9 +56,14 @@ class ApplyIn(BaseModel):
     items: list[ItemIn] = Field(max_length=50_000)
 
 
-def _saved_ya_style(db_path: Path) -> str:
+def _saved_ya_style(db_path: Path, project_id: int | None = None) -> str:
+    """Project override -> global setting -> standard."""
     conn = connect(db_path)
     try:
+        if project_id is not None:
+            p = conn.execute("SELECT ya_style FROM projects WHERE id=?", (project_id,)).fetchone()
+            if p and p["ya_style"] in ("standard", "egyptian"):
+                return p["ya_style"]
         row = conn.execute("SELECT value FROM settings WHERE key=?", (SETTING_YA,)).fetchone()
     finally:
         conn.close()
@@ -77,7 +84,7 @@ def _run(db_path: Path, data_dir: Path | None, body: ProofreadIn) -> dict:
             protected = find_protected_spans(body.text, data_dir)
         except Exception:  # noqa: BLE001 - protection is best-effort for the checker
             protected = []
-    style = body.ya_style or _saved_ya_style(db_path)
+    style = body.ya_style or _saved_ya_style(db_path, body.project_id)
     opt = ProofreadOptions(
         ya_style=style,  # type: ignore[arg-type]
         categories=tuple(body.categories) if body.categories else CATEGORIES,

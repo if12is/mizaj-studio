@@ -64,9 +64,12 @@ import { useEditorQuality } from '@renderer/composables/useEditorQuality'
 import { useQuranDetect } from '@renderer/composables/useQuranDetect'
 import { useQualityStore } from '@renderer/stores/quality'
 import { useGeminiStore } from '@renderer/stores/gemini'
-import { reviewKeep, reviewStep, type ConfWord } from '@renderer/editor/confidence'
+import { reviewKeep, reviewStart, reviewStep, type ConfWord } from '@renderer/editor/confidence'
 import { openInspectorAt } from '@renderer/editor/inspector'
 import ReviewBar from './ReviewBar.vue'
+import LearnPrompt from './LearnPrompt.vue'
+import { learningExtension } from '@renderer/editor/learning'
+import { useLearningStore } from '@renderer/stores/learning'
 import type { TabViewState } from '@renderer/tabs/viewState'
 import { normalizeSpec } from '@renderer/editor/normalizeEdits'
 
@@ -81,6 +84,7 @@ const settings = useSettingsStore()
 const sidecar = useSidecarStore()
 const projects = useProjectsStore()
 const dictionary = useDictionaryStore()
+const learningStore = useLearningStore()
 const host = ref<HTMLDivElement | null>(null)
 let view: EditorView | null = null
 let silent = false
@@ -202,10 +206,23 @@ function toggleReview(): void {
     quality.review.active = false
     return
   }
-  quality.review.active = true
-  if (!reviewStep(quals.confidence, view, 1))
-    notify('لا توجد كلمات منخفضة الثقة للمراجعة. شكّل النص أولاً.', { kind: 'info' })
+  startReview()
 }
+/** Start review mode at the first doubtful word (also used by the status-bar chip). */
+function startReview(): void {
+  if (!view) return
+  quality.review.active = true
+  if (!reviewStart(quals.confidence, view))
+    notify('لا توجد كلمات منخفضة الثقة للمراجعة. شكّل النص أولاً.', { kind: 'info' })
+  else view.focus()
+}
+function stepReview(dir: 1 | -1): void {
+  if (!view) return
+  quality.review.active = true
+  reviewStep(quals.confidence, view, dir)
+  view.focus()
+}
+quality.reviewControls = { start: startReview, step: stepReview }
 
 function splitLongLines(): number {
   if (!view) return 0
@@ -301,6 +318,7 @@ function extensions(): Extension[] {
         ...quals.inspector
       }
     }),
+    learningExtension({ onWordCorrected: (c) => learningStore.offer(c) }),
     keymap.of([...defaultKeymap, ...historyKeymap]),
     readOnlyCompartment.of(EditorState.readOnly.of(false)),
     freshExtension(),
@@ -342,6 +360,7 @@ function setText(text: string, notifyChange = false): void {
   spell.schedule()
   quranDetect.schedule()
   quality.review = { active: false, total: 0, reviewed: 0, remaining: 0 }
+  learningStore.dismiss()
   editor.diffBase = null
   editor.showDiff = false
   editor.pendingCount = 0
@@ -885,6 +904,7 @@ const btnCls =
         تحميل النص التجريبي
       </button>
     </div>
+    <LearnPrompt />
     <ReviewBar
       @step="(d) => view && reviewStep(quals.confidence, view, d)"
       @keep="view && reviewKeep(quals.confidence, view)"

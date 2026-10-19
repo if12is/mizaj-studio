@@ -6,6 +6,7 @@ import { useEditorStore } from './editor'
 import { recordEvent } from './history'
 import { EVENT_LABELS, acceptedLabel } from '@renderer/history/logic'
 import { useSettingsStore } from './settings'
+import { useProjectsStore } from './projects'
 import {
   acceptedEdits,
   autoEdits,
@@ -33,6 +34,7 @@ const GATE_MAX_CHARS = 1_500_000
 export const useProofreadStore = defineStore('proofread', () => {
   const settings = useSettingsStore()
   const editor = useEditorStore()
+  const projects = useProjectsStore()
 
   const open = ref(false)
   const loading = ref(false)
@@ -49,7 +51,16 @@ export const useProofreadStore = defineStore('proofread', () => {
   const mode = computed<BeforeTashkeelMode>(() =>
     normalizeMode(settings.values.proofread_before_tashkeel)
   )
-  const yaStyle = computed<YaStyle>(() => normalizeYaStyle(settings.values.ya_style))
+  /** the open document's project, when it has its own ya_style */
+  const projectYa = computed<YaStyle | null>(() => {
+    const id = projects.currentDocument?.project_id
+    const v = projects.projects.find((p) => p.id === id)?.ya_style
+    return v === 'standard' || v === 'egyptian' ? v : null
+  })
+  /** project override, else the global setting (the backend applies the same rule) */
+  const yaStyle = computed<YaStyle>(
+    () => projectYa.value ?? normalizeYaStyle(settings.values.ya_style)
+  )
   const groups = computed(() => groupItems(items.value))
   const acceptedCount = computed(() => countByDecision(items.value, decisions.value, 'accept'))
 
@@ -61,7 +72,12 @@ export const useProofreadStore = defineStore('proofread', () => {
       return await useApi().request<ProofResponse>(
         'POST',
         '/api/proofread',
-        { text: t, ya_style: yaStyle.value, ...(categories ? { categories } : {}) },
+        {
+          text: t,
+          ya_style: yaStyle.value,
+          ...(projects.currentDocument ? { project_id: projects.currentDocument.project_id } : {}),
+          ...(categories ? { categories } : {})
+        },
         true
       )
     } catch {
@@ -187,7 +203,10 @@ export const useProofreadStore = defineStore('proofread', () => {
     decisions.value = setGroup(decisions.value, items.value, category, d)
   }
   async function setYaStyle(v: YaStyle): Promise<void> {
-    await settings.update({ ya_style: v })
+    const pid = projects.currentDocument?.project_id
+    // a project with its own style keeps it: the choice made in the dialog goes to the project
+    if (pid !== undefined && projectYa.value !== null) await projects.setYaStyle(pid, v)
+    else await settings.update({ ya_style: v })
     await refresh()
   }
 

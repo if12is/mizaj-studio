@@ -3,6 +3,7 @@ import { computed } from 'vue'
 import { useEditorStore } from '@renderer/stores/editor'
 import { useSidecarStore } from '@renderer/stores/sidecar'
 import { engineWarmupText } from '@renderer/stores/engines'
+import DoubtChip from './DoubtChip.vue'
 
 const editor = useEditorStore()
 const sidecar = useSidecarStore()
@@ -60,6 +61,7 @@ const saveText = computed(
       >
     </div>
     <div class="flex items-center gap-4">
+      <DoubtChip />
       <span data-testid="status-words">الكلمات: {{ editor.wordCount }}</span>
       <span data-testid="status-line">السطر: {{ editor.cursorLine }}</span>
       <span data-testid="status-save" :data-state="editor.saveState">{{ saveText }}</span>

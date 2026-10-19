@@ -176,8 +176,8 @@ def test_error_envelope(client):
 def test_projects_crud(client):
     assert client.get("/api/projects").json() == []
     p = mk_project(client, "A")
-    assert set(p) == {"id", "name", "description", "created_at", "updated_at"}
-    assert p["description"] == ""
+    assert set(p) == {"id", "name", "description", "created_at", "updated_at", "ya_style"}
+    assert p["description"] == "" and p["ya_style"] is None
     assert client.get(f"/api/projects/{p['id']}").json() == p
     r = client.put(f"/api/projects/{p['id']}", json={"description": "d"})
     assert r.json()["description"] == "d" and r.json()["name"] == "A"

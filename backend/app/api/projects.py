@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import sqlite3
-from typing import Annotated
+from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, Response
 from pydantic import BaseModel, Field, field_validator
@@ -20,6 +20,8 @@ class Project(BaseModel):
     description: str
     created_at: str
     updated_at: str
+    # None = follow the global setting «الياء آخر الكلمة»
+    ya_style: Literal["standard", "egyptian"] | None = None
 
 
 def _name(v: str | None) -> str | None:
@@ -41,6 +43,8 @@ class ProjectCreate(BaseModel):
 class ProjectUpdate(BaseModel):
     name: str | None = Field(default=None, max_length=200)
     description: str | None = Field(default=None, max_length=5000)
+    # explicit null clears the override (back to the global setting)
+    ya_style: Literal["standard", "egyptian"] | None = None
 
     _n = field_validator("name")(_name)
 
@@ -81,10 +85,11 @@ def update_project(pid: int, body: ProjectUpdate, db: Db) -> Project:
         raise validation_error("name must not be null")
     name = body.name if body.name is not None else cur.name
     desc = body.description if body.description is not None else cur.description
+    ya = body.ya_style if "ya_style" in body.model_fields_set else cur.ya_style
     with write(db):
         db.execute(
-            "UPDATE projects SET name=?, description=?, updated_at=? WHERE id=?",
-            (name, desc, now_iso(), pid),
+            "UPDATE projects SET name=?, description=?, ya_style=?, updated_at=? WHERE id=?",
+            (name, desc, ya, now_iso(), pid),
         )
     return _get(db, pid)
 

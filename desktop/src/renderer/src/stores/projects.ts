@@ -69,6 +69,13 @@ export const useProjectsStore = defineStore('projects', () => {
     touch()
     projects.value = projects.value.map((x) => (x.id === id ? p : x))
   }
+  /** Per-project «الياء آخر الكلمة» override; null = follow the global setting. */
+  async function setYaStyle(id: number, v: 'standard' | 'egyptian' | null): Promise<void> {
+    touch()
+    const p = await useApi().put<Project>(`/api/projects/${id}`, { ya_style: v })
+    touch()
+    projects.value = projects.value.map((x) => (x.id === id ? p : x))
+  }
   async function deleteProject(id: number): Promise<void> {
     touch()
     await useApi().del(`/api/projects/${id}`)
@@ -145,6 +152,7 @@ export const useProjectsStore = defineStore('projects', () => {
     loadProjects,
     loadDocuments,
     renameProject,
+    setYaStyle,
     deleteProject,
     renameDocument,
     deleteDocument,

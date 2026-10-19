@@ -127,7 +127,32 @@ export interface ConfConfig {
   getProtected(state: EditorState): SpanLike[]
   isReviewActive(): boolean
   setReviewActive(on: boolean): void
-  onStats(s: ReviewStats): void
+  onStats(s: ReviewStats & { position: number }): void
+}
+
+/** 1-based position of the word under the selection among all flagged words (0 = none). */
+export function reviewPosition(
+  marks: ConfMark[],
+  threshold: number,
+  head: number,
+  protectedSpans: SpanLike[] = []
+): number {
+  const flagged = marks
+    .filter((m) => m.confidence < threshold || (m.irab !== null && m.irab < threshold))
+    .filter((m) => !overlaps(m, protectedSpans))
+  const i = flagged.findIndex((m) => head >= m.from && head <= m.to)
+  return i + 1
+}
+
+/** Start review mode at the first doubtful word of the document. */
+export function reviewStart(cfg: ConfConfig, view: EditorView): boolean {
+  const m = candidatesOf(cfg, view.state)[0]
+  if (!m) return false
+  view.dispatch({
+    selection: { anchor: m.from, head: m.to },
+    effects: EditorView.scrollIntoView(m.from, { y: 'center' })
+  })
+  return true
 }
 
 function candidatesOf(cfg: ConfConfig, state: EditorState): ConfMark[] {
@@ -136,7 +161,9 @@ function candidatesOf(cfg: ConfConfig, state: EditorState): ConfMark[] {
 
 /** Select the next/previous word to review. */
 export function reviewStep(cfg: ConfConfig, view: EditorView, dir: 1 | -1): boolean {
-  const m = nextCandidate(candidatesOf(cfg, view.state), view.state.selection.main.head, dir)
+  const sel = view.state.selection.main
+  // backwards starts from the START of the selected word, or it would re-select that same word
+  const m = nextCandidate(candidatesOf(cfg, view.state), dir === 1 ? sel.head : sel.from, dir)
   if (!m) return false
   view.dispatch({
     selection: { anchor: m.from, head: m.to },
@@ -157,6 +184,7 @@ export function reviewKeep(cfg: ConfConfig, view: EditorView): boolean {
 
 export function confidenceExtension(cfg: ConfConfig): Extension[] {
   let last: ConfMark[] | null = null
+  let lastHead = -1
   return [
     confField,
     EditorView.decorations.compute([confField], (state) =>
@@ -177,9 +205,15 @@ export function confidenceExtension(cfg: ConfConfig): Extension[] {
       class {
         update(u: ViewUpdate): void {
           const marks = u.state.field(confField)
-          if (marks !== last) {
+          const head = u.state.selection.main.head
+          if (marks !== last || head !== lastHead) {
             last = marks
-            cfg.onStats(reviewStats(marks, cfg.getThreshold(), cfg.getProtected(u.state)))
+            lastHead = head
+            const prot = cfg.getProtected(u.state)
+            cfg.onStats({
+              ...reviewStats(marks, cfg.getThreshold(), prot),
+              position: reviewPosition(marks, cfg.getThreshold(), head, prot)
+            })
           }
         }
       }

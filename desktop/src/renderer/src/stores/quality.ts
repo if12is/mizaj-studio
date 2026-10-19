@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { computed, ref } from 'vue'
+import { computed, ref, shallowRef } from 'vue'
 import { useApi } from '@renderer/api'
 import { announceFeature } from '@renderer/composables/useFeatureGuide'
 import { useProjectsStore } from './projects'
@@ -59,7 +59,15 @@ export const useQualityStore = defineStore('quality', () => {
     () => settings.values.online_languagetool === 'true' && !!tools.value?.languagetool?.detected
   )
 
-  const review = ref({ active: false, total: 0, reviewed: 0, remaining: 0 })
+  const review = ref<{
+    active: boolean
+    total: number
+    reviewed: number
+    remaining: number
+    position?: number
+  }>({ active: false, total: 0, reviewed: 0, remaining: 0 })
+  /** Registered by the editor pane: lets the status-bar chip drive review mode. */
+  const reviewControls = shallowRef<{ start(): void; step(dir: 1 | -1): void } | null>(null)
 
   const quranInstalled = ref<boolean | null>(null)
   /** Bumped when the Quran text is installed/removed so open editors re-detect immediately. */
@@ -97,6 +105,7 @@ export const useQualityStore = defineStore('quality', () => {
     loadTools,
     ltOn,
     review,
+    reviewControls,
     quranInstalled,
     quranRevision,
     quranChanged,

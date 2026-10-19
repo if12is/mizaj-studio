@@ -125,6 +125,8 @@ export interface Project {
   description: string
   created_at: string
   updated_at: string
+  /** per-project final-ya style; null = follow the global setting */
+  ya_style?: 'standard' | 'egyptian' | null
 }
 export interface DocumentSummary {
   id: number

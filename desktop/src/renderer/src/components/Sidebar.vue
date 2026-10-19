@@ -23,6 +23,15 @@ type Target =
     }
 const renaming = ref<{ kind: 'project' | 'document'; id: number; text: string } | null>(null)
 const pendingDelete = ref<Target | null>(null)
+/** project whose settings row («الياء آخر الكلمة») is expanded */
+const settingsFor = ref<number | null>(null)
+async function setYa(id: number, v: string): Promise<void> {
+  try {
+    await projects.setYaStyle(id, v === '' ? null : (v as 'standard' | 'egyptian'))
+  } catch {
+    /* error toast shown by api client */
+  }
+}
 
 function startRename(kind: 'project' | 'document', id: number, current: string): void {
   renaming.value = { kind, id, text: current }
@@ -132,6 +141,15 @@ async function submitDoc(): Promise<void> {
             </button>
             <button
               :class="iconBtn"
+              title="إعدادات المشروع"
+              aria-label="إعدادات المشروع"
+              data-testid="project-settings"
+              @click="settingsFor = settingsFor === p.id ? null : p.id"
+            >
+              ⚙
+            </button>
+            <button
+              :class="iconBtn"
               title="حذف"
               aria-label="حذف المشروع"
               data-testid="project-delete"
@@ -147,6 +165,24 @@ async function submitDoc(): Promise<void> {
               + مستند
             </button>
           </span>
+        </div>
+        <div
+          v-if="settingsFor === p.id"
+          class="flex items-center gap-2 px-3 pb-1 text-xs"
+          data-testid="project-settings-row"
+        >
+          <label :for="`ya-${p.id}`">الياء آخر الكلمة</label>
+          <select
+            :id="`ya-${p.id}`"
+            class="min-w-0 flex-1 rounded border px-1 py-0.5 dark:border-slate-600 dark:bg-slate-800"
+            :value="p.ya_style ?? ''"
+            data-testid="project-ya-style"
+            @change="setYa(p.id, ($event.target as HTMLSelectElement).value)"
+          >
+            <option value="">حسب الإعداد العام</option>
+            <option value="standard">قياسي (ي)</option>
+            <option value="egyptian">مصري (ى)</option>
+          </select>
         </div>
         <form v-if="newDocFor === p.id" class="px-3 pb-1" @submit.prevent="submitDoc">
           <input
