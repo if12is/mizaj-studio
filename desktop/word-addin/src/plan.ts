@@ -118,6 +118,58 @@ export const SKIP_REASON_AR: Record<SkipReason, string> = {
   special: 'فقرة تحتوي عناصر خاصة'
 }
 
+/** Operation on one of the ranges Word returned for `search('?')` (a "cluster"). */
+export type ClusterOp =
+  | { index: number; kind: 'replace'; text: string }
+  | { index: number; kind: 'delete' }
+  | { index: number; kind: 'after'; text: string }
+  | { index: number; kind: 'before'; text: string }
+
+/**
+ * Word's `search('?')` returns one range per *visible* character: in Arabic a letter comes back
+ * together with its diacritics («كَ», «بِّ»), so the ranges are clusters of 1+ UTF-16 units. This
+ * maps character ops onto those clusters. A cluster whose new text only grows at its end (a mark
+ * added after the letter) or start keeps a pure insertion; anything else replaces that one cluster,
+ * which still lies inside a single run, so formatting is kept. Returns null when the clusters are
+ * not exactly the paragraph text (Word skipped or merged something we cannot see).
+ */
+export function clusterOps(
+  text: string,
+  clusters: readonly string[],
+  ops: readonly CharOp[]
+): ClusterOp[] | null {
+  if (clusters.join('') !== text || clusters.some((c) => c === '')) return null
+  const byIndex = new Map<number, CharOp[]>()
+  for (const op of ops) {
+    const l = byIndex.get(op.index)
+    if (l) l.push(op)
+    else byIndex.set(op.index, [op])
+  }
+  const out: ClusterOp[] = []
+  let start = 0
+  clusters.forEach((c, k) => {
+    const end = start + c.length
+    let changed = false
+    let next = ''
+    for (let i = start; i < end; i++) {
+      const own = byIndex.get(i)
+      if (own) changed = true
+      next += applyOps(
+        text[i],
+        (own ?? []).map((o) => ({ ...o, index: 0 }))
+      )
+    }
+    start = end
+    if (!changed || next === c) return
+    if (next === '') out.push({ index: k, kind: 'delete' })
+    else if (next.startsWith(c)) out.push({ index: k, kind: 'after', text: next.slice(c.length) })
+    else if (next.endsWith(c))
+      out.push({ index: k, kind: 'before', text: next.slice(0, next.length - c.length) })
+    else out.push({ index: k, kind: 'replace', text: next })
+  })
+  return out.reverse() // from the end of the paragraph backwards
+}
+
 /** Whether the characters Word returned for a paragraph are exactly its text, one range per UTF-16 unit. */
 export function charsMatch(text: string, chars: readonly string[]): boolean {
   if (chars.length !== text.length) return false

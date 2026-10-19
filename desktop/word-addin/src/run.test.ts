@@ -330,3 +330,59 @@ describe('safety nets', () => {
     expect(r.paras[0].skip).toBe('field')
   })
 })
+
+describe('real Word returns a letter with its diacritics as ONE range', () => {
+  // the punctuation fixer of the engine, reduced: «كلمة ،» -> «كلمة،»
+  const punct: PipelineDeps = {
+    ...engine,
+    proofread: async (text, cats) => {
+      const items: ProofreadItem[] = []
+      if (cats.includes('punctuation'))
+        for (const m of text.matchAll(/ +(?=[،.])/g))
+          items.push({
+            start: m.index ?? 0,
+            end: (m.index ?? 0) + m[0].length,
+            original: m[0],
+            replacement: '',
+            category: 'punctuation'
+          })
+      return { items }
+    }
+  }
+  const make = (deps: PipelineDeps) => {
+    const paragraphs: P[] = [
+      {
+        runs: [
+          { t: 'قَضَتِ الْمَحْكَمَةُ ', fmt: B },
+          { t: '، وَأَلْزَمَتْ', fmt: {} }
+        ]
+      }
+    ]
+    const fake = createFakeWord({
+      clusterMarks: true,
+      paragraphs,
+      selection: { from: { p: 0, c: 0 }, to: { p: 0, c: 33 } }
+    })
+    return { fake, runner: new Runner({ host: fake.Word, api: api(deps), supported: () => true }) }
+  }
+
+  it('punctuation on a diacritized paragraph is applied, runs kept', async () => {
+    const { fake, runner } = make(punct)
+    const r = await runner.runDirect('punctuation')
+    expect(r.outcome.report.unmapped).toBe(0)
+    expect(r.outcome.report.edited).toBe(1)
+    expect(flat(fake.getDoc)[0]).toBe('قَضَتِ الْمَحْكَمَةُ، وَأَلْزَمَتْ')
+    expect(fake.getDoc()[0][0]).toEqual({ t: 'قَضَتِ الْمَحْكَمَةُ', fmt: B })
+  })
+
+  it('tashkeel on already-vowelized text maps marks onto the letter clusters', async () => {
+    const { fake, runner } = make({
+      ...engine,
+      tashkeel: async (t) => ({ text: t.replace('الْمَحْكَمَةُ', 'الْمَحْكَمَةِ') })
+    })
+    const r = await runner.runDirect('tashkeel')
+    expect(r.outcome.report.unmapped).toBe(0)
+    expect(flat(fake.getDoc)[0]).toContain('الْمَحْكَمَةِ')
+    expect(fake.getDoc()[0][0].fmt).toEqual(B)
+  })
+})

@@ -1,5 +1,5 @@
 import { applyEdits as applyTextEdits, type TextEdit } from '../../src/main/systemwide/textDiff'
-import { charsMatch, planParagraph, type CharOp } from './plan'
+import { clusterOps, planParagraph, type CharOp, type ClusterOp } from './plan'
 import type { ParaInfo } from './selection'
 import type { WContext, WRange } from './types'
 
@@ -64,16 +64,21 @@ export async function applyParagraphEdits(
   if (!jobs.length) return report
   await ctx.sync() // read phase: nothing has been written yet
 
-  const ready: Job[] = []
+  // Word returns a letter together with its diacritics as one range: map the ops onto those clusters
+  const ready: (Job & { cops: ClusterOp[] })[] = []
   for (const j of jobs) {
-    const got = j.chars.items.map((r) => r.text)
-    if (charsMatch(j.para.text, got)) ready.push(j)
+    const cops = clusterOps(
+      j.para.text,
+      j.chars.items.map((r) => r.text),
+      j.ops
+    )
+    if (cops) ready.push({ ...j, cops })
     else report.unmapped++
   }
   if (!ready.length) return report
 
   for (const j of ready) {
-    for (const op of j.ops) {
+    for (const op of j.cops) {
       const r = j.chars.items[op.index]
       if (op.kind === 'replace') r.insertText(op.text, 'Replace')
       else if (op.kind === 'delete') r.delete()

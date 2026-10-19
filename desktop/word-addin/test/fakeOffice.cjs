@@ -13,7 +13,8 @@
  *   - insertText 'Replace': new text takes the formatting of the first replaced character;
  *   - insertText 'End' / 'Start': new text takes the formatting of the last / first character of
  *     the range and the range grows to include it; OTHER ranges ending at that point do not grow;
- *   - search('?', {matchWildcards:true}) returns one range per character of the range.
+ *   - search('?', {matchWildcards:true}) returns one range per character of the range, or, with
+ *     spec.clusterMarks (what real Word does), one per letter together with its diacritics.
  *
  * Usable in Node (require) and in a browser page (addInitScript): it only assigns window globals
  * when a window exists.
@@ -144,7 +145,14 @@ function createFakeWord(spec) {
           const cs = paras[pi].cells
           const a = pi === this.sp ? idx(pi, this.sid) : 0
           const b = pi === this.ep ? idx(pi, this.eid) : cs.length - 1
-          for (let i = a; i <= b; i++) items.push(new Range(this.ctx, pi, cs[i].id, pi, cs[i].id))
+          for (let i = a; i <= b; i++) {
+            // real Word returns an Arabic letter TOGETHER with its diacritics as one match
+            let j = i
+            if (spec.clusterMarks)
+              while (j + 1 <= b && /[\u064b-\u0652\u0670]/.test(cs[j + 1].ch)) j++
+            items.push(new Range(this.ctx, pi, cs[i].id, pi, cs[j].id))
+            i = j
+          }
         }
         return items
       }
