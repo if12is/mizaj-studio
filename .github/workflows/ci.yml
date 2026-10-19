@@ -137,6 +137,18 @@ jobs:
           cache-dependency-path: desktop/package-lock.json
       - name: Unit tests (Windows)
         working-directory: ./desktop
+        timeout-minutes: 15
+        shell: pwsh
         run: |
           npm ci
-          npm run test:unit
+          # Watchdog: an intermittent hang was seen here; on timeout, report where it stopped.
+          $log = "$env:RUNNER_TEMP\vitest.log"
+          $p = Start-Process -FilePath npx.cmd -ArgumentList 'vitest','run','--reporter=verbose' -RedirectStandardOutput $log -RedirectStandardError "$log.err" -NoNewWindow -PassThru
+          if (-not $p.WaitForExit(480000)) {
+            $tail = ((Get-Content $log -Tail 25) + (Get-Content "$log.err" -Tail 10)) -join '%0A'
+            Write-Host "::error title=vitest hang::$tail"
+            taskkill /T /F /PID $p.Id | Out-Null
+            exit 1
+          }
+          Get-Content $log -Tail 15
+          exit $p.ExitCode
