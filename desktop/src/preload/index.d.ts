@@ -145,6 +145,48 @@ declare global {
     onPopupState(cb: (s: SystemwidePopupState) => void): () => void
   }
 
+  interface WordAddinState {
+    supported: boolean
+    enabled: boolean
+    installed: boolean
+    running: boolean
+    port: number
+    cert: {
+      exists: boolean
+      thumbprint: string | null
+      notAfter: string | null
+      trusted: boolean | null
+      needsRenewal: boolean
+      expired: boolean
+    }
+    manifestPath: string | null
+    catalogDir: string
+    officeJsLocal: boolean
+    error: string | null
+  }
+  interface WordAddinStep {
+    id: string
+    ok: boolean
+    text: string
+  }
+  interface WordAddinCheck {
+    id: string
+    level: 'ok' | 'warn' | 'fail'
+    text: string
+  }
+  interface WordAddinBridge {
+    getState(): Promise<WordAddinState>
+    setEnabled(v: boolean): Promise<WordAddinState>
+    install(): Promise<{ ok: boolean; steps: WordAddinStep[]; state: WordAddinState }>
+    uninstall(): Promise<{ ok: boolean; steps: WordAddinStep[]; state: WordAddinState }>
+    test(): Promise<{
+      ok: boolean
+      checks: WordAddinCheck[]
+      roundTrip: { https: boolean; paired: boolean; engine: boolean }
+    }>
+    openCatalog(): Promise<string>
+  }
+
   interface MizajAPI {
     getBackendConfig(): Promise<{
       port: number | null
@@ -195,6 +237,7 @@ declare global {
     relaunchApp(): Promise<void>
     gemini: GeminiBridge
     systemwide: SystemwideBridge
+    wordAddin: WordAddinBridge
     onBeforeQuitFlush(cb: () => Promise<void>): () => void
   }
 

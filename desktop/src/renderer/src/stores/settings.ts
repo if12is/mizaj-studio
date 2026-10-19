@@ -47,7 +47,8 @@ export const SETTINGS_SECTIONS = [
   'packs',
   'backup',
   'editor-quality',
-  'systemwide'
+  'systemwide',
+  'wordaddin'
 ] as const
 export type SettingsSection = (typeof SETTINGS_SECTIONS)[number]
 

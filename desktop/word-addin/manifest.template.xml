@@ -1,0 +1,157 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Mizaj Word add-in manifest TEMPLATE. Never installed as is: src/main/wordaddin/manifest.ts fills
+  the double-brace placeholders (a fresh random Id per install, the HTTPS origin served by the Mizaj app and
+  the per-install pairing token). All URLs are https://localhost:<port> served by Mizaj itself.
+-->
+<OfficeApp
+  xmlns="http://schemas.microsoft.com/office/appforoffice/1.1"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xmlns:bt="http://schemas.microsoft.com/office/officeappbasictypes/1.0"
+  xmlns:ov="http://schemas.microsoft.com/office/taskpaneappversionoverrides"
+  xsi:type="TaskPaneApp">
+  <Id>{{ID}}</Id>
+  <Version>{{VERSION}}</Version>
+  <ProviderName>Mizaj Studio</ProviderName>
+  <DefaultLocale>ar-SA</DefaultLocale>
+  <DisplayName DefaultValue="مِزَاج"/>
+  <Description DefaultValue="تدقيق إملائي وترقيم وتشكيل للنص العربي في Word، يعمل على جهازك عبر برنامج مِزَاج دون إنترنت."/>
+  <IconUrl DefaultValue="{{ORIGIN}}/assets/icon-32.png"/>
+  <HighResolutionIconUrl DefaultValue="{{ORIGIN}}/assets/icon-64.png"/>
+  <SupportUrl DefaultValue="{{ORIGIN}}/assets/help.html"/>
+  <AppDomains>
+    <AppDomain>{{ORIGIN}}</AppDomain>
+  </AppDomains>
+  <Hosts>
+    <Host Name="Document"/>
+  </Hosts>
+  <DefaultSettings>
+    <SourceLocation DefaultValue="{{TASKPANE_URL}}"/>
+  </DefaultSettings>
+  <Permissions>ReadWriteDocument</Permissions>
+  <VersionOverrides xmlns="http://schemas.microsoft.com/office/taskpaneappversionoverrides" xsi:type="VersionOverridesV1_0">
+    <Hosts>
+      <Host xsi:type="Document">
+        <DesktopFormFactor>
+          <FunctionFile resid="Mizaj.Commands.Url"/>
+          <ExtensionPoint xsi:type="PrimaryCommandSurface">
+            <CustomTab id="Mizaj.Tab">
+              <Group id="Mizaj.Group">
+                <Label resid="Mizaj.Group.Label"/>
+                <Icon>
+                  <bt:Image size="16" resid="Mizaj.Icon16"/>
+                  <bt:Image size="32" resid="Mizaj.Icon32"/>
+                  <bt:Image size="80" resid="Mizaj.Icon80"/>
+                </Icon>
+                <Control xsi:type="Button" id="Mizaj.Proofread">
+                  <Label resid="Mizaj.Proofread.Label"/>
+                  <Supertip>
+                    <Title resid="Mizaj.Proofread.Label"/>
+                    <Description resid="Mizaj.Proofread.Tip"/>
+                  </Supertip>
+                  <Icon>
+                    <bt:Image size="16" resid="Mizaj.Icon16"/>
+                    <bt:Image size="32" resid="Mizaj.Icon32"/>
+                    <bt:Image size="80" resid="Mizaj.Icon80"/>
+                  </Icon>
+                  <Action xsi:type="ExecuteFunction">
+                    <FunctionName>mizajProofread</FunctionName>
+                  </Action>
+                </Control>
+                <Control xsi:type="Button" id="Mizaj.Punctuation">
+                  <Label resid="Mizaj.Punctuation.Label"/>
+                  <Supertip>
+                    <Title resid="Mizaj.Punctuation.Label"/>
+                    <Description resid="Mizaj.Punctuation.Tip"/>
+                  </Supertip>
+                  <Icon>
+                    <bt:Image size="16" resid="Mizaj.Icon16"/>
+                    <bt:Image size="32" resid="Mizaj.Icon32"/>
+                    <bt:Image size="80" resid="Mizaj.Icon80"/>
+                  </Icon>
+                  <Action xsi:type="ExecuteFunction">
+                    <FunctionName>mizajPunctuation</FunctionName>
+                  </Action>
+                </Control>
+                <Control xsi:type="Button" id="Mizaj.Tashkeel">
+                  <Label resid="Mizaj.Tashkeel.Label"/>
+                  <Supertip>
+                    <Title resid="Mizaj.Tashkeel.Label"/>
+                    <Description resid="Mizaj.Tashkeel.Tip"/>
+                  </Supertip>
+                  <Icon>
+                    <bt:Image size="16" resid="Mizaj.Icon16"/>
+                    <bt:Image size="32" resid="Mizaj.Icon32"/>
+                    <bt:Image size="80" resid="Mizaj.Icon80"/>
+                  </Icon>
+                  <Action xsi:type="ExecuteFunction">
+                    <FunctionName>mizajTashkeel</FunctionName>
+                  </Action>
+                </Control>
+                <Control xsi:type="Button" id="Mizaj.All">
+                  <Label resid="Mizaj.All.Label"/>
+                  <Supertip>
+                    <Title resid="Mizaj.All.Label"/>
+                    <Description resid="Mizaj.All.Tip"/>
+                  </Supertip>
+                  <Icon>
+                    <bt:Image size="16" resid="Mizaj.Icon16"/>
+                    <bt:Image size="32" resid="Mizaj.Icon32"/>
+                    <bt:Image size="80" resid="Mizaj.Icon80"/>
+                  </Icon>
+                  <Action xsi:type="ExecuteFunction">
+                    <FunctionName>mizajAll</FunctionName>
+                  </Action>
+                </Control>
+                <Control xsi:type="Button" id="Mizaj.Taskpane">
+                  <Label resid="Mizaj.Taskpane.Label"/>
+                  <Supertip>
+                    <Title resid="Mizaj.Taskpane.Label"/>
+                    <Description resid="Mizaj.Taskpane.Tip"/>
+                  </Supertip>
+                  <Icon>
+                    <bt:Image size="16" resid="Mizaj.Icon16"/>
+                    <bt:Image size="32" resid="Mizaj.Icon32"/>
+                    <bt:Image size="80" resid="Mizaj.Icon80"/>
+                  </Icon>
+                  <Action xsi:type="ShowTaskpane">
+                    <TaskpaneId>MizajTaskpane</TaskpaneId>
+                    <SourceLocation resid="Mizaj.Taskpane.Url"/>
+                  </Action>
+                </Control>
+              </Group>
+              <Label resid="Mizaj.Tab.Label"/>
+            </CustomTab>
+          </ExtensionPoint>
+        </DesktopFormFactor>
+      </Host>
+    </Hosts>
+    <Resources>
+      <bt:Images>
+        <bt:Image id="Mizaj.Icon16" DefaultValue="{{ORIGIN}}/assets/icon-16.png"/>
+        <bt:Image id="Mizaj.Icon32" DefaultValue="{{ORIGIN}}/assets/icon-32.png"/>
+        <bt:Image id="Mizaj.Icon80" DefaultValue="{{ORIGIN}}/assets/icon-80.png"/>
+      </bt:Images>
+      <bt:Urls>
+        <bt:Url id="Mizaj.Taskpane.Url" DefaultValue="{{TASKPANE_URL}}"/>
+        <bt:Url id="Mizaj.Commands.Url" DefaultValue="{{COMMANDS_URL}}"/>
+      </bt:Urls>
+      <bt:ShortStrings>
+        <bt:String id="Mizaj.Tab.Label" DefaultValue="مِزَاج"/>
+        <bt:String id="Mizaj.Group.Label" DefaultValue="مِزَاج"/>
+        <bt:String id="Mizaj.Proofread.Label" DefaultValue="إملائي"/>
+        <bt:String id="Mizaj.Punctuation.Label" DefaultValue="ترقيم"/>
+        <bt:String id="Mizaj.Tashkeel.Label" DefaultValue="تشكيل"/>
+        <bt:String id="Mizaj.All.Label" DefaultValue="الكل"/>
+        <bt:String id="Mizaj.Taskpane.Label" DefaultValue="معاينة واستبدال"/>
+      </bt:ShortStrings>
+      <bt:LongStrings>
+        <bt:String id="Mizaj.Proofread.Tip" DefaultValue="تصحيح الهمزات والإملاء والياء في النص المحدد مع بقاء تنسيقه."/>
+        <bt:String id="Mizaj.Punctuation.Tip" DefaultValue="ضبط مسافات علامات الترقيم وعلاماتها في النص المحدد."/>
+        <bt:String id="Mizaj.Tashkeel.Tip" DefaultValue="إضافة التشكيل إلى النص المحدد دون تغيير حروفه أو تنسيقه."/>
+        <bt:String id="Mizaj.All.Tip" DefaultValue="تدقيق ثم ترقيم ثم تشكيل للنص المحدد، بهذا الترتيب."/>
+        <bt:String id="Mizaj.Taskpane.Tip" DefaultValue="يفتح لوحة فيها معاينة التغييرات وزر «استبدال»."/>
+      </bt:LongStrings>
+    </Resources>
+  </VersionOverrides>
+</OfficeApp>
