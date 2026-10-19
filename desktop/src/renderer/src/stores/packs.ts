@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { useApi } from '@renderer/api'
+import { announceFeature } from '@renderer/composables/useFeatureGuide'
 import { notify } from '@renderer/api/toast'
 import { ApiError } from '@renderer/api/client'
 import { pickOpenPath, pickSavePath } from '@renderer/lib/native'
@@ -173,6 +174,7 @@ export const usePacksStore = defineStore('packs', () => {
       const parts = [appliedText(r.applied)]
       if (r.models) parts.push(`تم تحديث النماذج (الإصدار ${r.models.version}).`)
       message.value = { ok: true, text: `تم الاستيراد. ${parts.filter(Boolean).join(' ')}` }
+      announceFeature('packs')
       preview.value = null
       await loadHistory()
     } catch (e) {

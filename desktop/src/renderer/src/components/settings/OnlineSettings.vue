@@ -5,6 +5,12 @@ import { useSettingsStore } from '@renderer/stores/settings'
 import { openExternal } from '@renderer/lib/native'
 import GeminiSettings from './GeminiSettings.vue'
 import {
+  STATUS_LABEL,
+  resourceStatus,
+  toolStatus,
+  type FeatureStatus
+} from '@renderer/features/registry'
+import {
   LEAVES_AR,
   ONLINE_KEYS,
   ONLINE_LABEL,
@@ -30,6 +36,15 @@ onBeforeUnmount(() => online.dispose())
 
 const isOn = (k: (typeof ONLINE_KEYS)[number]): boolean => settings.values[k] === 'true'
 const toolKeys = ['languagetool', 'tesseract'] as const
+const STATUS_BG: Record<FeatureStatus, string> = {
+  running: 'bg-mizaj-amber',
+  enabled: 'bg-mizaj-emerald',
+  off: 'bg-slate-600',
+  missing: 'bg-slate-500'
+}
+// LanguageTool needs its switch too; Tesseract is used whenever it is detected
+const toolOn = (t: (typeof toolKeys)[number]): boolean =>
+  t === 'languagetool' ? isOn('online_languagetool') : true
 </script>
 
 <template>
@@ -117,10 +132,11 @@ const toolKeys = ['languagetool', 'tesseract'] as const
             <b>{{ r.name }}</b>
             <span
               class="rounded px-2 py-0.5 text-xs text-white"
-              :class="r.installed ? 'bg-mizaj-emerald' : 'bg-slate-500'"
+              :class="STATUS_BG[resourceStatus(r)]"
+              :data-status="resourceStatus(r)"
               data-testid="resource-state"
             >
-              {{ r.installed ? 'مثبّت' : 'غير مثبّت' }}
+              {{ STATUS_LABEL[resourceStatus(r)] }}
             </span>
           </div>
           <p class="text-xs text-slate-500">
@@ -230,10 +246,12 @@ const toolKeys = ['languagetool', 'tesseract'] as const
             <b>{{ TOOL_INFO[t].title }}</b>
             <span
               class="rounded px-2 py-0.5 text-xs text-white"
-              :class="online.tools?.[t].detected ? 'bg-mizaj-emerald' : 'bg-slate-500'"
+              :class="STATUS_BG[toolStatus(online.tools?.[t].detected, toolOn(t))]"
               :data-testid="`tool-${t}-state`"
             >
-              {{ online.tools?.[t].detected ? 'جاهز' : online.tools ? 'غير مثبّت' : '…' }}
+              {{
+                online.tools ? STATUS_LABEL[toolStatus(online.tools[t].detected, toolOn(t))] : '…'
+              }}
             </span>
           </div>
           <template v-if="online.tools && !online.tools[t].detected">

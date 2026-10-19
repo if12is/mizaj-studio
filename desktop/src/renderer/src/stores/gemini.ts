@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
+import { announceFeature } from '@renderer/composables/useFeatureGuide'
 
 type Req = Parameters<GeminiBridge['ask']>[0]
 
@@ -44,8 +45,10 @@ export const useGeminiStore = defineStore('gemini', () => {
   }
 
   async function setConfig(patch: Parameters<GeminiBridge['setConfig']>[0]): Promise<void> {
+    const wasEnabled = state.value?.config.enabled === true
     const s = await api()?.setConfig(patch)
     if (s) state.value = s
+    if (s && !wasEnabled && s.config.enabled) announceFeature('gemini')
   }
 
   async function loadModels(): Promise<void> {

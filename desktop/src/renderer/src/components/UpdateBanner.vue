@@ -5,6 +5,7 @@ import MotionTransition from './ui/MotionTransition.vue'
 import { useUpdaterStore } from '@renderer/stores/updater'
 
 const updater = useUpdaterStore()
+const showNotes = ref(false)
 const s = computed(() => updater.status)
 const visible = computed(
   () =>
@@ -33,13 +34,22 @@ onBeforeUnmount(() => tick && clearInterval(tick))
   <MotionTransition name="m-fade">
     <div
       v-if="visible"
-      class="flex items-center gap-3 px-3 py-1 text-xs"
+      class="flex flex-wrap items-center gap-3 px-3 py-1 text-xs"
       :class="s.state === 'retrying' ? 'bg-mizaj-amber/15' : 'bg-mizaj-emerald/15'"
       data-testid="update-banner"
       :data-state="s.state"
     >
       <template v-if="s.state === 'available'">
         <span data-testid="update-text">يتوفر إصدار جديد {{ s.version }}</span>
+        <button
+          v-if="s.notes"
+          class="underline"
+          :aria-expanded="showNotes"
+          data-testid="update-whatsnew"
+          @click="showNotes = !showNotes"
+        >
+          ما الجديد؟
+        </button>
         <button
           class="rounded bg-mizaj-emerald px-2 py-0.5 text-white"
           data-testid="update-download"
@@ -54,6 +64,13 @@ onBeforeUnmount(() => tick && clearInterval(tick))
         >
           لاحقاً
         </button>
+        <p
+          v-if="showNotes && s.notes"
+          class="max-h-24 basis-full overflow-auto whitespace-pre-line text-slate-700 dark:text-slate-200"
+          data-testid="update-notes"
+        >
+          {{ s.notes }}
+        </p>
       </template>
       <template v-else-if="s.state === 'downloading'">
         <span>جاري تنزيل الإصدار {{ s.version }}</span>

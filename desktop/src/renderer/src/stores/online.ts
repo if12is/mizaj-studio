@@ -13,6 +13,8 @@ import {
 } from '@renderer/online/helpers'
 import { pickOpenPath } from '@renderer/lib/native'
 import { useSettingsStore } from './settings'
+import { announceFeature } from '@renderer/composables/useFeatureGuide'
+import { featureOf } from '@renderer/features/registry'
 
 export const useOnlineStore = defineStore('online', () => {
   const status = ref<OnlineStatus | null>(null)
@@ -32,6 +34,7 @@ export const useOnlineStore = defineStore('online', () => {
 
   async function setSwitch(key: OnlineKey, on: boolean): Promise<void> {
     await useSettingsStore().update({ [key]: String(on) })
+    if (on && key === 'online_languagetool') announceFeature('languagetool')
     await Promise.all([loadStatus(), loadResources()])
   }
 
@@ -48,7 +51,10 @@ export const useOnlineStore = defineStore('online', () => {
   async function refreshTools(): Promise<void> {
     toolsLoading.value = true
     try {
+      const prev = tools.value
       tools.value = await useApi().get<ToolsStatus>('/api/tools', true)
+      // OCR became available while the app was running (the user just installed Tesseract)
+      if (prev && !prev.tesseract.detected && tools.value.tesseract.detected) announceFeature('ocr')
     } catch {
       tools.value = null
     } finally {
@@ -73,6 +79,10 @@ export const useOnlineStore = defineStore('online', () => {
             setTimeout(() => void tick(), 500)
           )
         else {
+          if (j.status === 'done') {
+            const f = featureOf(rid)
+            if (f) announceFeature(f)
+          }
           await Promise.all([loadResources(), loadStatus()])
         }
       } catch {
@@ -134,6 +144,8 @@ export const useOnlineStore = defineStore('online', () => {
         true
       )
       message.value = { ok: true, text: 'تم استيراد الملف وتسجيل ترخيصه.' }
+      const f = featureOf(rid)
+      if (f) announceFeature(f)
       await loadResources()
     } catch (e) {
       message.value = { ok: false, text: onlineErrorText(e) }

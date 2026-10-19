@@ -120,6 +120,7 @@ handleSecure('updater:install', () => updater.installNow())
 handleSecure('updater:set-auto-check', (_e, enabled: unknown) =>
   updater.setAutoCheck(enabled === true)
 )
+app.on('browser-window-focus', () => updater.notifyFocus())
 app.on('will-quit', (e) => {
   if (sidecarStopped) return
   e.preventDefault()

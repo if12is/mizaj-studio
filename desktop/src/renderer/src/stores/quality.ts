@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 import { useApi } from '@renderer/api'
+import { announceFeature } from '@renderer/composables/useFeatureGuide'
 import { useProjectsStore } from './projects'
 import { useSettingsStore, type SettingsSection } from './settings'
 
@@ -64,6 +65,7 @@ export const useQualityStore = defineStore('quality', () => {
   /** Bumped when the Quran text is installed/removed so open editors re-detect immediately. */
   const quranRevision = ref(0)
   function quranChanged(installed: boolean): void {
+    if (installed && quranInstalled.value !== true) announceFeature('quran')
     quranInstalled.value = installed
     quranRevision.value++
   }

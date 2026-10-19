@@ -19,6 +19,8 @@ declare global {
       | 'retrying'
       | 'error'
     version?: string
+    /** state 'available': plain-text release notes summary */
+    notes?: string
     percent?: number
     bytesPerSecond?: number
     message?: string
