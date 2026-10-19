@@ -148,7 +148,7 @@ describe('GeminiService', () => {
       keys: new GeminiKeyStore(join(dir, 'k.bin'), storage),
       config: new GeminiConfigStore(join(dir, 'c.json')),
       base: DEFAULT_BASE,
-      cli: defaultDeps(),
+      cli: { ...defaultDeps(), env: { PATH: dir } }, // never probe the real PATH
       fetch: (async () => {
         throw new TypeError('fetch failed')
       }) as unknown as typeof fetch

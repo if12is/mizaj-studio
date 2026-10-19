@@ -1,13 +1,15 @@
 import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { EventEmitter } from 'node:events'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   askCli,
   classifyFailure,
   CLI_FIXED_PROMPT,
   defaultDeps,
   detectCli,
+  DETECT_TIMEOUT_MS,
   findOnPath,
   resolveLaunch,
   type CliDeps
@@ -118,5 +120,36 @@ describe('classifyFailure', () => {
   it('detects login problems', () => {
     expect(classifyFailure('not logged in', '').code).toBe('cli_login')
     expect(classifyFailure('', '').code).toBe('cli_failed')
+  })
+})
+
+describe('timeouts on Windows', () => {
+  it('kill the whole process tree with taskkill, not just the cmd wrapper', async () => {
+    vi.useFakeTimers()
+    try {
+      writeFileSync(join(dir, 'gemini.cmd'), '@echo off\r\n')
+      const calls: string[][] = []
+      const child = Object.assign(new EventEmitter(), {
+        pid: 4321,
+        stdout: new EventEmitter(),
+        stderr: new EventEmitter(),
+        stdin: { end: () => undefined, on: () => undefined },
+        kill: vi.fn(() => true)
+      })
+      const spawn = vi.fn((cmd: string, args: string[]) => {
+        calls.push([cmd, ...args])
+        return child
+      }) as unknown as CliDeps['spawn']
+      const p = detectCli({ spawn, env: { PATH: dir }, platform: 'win32', execPath: 'C:\\app.exe' })
+      await vi.advanceTimersByTimeAsync(DETECT_TIMEOUT_MS + 10)
+      expect(calls.some((c) => c[0] === 'taskkill' && c.includes('/T') && c.includes('4321'))).toBe(
+        true
+      )
+      expect(child.kill).not.toHaveBeenCalled()
+      child.emit('close', 1)
+      expect((await p).detected).toBe(false)
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })

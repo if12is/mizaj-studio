@@ -121,6 +121,23 @@ function childEnv(d: CliDeps, extra?: Record<string, string>): NodeJS.ProcessEnv
   return env
 }
 
+/** On Windows, killing a `cmd /c` wrapper leaves its child running: kill the whole tree. */
+function stop(child: { pid?: number; kill: () => boolean }, d: CliDeps): void {
+  if (d.platform === 'win32' && child.pid) {
+    try {
+      d.spawn('taskkill', ['/T', '/F', '/PID', String(child.pid)], {
+        shell: false,
+        windowsHide: true,
+        stdio: 'ignore'
+      })
+      return
+    } catch {
+      /* fall back to a plain kill */
+    }
+  }
+  child.kill()
+}
+
 function run(l: Launch, d: CliDeps, stdin: string | null, timeoutMs: number): Promise<RunResult> {
   return new Promise((resolve, reject) => {
     const opts: SpawnOptions = {
@@ -154,7 +171,7 @@ function run(l: Launch, d: CliDeps, stdin: string | null, timeoutMs: number): Pr
     }
     const timer = setTimeout(() => {
       timedOut = true
-      child.kill()
+      stop(child, d)
     }, timeoutMs)
     child.stdout?.on('data', (b: Buffer | string) => {
       const buf = typeof b === 'string' ? Buffer.from(b, 'utf8') : b
@@ -162,7 +179,7 @@ function run(l: Launch, d: CliDeps, stdin: string | null, timeoutMs: number): Pr
         truncated = true
         outChunks.push(buf.subarray(0, Math.max(0, MAX_OUTPUT_BYTES - outBytes)))
         outBytes = MAX_OUTPUT_BYTES
-        child.kill()
+        stop(child, d)
       } else {
         outChunks.push(buf)
         outBytes += buf.length
