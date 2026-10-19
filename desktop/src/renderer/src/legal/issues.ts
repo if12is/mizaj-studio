@@ -1,12 +1,13 @@
 import { makeCpToUtf16 } from '@renderer/editor/offsets'
 
-export type LegalGroup = 'amounts' | 'terms' | 'clauses' | 'glossary'
+export type LegalGroup = 'amounts' | 'terms' | 'clauses' | 'glossary' | 'refs'
 
 export const GROUP_LABELS: Record<LegalGroup, string> = {
   amounts: 'المبالغ',
   terms: 'المصطلحات المعرَّفة',
   clauses: 'ترقيم البنود',
-  glossary: 'المعجم القانوني'
+  glossary: 'المعجم القانوني',
+  refs: 'التواريخ وأرقام القضايا والمواد'
 }
 
 export interface LegalIssue {
@@ -36,6 +37,7 @@ export function buildLegalIssues(
     terms?: { issues?: Raw[] }
     clauses?: { issues?: Raw[]; suggestions?: Raw[] }
     glossary?: { issues?: Raw[] }
+    refs?: { issues?: Raw[] }
   }
 ): LegalIssue[] {
   const conv = makeCpToUtf16(text)
@@ -90,6 +92,7 @@ export function buildLegalIssues(
       pref && s.end > s.start ? { fix: { insert: pref, label: pref } } : {}
     )
   })
+  ;(r.refs?.issues ?? []).forEach((s, i) => mk('refs', i, s, s.message_ar ?? ''))
   return out.sort((a, b) => a.from - b.from)
 }
 

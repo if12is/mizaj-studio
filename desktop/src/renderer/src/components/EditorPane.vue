@@ -71,6 +71,8 @@ import ReviewBar from './ReviewBar.vue'
 import LearnPrompt from './LearnPrompt.vue'
 import { learningExtension } from '@renderer/editor/learning'
 import { useLearningStore } from '@renderer/stores/learning'
+import CaseCard from './legal/CaseCard.vue'
+import { useCaseCardStore } from '@renderer/stores/caseCard'
 import type { TabViewState } from '@renderer/tabs/viewState'
 import { normalizeSpec } from '@renderer/editor/normalizeEdits'
 
@@ -92,6 +94,7 @@ let silent = false
 
 const quality = useQualityStore()
 const proofread = useProofreadStore()
+const caseCard = useCaseCardStore()
 const gemini = useGeminiStore()
 const quranDetect = useQuranDetect(() => view)
 watch(
@@ -348,6 +351,7 @@ function extensions(): Extension[] {
       }
       if (u.docChanged) {
         scheduleStats()
+        caseCard.schedule()
         if (!silent) emit('change')
       }
       if (u.docChanged || u.viewportChanged) {
@@ -375,6 +379,7 @@ function setText(text: string, notifyChange = false): void {
   editor.showDiff = false
   editor.pendingCount = 0
   pageView.value = false
+  caseCard.schedule()
   refreshStats()
   if (notifyChange) emit('change')
 }
@@ -409,6 +414,7 @@ function restoreState(snap: TabViewState): void {
   spell.schedule()
   quranDetect.schedule()
   quality.review = { active: false, total: 0, reviewed: 0, remaining: 0 }
+  caseCard.schedule()
   refreshStats()
   const v = view
   requestAnimationFrame(() => {
@@ -916,6 +922,16 @@ const btnCls =
       >
         أدوات قانونية
       </ToolbarToggle>
+      <ToolbarToggle
+        :on="!caseCard.hidden"
+        name="بطاقة القضية"
+        icon="legal"
+        data-testid="case-card-toggle"
+        :disabled-reason="projects.currentDocument ? undefined : 'افتح مستنداً أولاً'"
+        @click="caseCard.toggleHidden()"
+      >
+        بطاقة القضية
+      </ToolbarToggle>
       <button
         class="rounded bg-mizaj-amber/20 px-2 py-1 text-mizaj-amber hover:bg-mizaj-amber/30"
         data-testid="load-sample"
@@ -927,6 +943,7 @@ const btnCls =
       </button>
     </div>
     <LearnPrompt />
+    <CaseCard />
     <ReviewBar
       @step="(d) => view && reviewStep(quals.confidence, view, d)"
       @keep="view && reviewKeep(quals.confidence, view)"

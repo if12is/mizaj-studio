@@ -38,6 +38,7 @@ const groups = computed(() => groupIssues(legal.issues))
           <button class="block w-full text-start" data-testid="legal-jump" @click="legal.jump(i)">
             <span class="font-editor">{{ i.expected.slice(0, 60) }}</span>
             <span class="block text-xs text-slate-500">{{ i.message_ar }}</span>
+            <span class="text-xs text-mizaj-emerald">انتقال ↖</span>
           </button>
           <p v-if="i.note" class="text-xs text-mizaj-amber">{{ i.note }}</p>
           <button

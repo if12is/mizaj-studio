@@ -20,13 +20,14 @@ export const useLegalStore = defineStore('legal', () => {
     running.value = true
     try {
       const body = { text }
-      const [amounts, terms, clauses, glossary] = await Promise.all([
+      const [amounts, terms, clauses, glossary, refs] = await Promise.all([
         api.post<never>('/api/legal/check-amounts', body),
         api.post<never>('/api/legal/defined-terms', body),
         api.post<never>('/api/legal/clauses', body),
-        api.post<never>('/api/legal/glossary/check', body)
+        api.post<never>('/api/legal/glossary/check', body),
+        api.post<never>('/api/legal/check-refs', body)
       ])
-      issues.value = buildLegalIssues(text, { amounts, terms, clauses, glossary })
+      issues.value = buildLegalIssues(text, { amounts, terms, clauses, glossary, refs })
       checked.value = true
     } catch {
       /* error toast already shown */
