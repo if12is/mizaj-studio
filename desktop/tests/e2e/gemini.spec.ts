@@ -328,7 +328,8 @@ test('answer cut at the output limit offers «متابعة» which continues it'
   let n = 0
   override = (body) => {
     n++
-    const cont = body.includes('"role":"model"')
+    // with per-document memory every request carries earlier model turns; only «متابعة» sends this
+    const cont = body.includes('تابع الإجابة من حيث توقفت')
     return {
       json: {
         candidates: [
