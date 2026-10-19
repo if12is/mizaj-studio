@@ -465,6 +465,30 @@ const btn =
                       {{ label }}
                     </option>
                   </select>
+
+                  <div>
+                    <label for="s-onestep" class="font-medium">
+                      قبول تصحيحات الحروف تلقائياً في «تدقيق وتشكيل»
+                    </label>
+                    <p :class="hint">
+                      الهمزات والإملاء والياء اقتراحات؛ الافتراضي أن تُعرض للمراجعة. الترقيم يُطبّق
+                      مباشرة دائماً.
+                    </p>
+                  </div>
+                  <select
+                    id="s-onestep"
+                    :class="field"
+                    :value="settings.values.proofread_onestep_auto_base"
+                    data-testid="setting-onestep-auto-base"
+                    @change="
+                      settings.update({
+                        proofread_onestep_auto_base: ($event.target as HTMLSelectElement).value
+                      })
+                    "
+                  >
+                    <option value="false">عرضها للمراجعة (الافتراضي)</option>
+                    <option value="true">قبولها تلقائياً</option>
+                  </select>
                 </div>
               </section>
 

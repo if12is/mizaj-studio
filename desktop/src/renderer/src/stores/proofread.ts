@@ -23,6 +23,16 @@ import {
   type ReviewResult,
   type YaStyle
 } from '@renderer/proofread/model'
+import {
+  AUTO_BASE_KEY,
+  autoAccepted,
+  autoBaseEnabled,
+  countCategories,
+  emptyCounts,
+  isBase,
+  type CategoryCounts,
+  type OneStepSummary
+} from '@renderer/proofread/oneStep'
 
 /** Texts above this size skip the automatic gate (the toolbar button still works). */
 const GATE_MAX_CHARS = 1_500_000
@@ -47,6 +57,14 @@ export const useProofreadStore = defineStore('proofread', () => {
   /** true when the review was opened by the explicit «تدقيق ثم تشكيل» button */
   const explicit = ref(false)
   let resolver: ((r: ReviewResult) => void) | null = null
+  /** «تدقيق وتشكيل» in one step: base-letter fixes accepted without the review dialog */
+  const autoBase = computed(() => autoBaseEnabled(settings.values[AUTO_BASE_KEY]))
+  /** the ONE summary shown when a one-step run ends (null = hidden) */
+  const summary = ref<OneStepSummary | null>(null)
+  /** what the last review applied, per category (read by the one-step flow) */
+  let lastApplied: CategoryCounts = emptyCounts()
+  /** bumped by the summary's «مراجعة المشكوك فيه»; the editor pane starts the review */
+  const reviewRequest = ref(0)
 
   const mode = computed<BeforeTashkeelMode>(() =>
     normalizeMode(settings.values.proofread_before_tashkeel)
@@ -128,9 +146,11 @@ export const useProofreadStore = defineStore('proofread', () => {
     res: ProofResponse,
     t: string,
     from: number,
-    isExplicit: boolean
+    isExplicit: boolean,
+    preset?: (items: readonly ProofItem[]) => Record<string, Decision>
   ): Promise<ReviewResult> {
     load(res, t, from)
+    if (preset) decisions.value = preset(res.items)
     explicit.value = isExplicit
     open.value = true
     return new Promise<ReviewResult>((resolve) => {
@@ -142,6 +162,7 @@ export const useProofreadStore = defineStore('proofread', () => {
     const r = resolver
     resolver = null
     if (result === 'apply_run' || result === 'apply_only') {
+      lastApplied = countCategories(items.value.filter((i) => decisions.value[i.id] === 'accept'))
       const ok = applyEditsToEditor(
         acceptedEdits(items.value, decisions.value, base.value, overrides.value)
       )
@@ -192,6 +213,46 @@ export const useProofreadStore = defineStore('proofread', () => {
     return r === 'apply_run' || r === 'skip_run'
   }
 
+  /**
+   * «تدقيق وتشكيل» step 1: proofread with every category and apply per the policy. Returns the
+   * applied counts and whether tashkeel should follow, or null when the user cancelled (or the
+   * edit could not be applied). Punctuation is applied directly; hamza/spelling/ya are applied
+   * directly only with the setting ON, otherwise the review dialog opens with punctuation
+   * pre-accepted and the base-letter items left for the user.
+   */
+  async function oneStepProofread(): Promise<{ fixed: CategoryCounts; run: boolean } | null> {
+    if (open.value) return null
+    const sel = editor.accessor?.selectionInfo()
+    if (!sel || !sel.text.trim()) return { fixed: emptyCounts(), run: true }
+    loading.value = true
+    const res = await fetchProposals(sel.text)
+    loading.value = false
+    if (!res) {
+      notify('تعذر التدقيق الآن؛ سيُشكَّل النص كما هو.', { kind: 'info' })
+      return { fixed: emptyCounts(), run: true }
+    }
+    const direct = autoAccepted(res.items, autoBase.value)
+    const needsReview = res.items.some((i) => isBase(i.category) && !direct.includes(i))
+    if (!needsReview) {
+      const dec: Record<string, Decision> = Object.fromEntries(direct.map((i) => [i.id, 'accept']))
+      const ok = applyEditsToEditor(acceptedEdits(res.items, dec, sel.from), EVENT_LABELS.oneStep)
+      return ok ? { fixed: countCategories(direct), run: true } : null
+    }
+    const preset = (its: readonly ProofItem[]): Record<string, Decision> =>
+      Object.fromEntries(its.filter((i) => !isBase(i.category)).map((i) => [i.id, 'accept']))
+    lastApplied = emptyCounts()
+    const r = await review(res, sel.text, sel.from, true, preset)
+    if (r === 'cancel') return null
+    if (r === 'skip_run') {
+      // the dialog applied nothing: punctuation still goes in directly
+      const punct = res.items.filter((i) => !isBase(i.category))
+      if (punct.length && !applyEditsToEditor(autoEdits(punct, sel.from), EVENT_LABELS.autoPunct))
+        return null
+      return { fixed: countCategories(punct), run: true }
+    }
+    return { fixed: lastApplied, run: r === 'apply_run' }
+  }
+
   function decide(id: string, d: Decision): void {
     decisions.value = { ...decisions.value, [id]: d }
   }
@@ -223,7 +284,11 @@ export const useProofreadStore = defineStore('proofread', () => {
     yaStyle,
     groups,
     acceptedCount,
+    autoBase,
+    summary,
+    reviewRequest,
     gate,
+    oneStepProofread,
     finish,
     decide,
     choose,

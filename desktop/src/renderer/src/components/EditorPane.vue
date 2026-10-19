@@ -63,6 +63,7 @@ import HistoryButton from './history/HistoryButton.vue'
 import { useEditorQuality } from '@renderer/composables/useEditorQuality'
 import { useQuranDetect } from '@renderer/composables/useQuranDetect'
 import { useQualityStore } from '@renderer/stores/quality'
+import { useProofreadStore } from '@renderer/stores/proofread'
 import { useGeminiStore } from '@renderer/stores/gemini'
 import { reviewKeep, reviewStart, reviewStep, type ConfWord } from '@renderer/editor/confidence'
 import { openInspectorAt } from '@renderer/editor/inspector'
@@ -90,6 +91,7 @@ let view: EditorView | null = null
 let silent = false
 
 const quality = useQualityStore()
+const proofread = useProofreadStore()
 const gemini = useGeminiStore()
 const quranDetect = useQuranDetect(() => view)
 watch(
@@ -223,6 +225,14 @@ function stepReview(dir: 1 | -1): void {
   view.focus()
 }
 quality.reviewControls = { start: startReview, step: stepReview }
+
+// the one-step summary's «مراجعة المشكوك فيه» starts the confidence review
+watch(
+  () => proofread.reviewRequest,
+  () => {
+    if (!quality.review.active) toggleReview()
+  }
+)
 
 function splitLongLines(): number {
   if (!view) return 0
@@ -574,6 +584,7 @@ defineExpose({
   actions: {
     tashkeel: () => run.start(),
     proofreadThenTashkeel: () => run.proofreadThenStart(),
+    proofreadAndTashkeel: () => run.proofreadAndTashkeel(),
     paragraphRun,
     spellCheck: () => spell.checkNow(true),
     togglePageView,
@@ -651,6 +662,17 @@ const btnCls =
         @click="run.proofreadThenStart()"
       >
         تدقيق ثم تشكيل
+      </ToolbarToggle>
+      <ToolbarToggle
+        action
+        icon="proofread"
+        name="تدقيق وتشكيل بنقرة واحدة"
+        message="جارٍ التدقيق والتشكيل…"
+        data-testid="toolbar-onestep"
+        :disabled-reason="runBusy ? 'التشكيل جارٍ الآن، انتظر حتى ينتهي' : undefined"
+        @click="run.proofreadAndTashkeel()"
+      >
+        تدقيق وتشكيل
       </ToolbarToggle>
       <select
         :class="selectCls"

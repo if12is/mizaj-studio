@@ -25,6 +25,8 @@ export const DEFAULT_SETTINGS: SettingsMap = {
   // proofreading before tashkeel: ask | auto_punct (punctuation only) | off; final ya: standard | egyptian
   proofread_before_tashkeel: 'ask',
   ya_style: 'standard',
+  // «تدقيق وتشكيل» in one step: hamza/spelling/ya fixes auto-accepted (true) or reviewed (false)
+  proofread_onestep_auto_base: 'false',
   theme: 'dark',
   // side panel layout: size in px ('' = default), dock side|bottom, collapsed true|false
   panel_width: '',

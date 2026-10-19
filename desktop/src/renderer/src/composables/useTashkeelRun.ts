@@ -14,6 +14,7 @@ import { useQualityStore } from '@renderer/stores/quality'
 import { useProofreadStore } from '@renderer/stores/proofread'
 import { recordEvent } from '@renderer/stores/history'
 import { EVENT_LABELS } from '@renderer/history/logic'
+import { wordsDiacritized } from '@renderer/proofread/oneStep'
 
 export const readOnlyCompartment = new Compartment()
 
@@ -40,6 +41,9 @@ export function useTashkeelRun(getView: () => EditorView | null, onApplied: () =
   let session: RunSession | null = null
   let wantPause = false
   let doneTimer: ReturnType<typeof setTimeout> | null = null
+  /** outcome of the last run, read by the one-step «تدقيق وتشكيل» summary */
+  let lastCompleted = false
+  let lastDoubtful = 0
 
   const setReadOnly = (view: EditorView, ro: boolean): void =>
     view.dispatch({ effects: readOnlyCompartment.reconfigure(EditorState.readOnly.of(ro)) })
@@ -52,6 +56,7 @@ export function useTashkeelRun(getView: () => EditorView | null, onApplied: () =
       if (id !== undefined) editor.diacritizedDocs = { ...editor.diacritizedDocs, [id]: true }
       onApplied()
       const marks = buildConfMarks(view.state, session.takeConfidence(), 0)
+      lastDoubtful += marks.length
       if (marks.length) view.dispatch({ effects: addConfidence.of(marks) })
     }
   }
@@ -124,6 +129,7 @@ export function useTashkeelRun(getView: () => EditorView | null, onApplied: () =
         notify('تعذر الاتصال بالمحرك الخلفي أثناء التشكيل.')
       }
     }
+    lastCompleted = completed && !wantPause
     // finalize (done / error / abort): one undo step for what was applied
     const sess = session === mine ? mine : null
     if (sess) commit(view)
@@ -169,14 +175,16 @@ export function useTashkeelRun(getView: () => EditorView | null, onApplied: () =
    * The proofreading gate runs first (setting «التدقيق قبل التشكيل»); `force` always opens the
    * review panel («تدقيق ثم تشكيل»). The gate only ever applies what the user accepted.
    */
-  async function start(opts: { force?: boolean; skipGate?: boolean } = {}): Promise<void> {
+  async function start(
+    opts: { force?: boolean; skipGate?: boolean; diffBase?: string } = {}
+  ): Promise<void> {
     const view = getView()
     if (!view || isBusy()) return
     if (!opts.skipGate && !(await proofread.gate(opts.force === true))) return
     if (getView() !== view || isBusy()) return // the document changed while the panel was open
     if (doneTimer) clearTimeout(doneTimer)
     const sel = view.state.selection.main
-    editor.diffBase = view.state.doc.toString()
+    editor.diffBase = opts.diffBase ?? view.state.doc.toString()
     editor.progress = 0
     editor.wps = 0
     paused = null
@@ -222,5 +230,32 @@ export function useTashkeelRun(getView: () => EditorView | null, onApplied: () =
   /** The toolbar workflow «تدقيق ثم تشكيل»: review proposals, apply the accepted, then run. */
   const proofreadThenStart = (): Promise<void> => start({ force: true })
 
-  return { start, proofreadThenStart, pause, resume, cancel, reset }
+  /**
+   * «تدقيق وتشكيل» in one step: proofread (all categories, per the auto-accept policy), apply,
+   * diacritize, then show ONE summary. The comparison view keeps the text from before the run.
+   */
+  async function proofreadAndTashkeel(): Promise<void> {
+    const view = getView()
+    if (!view || isBusy()) return
+    const original = view.state.doc.toString()
+    const step = await proofread.oneStepProofread()
+    if (!step) return
+    if (getView() !== view || isBusy()) return // the document changed while the panel was open
+    if (!step.run) {
+      editor.diffBase = original
+      return
+    }
+    const proofed = view.state.doc.toString()
+    lastCompleted = false
+    lastDoubtful = 0
+    await start({ skipGate: true, diffBase: original })
+    if (!lastCompleted || getView() !== view) return
+    proofread.summary = {
+      fixed: step.fixed,
+      words: wordsDiacritized(proofed, view.state.doc.toString()),
+      doubtful: lastDoubtful
+    }
+  }
+
+  return { start, proofreadThenStart, proofreadAndTashkeel, pause, resume, cancel, reset }
 }

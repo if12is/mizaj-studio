@@ -46,6 +46,8 @@ const FeatureGuideHost = lazyDialog(() => import('./components/ui/FeatureGuideHo
 const CommandPalette = lazyDialog(() => import('./components/CommandPalette.vue'))
 const GeminiConsentDialog = lazyDialog(() => import('./components/GeminiConsentDialog.vue'))
 const ProofreadDialog = lazyDialog(() => import('./components/ProofreadDialog.vue'))
+const OneStepSummaryDialog = lazyDialog(() => import('./components/OneStepSummaryDialog.vue'))
+const TrackedExportDialog = lazyDialog(() => import('./components/files/TrackedExportDialog.vue'))
 
 const sidecar = useSidecarStore()
 const projects = useProjectsStore()
@@ -471,6 +473,12 @@ onBeforeUnmount(() => {
     </MotionTransition>
     <MotionTransition name="m-modal">
       <ProofreadDialog v-if="proofread.open" />
+    </MotionTransition>
+    <MotionTransition name="m-modal">
+      <OneStepSummaryDialog v-if="proofread.summary" />
+    </MotionTransition>
+    <MotionTransition name="m-modal">
+      <TrackedExportDialog v-if="files.trackedOptions" />
     </MotionTransition>
     <MotionTransition name="m-modal">
       <ShortcutsDialog v-if="editor.shortcutsOpen" />

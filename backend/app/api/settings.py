@@ -29,6 +29,7 @@ ENUMS: dict[str, set[str]] = {
     "colored_diacritics": {"true", "false"},
     "ya_style": {"standard", "egyptian"},
     "proofread_before_tashkeel": {"ask", "auto_punct", "off"},
+    "proofread_onestep_auto_base": {"true", "false"},
 }
 
 
