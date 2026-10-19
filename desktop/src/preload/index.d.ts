@@ -99,6 +99,52 @@ declare global {
     ): Promise<GeminiOutcome<{ result: GeminiAskResultDto }>>
   }
 
+  type SystemwideShortcutId = 'main' | 'proofread' | 'punctuation' | 'tashkeel' | 'all'
+  type SystemwideOpId = 'proofread' | 'punctuation' | 'tashkeel' | 'all'
+  interface SystemwideConfigDto {
+    enabled: boolean
+    runInBackground: boolean
+    replaceMode: 'preview' | 'direct'
+    shortcuts: Record<SystemwideShortcutId, string>
+  }
+  interface SystemwideStateDto {
+    supported: boolean
+    platform: string
+    config: SystemwideConfigDto
+    shortcuts: Record<
+      SystemwideShortcutId,
+      { state: 'off' | 'registered' | 'conflict' | 'invalid'; accelerator: string; message: string }
+    >
+    errors: Record<string, string>
+  }
+  interface SystemwidePopupState {
+    phase: 'choose' | 'running' | 'preview' | 'applying' | 'error'
+    op: SystemwideOpId | null
+    source: 'word' | 'html' | 'plain'
+    chars: number
+    snippet: string
+    segments: { kind: 'same' | 'change'; text: string; old?: string; letters?: boolean }[]
+    changed: boolean
+    warnings: string[]
+    error: string | null
+    mode: 'preview' | 'direct'
+  }
+  interface SystemwideBridge {
+    getState(): Promise<SystemwideStateDto>
+    setConfig(patch: {
+      enabled?: boolean
+      runInBackground?: boolean
+      replaceMode?: 'preview' | 'direct'
+      shortcuts?: Partial<Record<SystemwideShortcutId, string>>
+    }): Promise<SystemwideStateDto>
+    popupReady(): Promise<SystemwidePopupState | null>
+    popupRun(op: SystemwideOpId): Promise<void>
+    popupApply(): Promise<void>
+    popupCancel(): Promise<void>
+    popupResize(height: number): Promise<void>
+    onPopupState(cb: (s: SystemwidePopupState) => void): () => void
+  }
+
   interface MizajAPI {
     getBackendConfig(): Promise<{
       port: number | null
@@ -139,6 +185,7 @@ declare global {
     openGuide(page: 'quick' | 'guide', anchor?: string): Promise<boolean>
     relaunchApp(): Promise<void>
     gemini: GeminiBridge
+    systemwide: SystemwideBridge
     onBeforeQuitFlush(cb: () => Promise<void>): () => void
   }
 

@@ -8,6 +8,29 @@ import { openGuide, safeAnchor } from './guide'
 
 export const FLUSH_TIMEOUT_MS = 2000
 
+let mainWindow: BrowserWindow | null = null
+let hideOnClose: () => boolean = () => false
+let onMainClosed: () => void = () => {}
+
+/** Called when the main window is really gone (not merely hidden in the tray). */
+export function setOnMainClosed(fn: () => void): void {
+  onMainClosed = fn
+}
+
+/** «تشغيل في الخلفية»: when this returns true the close button hides the window (the tray keeps the app alive). */
+export function setHideOnClose(fn: () => boolean): void {
+  hideOnClose = fn
+}
+
+/** Show the main window (restoring it from the tray), or create it again if it was destroyed. */
+export function showMainWindow(): void {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    if (mainWindow.isMinimized()) mainWindow.restore()
+    mainWindow.show()
+    mainWindow.focus()
+  } else createMainWindow()
+}
+
 export function createMainWindow(): BrowserWindow {
   const win = new BrowserWindow({
     width: 1280,
@@ -36,6 +59,11 @@ export function createMainWindow(): BrowserWindow {
   if (process.env.ELECTRON_RENDERER_URL) void win.loadURL(process.env.ELECTRON_RENDERER_URL)
   else void win.loadFile(join(__dirname, '../renderer/index.html'))
   attachFlushOnClose(win)
+  mainWindow = win
+  win.on('closed', () => {
+    if (mainWindow === win) mainWindow = null
+    onMainClosed()
+  })
   return win
 }
 
@@ -64,8 +92,13 @@ function attachFlushOnClose(win: BrowserWindow): void {
     if (flushed) return
     e.preventDefault()
     void requestFlush(win).then(() => {
+      if (win.isDestroyed()) return
+      if (hideOnClose()) {
+        win.hide() // background mode: stay in the tray, work is already saved
+        return
+      }
       flushed = true
-      if (!win.isDestroyed()) win.close()
+      win.close()
     })
   })
 }

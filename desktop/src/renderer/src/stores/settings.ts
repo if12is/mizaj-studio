@@ -46,7 +46,8 @@ export const SETTINGS_SECTIONS = [
   'online',
   'packs',
   'backup',
-  'editor-quality'
+  'editor-quality',
+  'systemwide'
 ] as const
 export type SettingsSection = (typeof SETTINGS_SECTIONS)[number]
 

@@ -7,5 +7,6 @@ export const SETTINGS_SECTION_LABELS: Record<string, string> = {
   online: 'الاتصال والموارد المجانية',
   packs: 'الحزم والمشاركة',
   backup: 'النسخ الاحتياطي',
-  'editor-quality': 'جودة التحرير'
+  'editor-quality': 'جودة التحرير',
+  systemwide: 'مِزَاج في أي برنامج'
 }
