@@ -670,7 +670,7 @@ _PUNCT_CODES = {
 _QUOTE = re.compile(r'["“”]')
 _COLON_DASH = re.compile(r"([:：])[ \t]*[-–—]+[ \t]*(?=\S|\r|\n|$)")
 _DOTS = re.compile(r"(?<![\d.])\.{2,}(?![\d.])")
-_WAW_SPACE = re.compile(rf"(?<![{AR_LETTER}])(و)([ \t]+)(?=[{AR_LETTER}]{{2,}})")
+_WAW_SPACE = re.compile(rf"(?<![{AR_LETTER}ـ])(و)([ \t]+)(?=[{AR_LETTER}]{{2,}})")
 _SPACE_BEFORE = re.compile(r"(?<=\S)([ \t\u00a0]+)(?=[،؛:.!؟]|\?|;)")
 _AR_CH = re.compile(f"[{AR_LETTER}]")
 _WS_INNER = " \t\u00a0"
@@ -770,6 +770,12 @@ def punctuation_items(text: str, masker: Masker, opt: ProofreadOptions) -> list[
         if mark == "." and (nxt.isdigit() or prv in "([{«“" or text[e : e + 3] == "..."):
             continue  # ".5", "( ." and fill-in / elision runs («فيها ........»)
         if prv in "([{«“":
+            continue
+        if mark in "،؛:" and (_AR_CH.match(nxt) or nxt in '"«“('):
+            # «بأن :"النص» -> «بأن: "النص»: move the space after the mark, never glue words
+            out.append(
+                _pi(text, s, e + 1, mark + " ", "PUNCT_SPACE_BEFORE", MSG_P["PUNCT_SPACE_BEFORE"], 0.9)
+            )
             continue
         out.append(_pi(text, s, e, "", "PUNCT_SPACE_BEFORE", MSG_P["PUNCT_SPACE_BEFORE"], 0.9))
 

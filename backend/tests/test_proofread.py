@@ -423,3 +423,10 @@ def test_egyptian_style_flip_is_limited_to_fi_relatives_and_nisba():
 
 def test_module_exports():
     assert proofread_api.router.prefix == "/api/proofread"
+
+
+def test_punctuation_never_glues_words():
+    # tatweel before a final waw is not a detached «و», and a space before «:" moves after it
+    assert fixed("على نحـو ما لا يماري", cats=("punctuation",)) == "على نحـو ما لا يماري"
+    assert fixed('قضت بأن :" الرسوم', cats=("punctuation",)) == 'قضت بأن: "الرسوم'
+    assert fixed("قال ، نعم", cats=("punctuation",)) == "قال، نعم"
