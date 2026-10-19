@@ -13,6 +13,8 @@ export type UpdaterState =
 export interface UpdaterStatus {
   state: UpdaterState
   version?: string
+  /** state 'available': short plain-text summary of the release notes (may be absent) */
+  notes?: string
   percent?: number
   bytesPerSecond?: number
   message?: string
@@ -69,7 +71,44 @@ export function isRetryableUpdateError(e: unknown): boolean {
 
 export const UPDATER_STATUS_CHANNEL = 'updater:status'
 export const FIRST_CHECK_DELAY_MS = 10_000
-export const CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000
+export const CHECK_INTERVAL_MS = 4 * 60 * 60 * 1000
+/** Minimum gap between automatic checks triggered by window focus. */
+export const FOCUS_MIN_GAP_MS = 30 * 60 * 1000
+export const NOTES_MAX_CHARS = 280
+
+/** Throttle for focus-triggered checks: true when no automatic check ran in the last `gapMs`. */
+export function shouldCheckOnFocus(
+  now: number,
+  lastCheckAt: number | null,
+  gapMs: number = FOCUS_MIN_GAP_MS
+): boolean {
+  return lastCheckAt === null || now - lastCheckAt >= gapMs || now < lastCheckAt
+}
+
+/** electron-updater's releaseNotes (HTML string, list of {note}, or null) -> short plain text. */
+export function summarizeReleaseNotes(
+  raw: unknown,
+  max: number = NOTES_MAX_CHARS
+): string | undefined {
+  let text = ''
+  if (typeof raw === 'string') text = raw
+  else if (Array.isArray(raw))
+    text = raw
+      .map((n) => (n && typeof n === 'object' ? String((n as { note?: unknown }).note ?? '') : ''))
+      .join('\n')
+  text = text
+    .replace(/<\/(p|li|h\d|div|br)>|<br\s*\/?>/gi, '\n')
+    .replace(/<[^>]*>/g, '')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/[ \t]+/g, ' ')
+    .replace(/\s*\n\s*/g, '\n')
+    .trim()
+  if (!text) return undefined
+  return text.length > max ? text.slice(0, max).trimEnd() + '…' : text
+}
 
 /** The subset of electron-updater's AppUpdater we use (fakeable in tests). */
 export interface UpdaterLike extends EventEmitter {
@@ -122,6 +161,7 @@ export class UpdaterController {
   private autoCheck: boolean | null = null
   private firstDelayElapsed = false
   private autoChecked = false
+  private lastAutoCheckAt: number | null = null
   private manual = false
   private failures = 0
   private errorSeq = 0
@@ -141,9 +181,13 @@ export class UpdaterController {
     u.allowDowngrade = false
     if (d.logger) u.logger = d.logger
     u.on('checking-for-update', () => this.set({ state: 'checking' }))
-    u.on('update-available', (info: { version: string }) => {
+    u.on('update-available', (info: { version: string; releaseNotes?: unknown }) => {
       this.resetRetry()
-      this.set({ state: 'available', version: info.version })
+      this.set({
+        state: 'available',
+        version: info.version,
+        notes: summarizeReleaseNotes(info.releaseNotes)
+      })
     })
     u.on('update-not-available', () => {
       this.resetRetry()
@@ -284,7 +328,7 @@ export class UpdaterController {
     this.d.send(s)
   }
 
-  /** Schedule: first automatic check after 10s, then every 6h (packaged only). */
+  /** Schedule: first automatic check after 10s, then every 4h (packaged only); see also notifyFocus(). */
   start(): void {
     if (!this.d.isPackaged || this.d.portable) return
     const st = this.d.setTimeoutFn ?? setTimeout
@@ -312,9 +356,23 @@ export class UpdaterController {
     if (enabled && was !== true && this.firstDelayElapsed && !this.autoChecked) this.tick()
   }
 
+  /**
+   * The window gained focus: run an automatic check unless one ran within FOCUS_MIN_GAP_MS.
+   * Same opt-in rules as the timer (packaged, not portable, auto_update_check on).
+   */
+  notifyFocus(): void {
+    if (!this.firstDelayElapsed) return // startup delay not over yet
+    if (!shouldCheckOnFocus((this.d.now ?? Date.now)(), this.lastAutoCheckAt)) return
+    this.tick()
+  }
+
   private tick(): void {
     if (this.autoCheck !== true || !this.d.isPackaged || this.d.portable) return
+    // A found / downloading update needs no re-check (it would flicker the banner and re-nag).
+    const st = this.status.state
+    if (st === 'available' || st === 'downloading' || st === 'downloaded') return
     this.autoChecked = true
+    this.lastAutoCheckAt = (this.d.now ?? Date.now)()
     void this.check(false)
   }
 

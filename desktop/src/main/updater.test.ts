@@ -3,6 +3,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   CHECK_INTERVAL_MS,
   FIRST_CHECK_DELAY_MS,
+  FOCUS_MIN_GAP_MS,
+  shouldCheckOnFocus,
+  summarizeReleaseNotes,
   OFFLINE_POLL_MS,
   isRetryableUpdateError,
   UpdaterController,
@@ -60,7 +63,7 @@ describe('UpdaterController config', () => {
 })
 
 describe('scheduling', () => {
-  it('checks 10s after start and every 6h when enabled', async () => {
+  it('checks 10s after start and every 4h when enabled', async () => {
     const { updater, ctl } = make()
     ctl.setAutoCheck(true)
     ctl.start()
@@ -359,5 +362,102 @@ describe('resilient updates (8.4.1)', () => {
     })
     await ctl.check(true)
     expect(sent.at(-1)).toMatchObject({ state: 'retrying', attempt: 1 })
+  })
+})
+
+describe('focus-triggered checks (throttle)', () => {
+  it('shouldCheckOnFocus: first time, inside and outside the gap, clock going back', () => {
+    expect(shouldCheckOnFocus(1000, null)).toBe(true)
+    expect(shouldCheckOnFocus(1000 + FOCUS_MIN_GAP_MS - 1, 1000)).toBe(false)
+    expect(shouldCheckOnFocus(1000 + FOCUS_MIN_GAP_MS, 1000)).toBe(true)
+    expect(shouldCheckOnFocus(500, 1000)).toBe(true)
+  })
+
+  it('interval is 4h and the focus gap is at least 30 min', () => {
+    expect(CHECK_INTERVAL_MS).toBe(4 * 60 * 60 * 1000)
+    expect(FOCUS_MIN_GAP_MS).toBeGreaterThanOrEqual(30 * 60 * 1000)
+  })
+
+  it('focus before the startup delay does nothing', async () => {
+    const { updater, ctl } = make()
+    ctl.setAutoCheck(true)
+    ctl.start()
+    ctl.notifyFocus()
+    expect(updater.checkForUpdates).not.toHaveBeenCalled()
+  })
+
+  it('focus checks once, then is throttled for 30 min, then checks again', async () => {
+    const { updater, ctl } = make()
+    ctl.setAutoCheck(true)
+    ctl.start()
+    await vi.advanceTimersByTimeAsync(FIRST_CHECK_DELAY_MS) // first check at 10 s
+    updater.emit('update-not-available')
+    expect(updater.checkForUpdates).toHaveBeenCalledTimes(1)
+    await vi.advanceTimersByTimeAsync(10 * 60 * 1000)
+    ctl.notifyFocus() // 10 min after the last check: throttled
+    expect(updater.checkForUpdates).toHaveBeenCalledTimes(1)
+    await vi.advanceTimersByTimeAsync(FOCUS_MIN_GAP_MS)
+    ctl.notifyFocus()
+    expect(updater.checkForUpdates).toHaveBeenCalledTimes(2)
+    updater.emit('update-not-available')
+    ctl.notifyFocus() // immediately again: throttled
+    expect(updater.checkForUpdates).toHaveBeenCalledTimes(2)
+  })
+
+  it('the 4h timer counts as a check for the throttle', async () => {
+    const { updater, ctl } = make()
+    ctl.setAutoCheck(true)
+    ctl.start()
+    await vi.advanceTimersByTimeAsync(CHECK_INTERVAL_MS)
+    updater.emit('update-not-available')
+    const n = updater.checkForUpdates.mock.calls.length
+    ctl.notifyFocus()
+    expect(updater.checkForUpdates).toHaveBeenCalledTimes(n)
+  })
+
+  it('respects the opt-out, portable and development builds', async () => {
+    for (const o of [{ portable: true }, { isPackaged: false }]) {
+      const { updater, ctl } = make(o)
+      ctl.setAutoCheck(true)
+      ctl.start()
+      await vi.advanceTimersByTimeAsync(CHECK_INTERVAL_MS)
+      ctl.notifyFocus()
+      expect(updater.checkForUpdates).not.toHaveBeenCalled()
+    }
+    const { updater, ctl } = make()
+    ctl.setAutoCheck(false)
+    ctl.start()
+    await vi.advanceTimersByTimeAsync(CHECK_INTERVAL_MS)
+    ctl.notifyFocus()
+    expect(updater.checkForUpdates).not.toHaveBeenCalled()
+  })
+
+  it('does not re-check while an update is already available (no banner flicker)', async () => {
+    const { updater, ctl } = make()
+    ctl.setAutoCheck(true)
+    ctl.start()
+    await vi.advanceTimersByTimeAsync(FIRST_CHECK_DELAY_MS)
+    updater.emit('update-available', { version: '9.9.9' })
+    await vi.advanceTimersByTimeAsync(CHECK_INTERVAL_MS)
+    ctl.notifyFocus()
+    expect(updater.checkForUpdates).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('release notes summary', () => {
+  it('strips HTML, joins note lists and truncates', () => {
+    expect(summarizeReleaseNotes('<p>إصلاح &amp; تحسين</p><ul><li>أ</li><li>ب</li></ul>')).toBe(
+      'إصلاح & تحسين\nأ\nب'
+    )
+    expect(summarizeReleaseNotes([{ note: 'one' }, { note: 'two' }])).toBe('one\ntwo')
+    expect(summarizeReleaseNotes('x'.repeat(500), 10)).toBe('x'.repeat(10) + '…')
+    expect(summarizeReleaseNotes(null)).toBeUndefined()
+    expect(summarizeReleaseNotes('  <br/> ')).toBeUndefined()
+  })
+
+  it('carries the summary in the available status', () => {
+    const { updater, sent } = make()
+    updater.emit('update-available', { version: '1.2.3', releaseNotes: '<p>ميزة جديدة</p>' })
+    expect(sent.at(-1)).toMatchObject({ state: 'available', version: '1.2.3', notes: 'ميزة جديدة' })
   })
 })

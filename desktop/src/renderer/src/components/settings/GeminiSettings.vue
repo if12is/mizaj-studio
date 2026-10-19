@@ -26,7 +26,18 @@ async function test(): Promise<void> {
 
 <template>
   <section class="space-y-3 rounded border p-3 dark:border-slate-600" data-testid="gemini-settings">
-    <h3 class="font-semibold">مساعد Gemini (اختياري)</h3>
+    <div class="flex items-center justify-between">
+      <h3 class="font-semibold">مساعد Gemini (اختياري)</h3>
+      <span
+        class="rounded px-2 py-0.5 text-xs text-white"
+        :class="
+          gemini.ready ? 'bg-mizaj-amber' : gemini.enabled ? 'bg-mizaj-emerald' : 'bg-slate-500'
+        "
+        data-testid="gemini-state"
+      >
+        {{ gemini.ready ? 'يعمل' : gemini.enabled ? 'مفعّل (يحتاج مفتاحاً)' : 'غير مفعّل' }}
+      </span>
+    </div>
     <p class="text-xs text-slate-500">
       مساعد يجيب عن أسئلتك حول المستند أو عن كلمة بعينها ويقترح أو يؤكد شكّاً فقط؛ لا يعدّل نصك
       أبداً. <b>ما يغادر جهازك:</b> النص المحدد أو مقتطف المستند وسؤالك، عند طرح سؤال فقط، وإلى

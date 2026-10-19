@@ -10,6 +10,7 @@ import StatusBar from './components/StatusBar.vue'
 import UpdateBanner from './components/UpdateBanner.vue'
 import TabStrip from './components/TabStrip.vue'
 import CommandPalette from './components/CommandPalette.vue'
+import FeatureGuideHost from './components/ui/FeatureGuideHost.vue'
 import RightPanel from './components/RightPanel.vue'
 import FileMenu from './components/files/FileMenu.vue'
 import SplashScreen from './components/ui/SplashScreen.vue'
@@ -490,6 +491,7 @@ onBeforeUnmount(() => {
         <span>{{ t.text }}</span>
       </div>
     </MotionGroup>
+    <FeatureGuideHost />
     <MotionTransition name="m-splash">
       <SplashScreen v-if="!editorReady" />
     </MotionTransition>
