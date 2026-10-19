@@ -6,6 +6,6 @@ export default defineConfig({
   workers: 1,
   // One retry on CI: a test that only passes on retry is reported as "flaky", not hidden.
   retries: process.env.CI ? 1 : 0,
-  reporter: [['list']],
+  reporter: process.env.CI ? [['list'], ['github']] : [['list']],
   expect: { timeout: 15_000 }
 })
