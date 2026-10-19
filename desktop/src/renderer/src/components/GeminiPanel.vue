@@ -183,8 +183,7 @@ async function loadSession(): Promise<void> {
     refreshed: false
   }))
   // turns asked in this session (not yet in the store's copy) stay; the saved history replaces the rest
-  if (!allTurns.value.some((t) => t.docId === id))
-    allTurns.value = [...allTurns.value, ...restored]
+  if (!allTurns.value.some((t) => t.docId === id)) allTurns.value = [...allTurns.value, ...restored]
   saved.value = r.messages.length > 0
   staleOnLoad.value = r.stale && r.messages.length > 0
 }

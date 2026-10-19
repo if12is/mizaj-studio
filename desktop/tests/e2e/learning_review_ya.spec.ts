@@ -155,7 +155,9 @@ test('per-project final-ya style overrides the global setting in proofreading', 
   await expect(sel).toHaveValue('')
   await sel.selectOption('standard')
   await expect
-    .poll(async () => ((await apiGet('/api/projects')) as { ya_style: string | null }[])[0].ya_style)
+    .poll(
+      async () => ((await apiGet('/api/projects')) as { ya_style: string | null }[])[0].ya_style
+    )
     .toBe('standard')
 
   await setDoc('في الدعوى مدني')
@@ -166,7 +168,9 @@ test('per-project final-ya style overrides the global setting in proofreading', 
 
   await sel.selectOption('') // back to the global setting
   await expect
-    .poll(async () => ((await apiGet('/api/projects')) as { ya_style: string | null }[])[0].ya_style)
+    .poll(
+      async () => ((await apiGet('/api/projects')) as { ya_style: string | null }[])[0].ya_style
+    )
     .toBeNull()
   await text('toolbar-proofread').click()
   await expect(text('proofread-ya-style')).toHaveValue('egyptian')
