@@ -48,6 +48,9 @@ ALLOWED_HOSTS: set[str] = {
     "cas-bridge.xethub.hf.co",
     "hf.co",
 }
+# Hugging Face picks a regional CDN host (us.aws.cdn.hf.co, …) per request; every download is
+# sha256-pinned, so any subdomain of its own domain is accepted.
+ALLOWED_SUFFIXES: tuple[str, ...] = (".hf.co",)
 REQUEST_LOG: deque[dict[str, Any]] = deque(maxlen=200)
 _lock = threading.Lock()
 
@@ -58,7 +61,7 @@ def allow_host(host: str) -> None:
 
 def host_allowed(host: str) -> bool:
     h = (host or "").lower()
-    return h in ALLOWED_HOSTS or h in LOOPBACK
+    return h in ALLOWED_HOSTS or h in LOOPBACK or h.endswith(ALLOWED_SUFFIXES)
 
 
 def _record(kind: str, url: str, outcome: str) -> None:

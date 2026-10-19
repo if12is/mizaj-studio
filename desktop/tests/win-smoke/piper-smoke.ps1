@@ -31,7 +31,7 @@ try {
     for ($i = 0; $i -lt 6; $i++) {
       $u = [Uri]$url
       if ($u.Scheme -ne 'https') { throw "non-https hop: $url" }
-      if ($allowed -notcontains $u.Host) { throw "redirect host NOT on the app allowlist: $($u.Host)" }
+      if ($allowed -notcontains $u.Host -and -not $u.Host.EndsWith('.hf.co')) { throw "redirect host NOT on the app allowlist: $($u.Host)" }
       Write-Host "GET host=$($u.Host)"
       $r = $c.GetAsync($url, [System.Net.Http.HttpCompletionOption]::ResponseHeadersRead).GetAwaiter().GetResult()
       if ([int]$r.StatusCode -ge 300 -and [int]$r.StatusCode -lt 400) { $url = [Uri]::new($u, $r.Headers.Location).AbsoluteUri; continue }

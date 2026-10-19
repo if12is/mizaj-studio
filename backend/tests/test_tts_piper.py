@@ -84,7 +84,11 @@ def test_text_never_logged(data_dir, caplog):
         (FakeRun(exc=PermissionError(13, "denied")), "ERR_PIPER_SPAWN_FAILED", 500),
         (FakeRun(wav_bytes(), code=1), "ERR_PIPER_FAILED", 500),
         (FakeRun(None), "ERR_PIPER_FAILED", 500),
-        (FakeRun(b"not a wav at all, definitely not riff data......................"), "ERR_PIPER_FAILED", 500),
+        (
+            FakeRun(b"not a wav at all, definitely not riff data......................"),
+            "ERR_PIPER_FAILED",
+            500,
+        ),
     ],
 )
 def test_failures_map_to_arabic_errors_and_clean_up(data_dir, run, code, http):
@@ -142,7 +146,10 @@ def test_api_status_and_synthesize(client, monkeypatch):
     r = client.post("/api/tts/piper/synthesize", json={"text": TEXT, "length_scale": 1.1})
     assert r.status_code == 200 and r.headers["content-type"] == "audio/wav"
     assert r.content[:4] == b"RIFF"
-    assert client.post("/api/tts/piper/synthesize", json={"text": TEXT, "length_scale": 0}).status_code == 422
+    assert (
+        client.post("/api/tts/piper/synthesize", json={"text": TEXT, "length_scale": 0}).status_code
+        == 422
+    )
 
 
 def test_settings_validation(client):
@@ -203,6 +210,17 @@ def test_import_engine_zip_extracts_and_verifies(client):
         src.write_bytes(blob)
         meta = manager.import_file(client.data_dir, "piper-engine-win", src, True)
         assert json.loads(json.dumps(meta))["extracted_to"].endswith("piper")
-        assert (client.data_dir / "resources" / "piper-engine-win" / "piper" / "piper.exe").is_file()
+        assert (
+            client.data_dir / "resources" / "piper-engine-win" / "piper" / "piper.exe"
+        ).is_file()
     finally:
         manager.set_catalog(None)
+
+
+def test_hugging_face_regional_cdn_hosts_are_allowed():
+    from app.resources.net import host_allowed
+
+    assert host_allowed("us.aws.cdn.hf.co")
+    assert host_allowed("cas-bridge.xethub.hf.co")
+    assert not host_allowed("evilhf.co")
+    assert not host_allowed("hf.co.evil.com")
