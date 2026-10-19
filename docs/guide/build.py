@@ -12,7 +12,7 @@ AR_DIGITS = str.maketrans("0123456789", "٠١٢٣٤٥٦٧٨٩")
 
 
 def mark_svg(uid: str) -> str:
-    s = (BRAND / "logo-mark.svg").read_text()
+    s = (BRAND / "logo-mark.svg").read_text(encoding="utf-8")
     s = re.sub(r"<title>.*?</title>", "", s)
     s = s.replace('id="halo"', f'id="halo{uid}"').replace(
         "url(#halo)", f"url(#halo{uid})"
@@ -28,7 +28,7 @@ def mark_svg(uid: str) -> str:
 
 
 def wordmark_svg() -> str:
-    s = (BRAND / "wordmark-ar.svg").read_text()
+    s = (BRAND / "wordmark-ar.svg").read_text(encoding="utf-8")
     s = re.sub(r"<title>.*?</title>", "", s)
     s = re.sub(r"<defs>.*?</defs>", "", s)
     s = s.replace('fill="#0F172A"', 'fill="var(--ink)"').replace(

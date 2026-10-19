@@ -67,6 +67,10 @@ jobs:
       - name: Install Backend Dependencies
         working-directory: ./backend
         run: pip install -r requirements.txt
+      - name: Build the user guide on Windows (UTF-8 everywhere)
+        run: |
+          python -m pip install markdown==3.7
+          python docs/guide/build.py docs/guide/dist --offline
       - name: Run Pytest Suite (Mock Mode, Windows)
         working-directory: ./backend
         run: pytest -q
