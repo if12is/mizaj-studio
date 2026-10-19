@@ -42,7 +42,6 @@ const saved = ref(false)
 const staleOnLoad = ref(false)
 const question = ref('')
 const scope = ref<'doc' | 'selection'>('doc')
-const projects = useProjectsStore()
 const allTurns = ref<Turn[]>([])
 // each document (tab) has its own conversation: the panel only shows the active tab's turns
 const turns = computed(() =>
@@ -159,15 +158,15 @@ async function run(id: number, req: Req, cont: boolean, retried = false): Promis
 
 /** Restore the persisted conversation of the open document (history lives in the main process). */
 async function loadSession(): Promise<void> {
-  turns.value = []
   saved.value = false
   staleOnLoad.value = false
   const id = docId.value
   if (!id || !gemini.ready) return
   const r = await gemini.sessionGet(id, editor.accessor?.getText() ?? '')
   if (!r || docId.value !== id) return
-  turns.value = r.messages.map((m) => ({
+  const restored: Turn[] = r.messages.map((m) => ({
     id: ++seq,
+    docId: id,
     scope: m.scope,
     question: m.q,
     answer: m.answer.replace(/```mizaj-suggestion[^\S\n]*\n[\s\S]*?```/, '').trim() || '(لا نص)',
@@ -181,6 +180,9 @@ async function loadSession(): Promise<void> {
     applied: false,
     refreshed: false
   }))
+  // turns asked in this session (not yet in the store's copy) stay; the saved history replaces the rest
+  if (!allTurns.value.some((t) => t.docId === id))
+    allTurns.value = [...allTurns.value, ...restored]
   saved.value = r.messages.length > 0
   staleOnLoad.value = r.stale && r.messages.length > 0
 }
@@ -189,7 +191,7 @@ async function newChat(): Promise<void> {
   const id = docId.value
   if (!id || busy.value) return
   await gemini.sessionReset(id)
-  turns.value = []
+  allTurns.value = allTurns.value.filter((t) => t.docId !== id)
   saved.value = false
   staleOnLoad.value = false
 }

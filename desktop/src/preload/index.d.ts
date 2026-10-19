@@ -134,7 +134,7 @@ declare global {
     showOpenDirectoryDialog(title?: string): Promise<string | null>
     openPath(p: string): Promise<string>
     openExternal(url: string): Promise<boolean>
-    openGuide(page: 'quick' | 'guide'): Promise<boolean>
+    openGuide(page: 'quick' | 'guide', anchor?: string): Promise<boolean>
     relaunchApp(): Promise<void>
     gemini: GeminiBridge
     onBeforeQuitFlush(cb: () => Promise<void>): () => void

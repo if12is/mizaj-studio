@@ -314,6 +314,23 @@ export function registerBuiltinCommands(ctx: BuiltinContext): () => void {
       run: () => (editor.shortcutsOpen = true)
     },
     {
+      id: 'app.guide.quick',
+      title: 'الدليل السريع',
+      group: G.app,
+      keywords: ['guide', 'help', 'دليل', 'مساعدة', 'شرح'],
+      shortcut: 'F1',
+      global: true,
+      keybinding: 'F1',
+      run: () => window.mizajAPI?.openGuide('quick')
+    },
+    {
+      id: 'app.guide.full',
+      title: 'الدليل الكامل',
+      group: G.app,
+      keywords: ['guide', 'manual', 'دليل', 'مساعدة'],
+      run: () => window.mizajAPI?.openGuide('guide')
+    },
+    {
       id: 'app.about',
       title: 'عن مِزَاج',
       group: G.app,

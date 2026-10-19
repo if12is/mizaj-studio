@@ -31,6 +31,7 @@ import { useSidecarStore } from './stores/sidecar'
 import { useUpdaterStore } from './stores/updater'
 import { useTabsStore } from './stores/tabs'
 import { usePaletteStore } from './stores/palette'
+import { registerQuickGuideTopics } from '@renderer/search/guideTopics'
 import { registerBuiltinCommands } from './commands/builtin'
 import { findCommandForKey, runCommand } from './commands/registry'
 import type { TabViewState } from './tabs/viewState'
@@ -265,6 +266,7 @@ async function restoreTabs(): Promise<void> {
 const flushNow = (): void => void autosave.flush()
 let offFlush: (() => void) | undefined
 let offCommands: (() => void) | undefined
+let offGuide: (() => void) | undefined
 
 async function bootstrap(): Promise<void> {
   try {
@@ -317,6 +319,7 @@ onMounted(async () => {
     nextTab,
     prevTab
   })
+  offGuide = registerQuickGuideTopics()
   await sidecar.init()
   whenIdle(() => void useUpdaterStore().init(), 3000) // not needed for first interaction
   if (sidecar.isReady) void bootstrap()
@@ -331,6 +334,7 @@ onBeforeUnmount(() => {
   window.removeEventListener('keydown', onCommandKey, true)
   window.removeEventListener('keydown', onGlobalKey)
   offCommands?.()
+  offGuide?.()
   window.removeEventListener('blur', flushNow)
   window.removeEventListener('beforeunload', flushNow)
   offFlush?.()

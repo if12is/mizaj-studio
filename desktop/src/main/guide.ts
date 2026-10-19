@@ -33,8 +33,18 @@ export function guidePageOf(url: string, dir: string): GuidePage | null {
 
 let guideWin: BrowserWindow | null = null
 
+/** Section anchors are the builder's slugs: Arabic/latin letters, digits, '-' and '_'. */
+export function safeAnchor(a: unknown): string | undefined {
+  return typeof a === 'string' && /^[\w\u0600-\u06FF-]{1,120}$/.test(a) ? a : undefined
+}
+
 /** Open (or focus) the guide in its own sandboxed window: no preload, no network, no permissions. */
-export async function openGuide(page: GuidePage, parent: BrowserWindow | null): Promise<boolean> {
+export async function openGuide(
+  page: GuidePage,
+  parent: BrowserWindow | null,
+  anchor?: string
+): Promise<boolean> {
+  const hash = safeAnchor(anchor)
   const dir = guideDir()
   const file = join(dir, `${page}.html`)
   if (!existsSync(file)) {
@@ -48,7 +58,7 @@ export async function openGuide(page: GuidePage, parent: BrowserWindow | null): 
     return false
   }
   if (guideWin && !guideWin.isDestroyed()) {
-    await guideWin.loadFile(file)
+    await guideWin.loadFile(file, { hash })
     guideWin.show()
     guideWin.focus()
     return true
@@ -85,6 +95,6 @@ export async function openGuide(page: GuidePage, parent: BrowserWindow | null): 
     const target = guidePageOf(url, dir)
     if (target) setImmediate(() => void win.loadFile(join(dir, `${target}.html`)))
   })
-  await win.loadFile(file)
+  await win.loadFile(file, { hash })
   return true
 }
