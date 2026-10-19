@@ -1,0 +1,30 @@
+name: Tanzil probe
+on: workflow_dispatch
+jobs:
+  probe:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11.7'
+      - name: Probe tanzil.net download endpoints
+        shell: python
+        run: |
+          import urllib.request, urllib.parse, urllib.error
+          def show(tag, req):
+              try:
+                  with urllib.request.urlopen(req, timeout=60) as r:
+                      body = r.read()
+                      msg = f"{r.status} url={r.geturl()} type={r.headers.get('Content-Type')} len={len(body)} head={body[:120]!r}"
+              except urllib.error.HTTPError as e:
+                  msg = f"HTTPError {e.code} url={e.geturl()} hdr={dict(e.headers)} body={e.read()[:200]!r}"
+              except Exception as e:
+                  msg = f"{type(e).__name__}: {e}"
+              print(f"::notice title={tag}::{msg}")
+          ua = "MizajStudio/0.1 (+offline-first)"
+          f = {"quranType": "simple", "outType": "txt-2", "agree": "true"}
+          for u in ["https://tanzil.net/pub/download/download.php", "https://tanzil.net/pub/download/index.php"]:
+              show("POST " + u, urllib.request.Request(u, data=urllib.parse.urlencode(f).encode(), headers={"User-Agent": ua, "Content-Type": "application/x-www-form-urlencoded"}))
+          show("GET download page", urllib.request.Request("https://tanzil.net/download/", headers={"User-Agent": ua}))
+          show("GET pub/download", urllib.request.Request("https://tanzil.net/pub/download/", headers={"User-Agent": ua}))
+          show("GET res text", urllib.request.Request("https://tanzil.net/res/text/quran-simple.txt", headers={"User-Agent": ua}))
