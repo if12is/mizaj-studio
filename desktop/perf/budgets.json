@@ -1,5 +1,5 @@
 {
-  "headroom": "set from 3 local runs (median): load 10-26ms, long-line typing 29ms, scroll 60fps, run 17-26k words/s, undo 40-70ms. Times get ~4-5x headroom and rates ~0.25x so only real regressions (not slower shared CI runners) fail. Startup/size/motion budgets (8.3/8.5): measured firstPaint 255-360ms, editorReady 185-273ms, entry chunk 108KB, critical JS 440KB, total JS 1020KB, renderer dist 1325KB (before: entry 1647KB single chunk, dist ~2.2MB), idle heap 5.6MB, modal frame p95 21-24ms. v0.6.0: entry chunk 172KB (tabs, toolbar icons/states and the edit-history recorder live on the main screen; palette, history panel, feature guide and commands are lazy chunks); firstPaint/editorReady unchanged (247-283 / 186-220ms), so the size budget moves to 180KB.",
+  "headroom": "set from 3 local runs (median): load 10-26ms, long-line typing 29ms, scroll 60fps, run 17-26k words/s, undo 40-70ms. Times get ~4-5x headroom and rates ~0.25x so only real regressions (not slower shared CI runners) fail. Startup/size/motion budgets (8.3/8.5): measured firstPaint 255-360ms, editorReady 185-273ms, entry chunk 108KB, critical JS 440KB, total JS 1020KB, renderer dist 1325KB (before: entry 1647KB single chunk, dist ~2.2MB), idle heap 5.6MB, modal frame p95 21-24ms. v0.6.0: entry chunk 172KB (tabs, toolbar icons/states and the edit-history recorder live on the main screen; palette, history panel, feature guide and commands are lazy chunks); firstPaint/editorReady unchanged (247-283 / 186-220ms), so the size budget moves to 180KB. v0.7.0: merged work from several features (case card, tracked export, learning/doubts) plus start screen, tour, search, print preview and the print window page (all lazy chunks; this branch adds ~2.5KB to the entry chunk) measure entry 194KB, total JS 1173KB, dist 1501KB, so the budgets move to 200 / 1250 / 1600KB (critical JS 540KB).",
   "maxMs": {
     "loadSampleMs": 150,
     "typeLongLineMs": 150,
@@ -17,10 +17,10 @@
     "scrollFpsDuringFade": 25
   },
   "maxKB": {
-    "entryChunkKB": 180,
-    "criticalJsKB": 520,
-    "totalJsKB": 1150,
-    "rendererDistKB": 1500
+    "entryChunkKB": 200,
+    "criticalJsKB": 540,
+    "totalJsKB": 1250,
+    "rendererDistKB": 1600
   },
   "maxMB": {
     "idleHeapMB": 14,

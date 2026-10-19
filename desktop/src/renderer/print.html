@@ -1,0 +1,22 @@
+<!doctype html>
+<html dir="rtl" lang="ar">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src data: blob:; font-src 'self' data:"
+    />
+    <title>طباعة</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        background: #fff;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="sheets" class="print-sheets"></div>
+    <script type="module" src="/src/print/printEntry.ts"></script>
+  </body>
+</html>

@@ -26,11 +26,14 @@ import EnginePill from './ui/EnginePill.vue'
 import { lazyDialog, lazyPanel } from '@renderer/lib/lazy'
 import { markEditorReady } from '@renderer/lib/boot'
 import { freshExtension } from '@renderer/editor/fresh'
+import { getViewPos, saveViewPos } from '@renderer/lib/recentFiles'
+import { useExtrasStore } from '@renderer/stores/extras'
 
 // rarely used parts are separate chunks (diff view pulls in @codemirror/merge)
 const DiffView = lazyPanel(() => import('./DiffView.vue'))
 const StatsPanel = lazyPanel(() => import('./StatsPanel.vue'))
 const NormalizeDialog = lazyDialog(() => import('./NormalizeDialog.vue'))
+const StartScreen = lazyDialog(() => import('./StartScreen.vue'))
 import { useSpellCheck } from '@renderer/composables/useSpellCheck'
 import { useSpellingStore } from '@renderer/stores/spelling'
 import { createThrottle as throttle2 } from '@renderer/composables/throttle'
@@ -348,6 +351,7 @@ function extensions(): Extension[] {
     EditorView.updateListener.of((u) => {
       if (u.selectionSet || u.docChanged) {
         editor.cursorLine = u.state.doc.lineAt(u.state.selection.main.head).number
+        rememberView()
       }
       if (u.docChanged) {
         scheduleStats()
@@ -384,8 +388,45 @@ function setText(text: string, notifyChange = false): void {
   if (notifyChange) emit('change')
 }
 
+// ---- where the user stopped (cursor + scroll), remembered per document ------------------------
+const extras = useExtrasStore()
+/** Start screen: shown over the empty editor while no document is open (typing hides it). */
+const showStart = computed(
+  () => extras.shellReady && !projects.currentDocument && editor.wordCount === 0
+)
+let viewTimer: ReturnType<typeof setTimeout> | null = null
+let viewHoldUntil = 0 // right after a document swap the scroll resets: do not store that
+function rememberViewNow(): void {
+  if (viewTimer) clearTimeout(viewTimer)
+  viewTimer = null
+  const id = projects.currentDocument?.id
+  if (!view || !id || Date.now() < viewHoldUntil) return
+  saveViewPos(id, { anchor: view.state.selection.main.head, scrollTop: view.scrollDOM.scrollTop })
+}
+function rememberView(): void {
+  if (viewTimer) clearTimeout(viewTimer)
+  viewTimer = setTimeout(rememberViewNow, 400)
+}
+/** Put the cursor and scroll position back where the user left this document. */
+function restoreView(docId: number): void {
+  const v = view
+  viewHoldUntil = Date.now() + 800
+  const pos = getViewPos(docId)
+  if (!v || !pos) return
+  v.dispatch({ selection: { anchor: Math.min(pos.anchor, v.state.doc.length) } })
+  editor.cursorLine = v.state.doc.lineAt(v.state.selection.main.head).number
+  const apply = (): void => {
+    if (view === v) v.scrollDOM.scrollTop = pos.scrollTop
+  }
+  requestAnimationFrame(() => {
+    apply()
+    setTimeout(apply, 120) // block heights are refined after the first measure
+  })
+}
+
 function captureState(): TabViewState | null {
   if (!view) return null
+  rememberViewNow()
   return {
     state: view.state,
     scrollTop: view.scrollDOM.scrollTop,
@@ -571,9 +612,13 @@ onMounted(() => {
     }
   })
   if (settings.values.spell_check_enabled !== 'false') spell.schedule()
+  view.scrollDOM.addEventListener('scroll', rememberView, { passive: true })
+  window.addEventListener('beforeunload', rememberViewNow)
   markEditorReady()
 })
 onBeforeUnmount(() => {
+  rememberViewNow()
+  window.removeEventListener('beforeunload', rememberViewNow)
   statsThrottle.cancel()
   spell.dispose()
   quranDetect.dispose()
@@ -586,6 +631,7 @@ defineExpose({
   loadSample,
   captureState,
   restoreState,
+  restoreView,
   /** actions the command registry drives (same as the toolbar buttons) */
   actions: {
     tashkeel: () => run.start(),
@@ -1029,11 +1075,16 @@ const btnCls =
     />
     <div
       v-show="!pageView && !(editor.showDiff && editor.diffBase !== null)"
-      ref="host"
-      class="mizaj-editor min-h-0 flex-1"
-      :class="[paletteClass, quality.confidenceShow ? '' : 'conf-off']"
-      data-testid="editor-host"
-    />
+      class="relative flex min-h-0 flex-1 flex-col"
+    >
+      <div
+        ref="host"
+        class="mizaj-editor min-h-0 flex-1"
+        :class="[paletteClass, quality.confidenceShow ? '' : 'conf-off']"
+        data-testid="editor-host"
+      />
+      <StartScreen v-if="showStart" :open-document="props.openDocument" />
+    </div>
     <MotionTransition name="m-modal">
       <NormalizeDialog v-if="quality.normalizeOpen" />
     </MotionTransition>

@@ -65,6 +65,11 @@ export default defineConfig({
       minify: 'esbuild',
       sourcemap: false,
       rollupOptions: {
+        // second page: the hidden print window (src/main/print.ts)
+        input: {
+          index: resolve('src/renderer/index.html'),
+          print: resolve('src/renderer/print.html')
+        },
         output: {
           // Vendor split keeps the entry chunk to app code. @codemirror/merge (diff view) is not
           // listed: it stays with its lazy DiffView chunk.

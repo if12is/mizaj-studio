@@ -43,6 +43,16 @@ const mizajAPI = {
     ipcRenderer.on('sidecar:status-changed', handler)
     return () => ipcRenderer.removeListener('sidecar:status-changed', handler)
   },
+  getFlags: (): Promise<{ autoTour: boolean }> => ipcRenderer.invoke('app:flags'),
+  printSheets: (req: {
+    html: string
+    widthPt: number
+    heightPt: number
+    pages: number
+    mode: 'print' | 'pdf'
+    targetPath?: string
+  }): Promise<{ ok: true; pages: number } | { ok: false; error: string }> =>
+    ipcRenderer.invoke('print:run', req),
   windowMinimize: (): Promise<void> => ipcRenderer.invoke('window:minimize'),
   openGuide: (page: 'quick' | 'guide', anchor?: string): Promise<boolean> =>
     ipcRenderer.invoke('guide:open', page, anchor),

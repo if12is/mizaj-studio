@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, Response
 from pydantic import BaseModel, Field, field_validator
 
 from app.api.deps import get_db
+from app.core import search as fts
 from app.core import versions as vs
 from app.core.database import now_iso, write
 from app.core.errors import not_found, validation_error
@@ -121,6 +122,7 @@ def create_document(body: DocumentCreate, db: Db) -> Document:
                     kind="initial",
                     label=body.history_label or vs.LABEL_CREATED,
                 )
+            fts.index_document(db, cur.lastrowid)
     except sqlite3.IntegrityError as exc:  # project deleted concurrently
         raise not_found("Project", body.project_id) from exc
     return Document(**dict(_row(db, cur.lastrowid)))
@@ -152,6 +154,7 @@ def update_document(did: int, body: DocumentUpdate, db: Db) -> Document:
         )
         if "raw_content" in sent:
             vs.record_version(db, did, raw, kind="autosave")
+        fts.index_document(db, did)
     return Document(**dict(_row(db, did)))
 
 
@@ -160,4 +163,5 @@ def delete_document(did: int, db: Db) -> Response:
     _row(db, did)
     with write(db):
         db.execute("UPDATE documents SET is_deleted=1, updated_at=? WHERE id=?", (now_iso(), did))
+        fts.index_document(db, did)
     return Response(status_code=204)

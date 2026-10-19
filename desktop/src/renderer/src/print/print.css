@@ -1,0 +1,112 @@
+/* Print sheets: shared by the preview dialog and the dedicated print window (print.html). */
+.print-probe {
+  position: absolute;
+  left: -100000px;
+  top: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+.print-probe .dp-page,
+.print-sheets .dp-page {
+  background: #fff;
+  color: #000;
+  text-align: start;
+}
+.print-probe .dp-page p,
+.print-sheets .dp-page p {
+  margin: 0;
+  white-space: pre-wrap;
+  tab-size: 36pt;
+  overflow-wrap: anywhere;
+}
+.print-probe .dp-page td > p:last-child,
+.print-sheets .dp-page td > p:last-child {
+  margin-bottom: 0;
+}
+.print-probe .dp-page table,
+.print-sheets .dp-page table {
+  border-spacing: 0;
+}
+.print-probe .dp-page img,
+.print-sheets .dp-page img {
+  max-width: none;
+}
+.print-probe .dp-num,
+.print-sheets .dp-num {
+  margin-inline-end: 0.5em;
+}
+.print-probe .dp-pagebreak,
+.print-sheets .dp-pagebreak {
+  display: none;
+}
+.print-sheets {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+.print-sheet {
+  position: relative;
+  flex: none;
+  overflow: hidden;
+  background: #fff;
+  color: #000;
+  font-family: Cairo, 'Amiri', system-ui, sans-serif;
+  box-shadow: 0 2px 14px rgba(0, 0, 0, 0.5);
+}
+.print-head {
+  position: absolute;
+  top: 22px;
+  left: 0;
+  right: 0;
+  padding-bottom: 6px;
+  border-bottom: 1px solid #6b7280;
+}
+.print-title {
+  font-size: 13pt;
+  font-weight: 700;
+  line-height: 1.4;
+}
+.print-case {
+  margin-top: 2px;
+  font-size: 9.5pt;
+  color: #1f2937;
+}
+.print-window {
+  position: absolute;
+  overflow: hidden;
+}
+.print-block {
+  display: flow-root;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+.print-foot {
+  position: absolute;
+  bottom: 20px;
+  left: 0;
+  right: 0;
+  text-align: center;
+  font-size: 11pt;
+  color: #1f2937;
+}
+@media print {
+  html,
+  body {
+    background: #fff !important;
+    margin: 0;
+  }
+  .print-sheets {
+    display: block;
+  }
+  .print-sheet {
+    box-shadow: none;
+    margin: 0;
+    break-after: page;
+    page-break-after: always;
+  }
+  .print-sheet:last-child {
+    break-after: auto;
+    page-break-after: auto;
+  }
+}

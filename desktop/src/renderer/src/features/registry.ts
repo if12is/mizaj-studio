@@ -57,6 +57,35 @@ export const FEATURES = {
     where: 'شريط الأدوات ← أدوات قانونية',
     description: 'مصطلحات الحزمة وعباراتها الجاهزة تجدها في الأدوات القانونية.'
   },
+  // ---- core controls the guided tour points at (no «جديد» badge, never enabled/disabled)
+  fileMenu: {
+    title: 'قائمة الملف',
+    selector: '[data-testid="file-menu"]',
+    where: 'قائمة «ملف» أعلى المحرر',
+    description: 'من هنا تستورد ملف Word أو PDF أو صورة، وتصدّر مستندك.',
+    badge: false
+  },
+  tashkeel: {
+    title: 'التشكيل',
+    selector: '[data-testid="toolbar-tashkeel"]',
+    where: 'شريط الأدوات ← تشكيل',
+    description: 'يشكّل المحدد أو كامل المقال.',
+    badge: false
+  },
+  proofread: {
+    title: 'تدقيق ثم تشكيل',
+    selector: '[data-testid="toolbar-proofread"]',
+    where: 'شريط الأدوات ← تدقيق ثم تشكيل',
+    description: 'يصحّح الإملاء والترقيم أولاً ثم يشكّل.',
+    badge: false
+  },
+  history: {
+    title: 'سجل التعديلات',
+    selector: '[data-testid="toolbar-history"]',
+    where: 'شريط الأدوات ← سجل التعديلات',
+    description: 'يحفظ نسخاً من عملك لتعود إلى أي منها.',
+    badge: false
+  },
   gemini: {
     title: 'مساعد Gemini',
     selector: '[data-testid="toggle-gemini-panel"]',
