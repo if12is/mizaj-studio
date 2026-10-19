@@ -1,0 +1,55 @@
+name: Guide on GitHub Pages
+
+# Publishes the user guide (docs/guide) to GitHub Pages: index.html = full guide, quick.html =
+# quick guide. Runs when the guide changes on master, after every release, or by hand.
+on:
+  push:
+    branches: [master]
+    paths: ['docs/guide/**', 'brand/**', '.github/workflows/guide-pages.yml']
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11.7'
+      - name: Version for the guide header (latest release, else package.json)
+        id: v
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          v=$(gh release view --repo "${{ github.repository }}" --json tagName --jq .tagName 2>/dev/null | sed 's/^v//')
+          echo "version=${v:-$(node -p "require('./desktop/package.json').version")}" >> "$GITHUB_OUTPUT"
+      - name: Build the guide pages
+        run: |
+          python -m pip install markdown==3.7
+          python docs/guide/build.py site --links --version "${{ steps.v.outputs.version }}"
+          cp site/guide.html site/index.html
+          touch site/.nojekyll
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

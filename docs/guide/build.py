@@ -267,13 +267,13 @@ def app_version() -> str:
     return json.loads(pkg.read_text(encoding="utf-8"))["version"]
 
 
-def render(name: str, version: str, offline: bool) -> str:
+def render(name: str, version: str, offline: bool, links: bool = False) -> str:
     cfg = PAGES[name]
     md = (HERE / cfg["src"]).read_text(encoding="utf-8").replace("{{VERSION}}", version)
     body, toc = build(md)
     chapters = len([c for c in toc if c["n"]])
     href, label = cfg["switch"]
-    switch = f'<li><a href="{href}">{label} ←</a></li>' if offline else ""
+    switch = f'<li><a href="{href}">{label} ←</a></li>' if offline or links else ""
     tpl = (HERE / "template.html").read_text(encoding="utf-8")
     return (
         tpl.replace(
@@ -302,11 +302,12 @@ def main() -> None:
     ap.add_argument("out", type=Path)
     ap.add_argument("--offline", action="store_true")
     ap.add_argument("--version", default=None)
+    ap.add_argument("--links", action="store_true", help="link quick <-> full (a site)")
     a = ap.parse_args()
     version = a.version or app_version()
     a.out.mkdir(parents=True, exist_ok=True)
     for name in PAGES:
-        page = render(name, version, a.offline)
+        page = render(name, version, a.offline, a.links)
         (a.out / f"{name}.html").write_text(page, encoding="utf-8")
         print(a.out / f"{name}.html", len(page))
 
