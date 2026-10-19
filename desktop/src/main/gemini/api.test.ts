@@ -5,6 +5,7 @@ import {
   generate,
   listModels,
   parseModels,
+  parseRetryDelay,
   pickDefaultModel,
   resolveBase,
   sortModels
@@ -91,7 +92,7 @@ describe('generate and error mapping', () => {
     const seen: { url?: string; init?: RequestInit } = {}
     expect(
       await generate(fakeFetch(200, ok, seen), DEFAULT_BASE, KEY, 'gemini-2.5-flash', 'sys', 'q')
-    ).toBe('الجواب')
+    ).toEqual({ text: 'الجواب', cutoff: false })
     expect(seen.url).toContain('gemini-2.5-flash:generateContent')
     expect(JSON.stringify(seen.init!.body)).not.toContain(KEY)
   })
@@ -145,5 +146,143 @@ describe('generate and error mapping', () => {
     await expect(
       generate(fakeFetch(200, ok), DEFAULT_BASE, KEY, '../x?y', 's', 'q')
     ).rejects.toBeInstanceOf(GeminiError)
+  })
+})
+
+describe('generate: output budget, thoughts, finish reasons', () => {
+  const resp = (parts: unknown[], finishReason = 'STOP') => ({
+    candidates: [{ content: { parts }, finishReason }]
+  })
+  const gen = (f: typeof fetch, model = 'gemini-2.5-flash', o = {}) =>
+    generate(f, DEFAULT_BASE, KEY, model, 's', 'q', { sleep: async () => undefined, ...o })
+
+  it('requests a large output budget and a modest thinking budget', async () => {
+    const seen: { init?: RequestInit } = {}
+    await gen(fakeFetch(200, resp([{ text: 'a' }]), seen))
+    const body = JSON.parse(seen.init!.body as string)
+    expect(body.generationConfig.maxOutputTokens).toBe(8192)
+    expect(body.generationConfig.thinkingConfig.thinkingBudget).toBeGreaterThan(0)
+    const seen2: { init?: RequestInit } = {}
+    await gen(fakeFetch(200, resp([{ text: 'a' }]), seen2), 'gemini-2.0-flash', {
+      outputTokenLimit: 4000
+    })
+    const b2 = JSON.parse(seen2.init!.body as string)
+    expect(b2.generationConfig.maxOutputTokens).toBe(4000)
+    expect(b2.generationConfig.thinkingConfig).toBeUndefined()
+  })
+  it('concatenates all text parts and skips thoughts', async () => {
+    const r = await gen(
+      fakeFetch(200, resp([{ text: 'تفكير', thought: true }, { text: 'أ' }, { text: 'ب' }]))
+    )
+    expect(r.text).toBe('أب')
+  })
+  it('MAX_TOKENS keeps the partial answer and flags cutoff; empty is a clear error', async () => {
+    expect(await gen(fakeFetch(200, resp([{ text: 'جزء' }], 'MAX_TOKENS')))).toEqual({
+      text: 'جزء',
+      cutoff: true
+    })
+    await expect(gen(fakeFetch(200, resp([], 'MAX_TOKENS')))).rejects.toMatchObject({
+      code: 'empty'
+    })
+  })
+  it('maps RECITATION, OTHER and block reasons', async () => {
+    await expect(gen(fakeFetch(200, resp([], 'RECITATION')))).rejects.toMatchObject({
+      code: 'recitation'
+    })
+    await expect(gen(fakeFetch(200, resp([], 'OTHER')))).rejects.toMatchObject({
+      code: 'blocked_other'
+    })
+    await expect(
+      gen(fakeFetch(200, { promptFeedback: { blockReason: 'OTHER' } }))
+    ).rejects.toMatchObject({ code: 'blocked_other' })
+  })
+  it('continuation sends the partial answer as a model turn', async () => {
+    const seen: { init?: RequestInit } = {}
+    await gen(fakeFetch(200, resp([{ text: 'x' }]), seen), 'gemini-2.5-flash', {
+      continueFrom: 'بداية'
+    })
+    const c = JSON.parse(seen.init!.body as string).contents
+    expect(c.map((x: { role: string }) => x.role)).toEqual(['user', 'model', 'user'])
+    expect(c[1].parts[0].text).toBe('بداية')
+  })
+  it('parses model token limits', () => {
+    const m = parseModels({
+      models: [
+        {
+          name: 'models/gemini-2.5-flash',
+          supportedGenerationMethods: ['generateContent'],
+          inputTokenLimit: 1048576,
+          outputTokenLimit: 65536
+        }
+      ]
+    })
+    expect(m[0]).toMatchObject({ inputTokenLimit: 1048576, outputTokenLimit: 65536 })
+  })
+})
+
+describe('quota delay and 5xx backoff', () => {
+  const q = (retryDelay: string) => ({
+    error: {
+      status: 'RESOURCE_EXHAUSTED',
+      details: [{ '@type': 'type.googleapis.com/google.rpc.RetryInfo', retryDelay }]
+    }
+  })
+  it('parses RetryInfo.retryDelay', () => {
+    expect(parseRetryDelay(q('27s').error.details)).toBe(27)
+    expect(parseRetryDelay(q('1.5s').error.details)).toBe(1.5)
+    expect(parseRetryDelay(undefined, 'Please retry in 12.3s.')).toBe(12.3)
+    expect(parseRetryDelay([], 'x')).toBeUndefined()
+  })
+  it('short waits carry retryAfterSec; long waits put the time and advice in the message', async () => {
+    const short = await generate(
+      fakeFetch(429, q('5s')),
+      DEFAULT_BASE,
+      KEY,
+      'gemini-2.5-flash',
+      's',
+      'q'
+    ).catch((e) => e)
+    expect(short.retryAfterSec).toBe(5)
+    const long = await generate(
+      fakeFetch(429, q('90s')),
+      DEFAULT_BASE,
+      KEY,
+      'gemini-2.5-flash',
+      's',
+      'q'
+    ).catch((e) => e)
+    expect(long.retryAfterSec).toBe(90)
+    expect(long.message).toContain('90')
+    expect(long.message).toContain('flash-lite')
+    expect(long.message).toContain('Gemini CLI')
+  })
+  it('retries 503 twice with backoff, then succeeds', async () => {
+    let n = 0
+    const waits: number[] = []
+    const f = (async () => {
+      n++
+      if (n < 3) return new Response('{}', { status: 503 })
+      return new Response(
+        JSON.stringify({ candidates: [{ content: { parts: [{ text: 'تم' }] } }] }),
+        { status: 200 }
+      )
+    }) as unknown as typeof fetch
+    const r = await generate(f, DEFAULT_BASE, KEY, 'gemini-2.5-flash', 's', 'q', {
+      sleep: async (ms) => void waits.push(ms)
+    })
+    expect(r.text).toBe('تم')
+    expect(n).toBe(3)
+    expect(waits).toEqual([1000, 3000])
+  })
+  it('gives up after two retries', async () => {
+    let n = 0
+    const f = (async () => {
+      n++
+      return new Response('{}', { status: 500 })
+    }) as unknown as typeof fetch
+    await expect(
+      generate(f, DEFAULT_BASE, KEY, 'gemini-2.5-flash', 's', 'q', { sleep: async () => undefined })
+    ).rejects.toMatchObject({ code: 'bad_response' })
+    expect(n).toBe(3)
   })
 })

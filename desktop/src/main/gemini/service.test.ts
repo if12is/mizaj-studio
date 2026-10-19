@@ -116,8 +116,20 @@ describe('GeminiService', () => {
     reply = {
       candidates: [{ content: { parts: [{ text: 'x\n```mizaj-suggestion\nكَتَبَ\n```' }] } }]
     }
-    const r = await s.ask({ kind: 'document', question: 'س', text: 'ا'.repeat(60_000) })
-    expect(r).toMatchObject({ ok: true, result: { truncated: true, suggestion: 'كَتَبَ' } })
+    const r = await s.ask({ kind: 'document', question: 'س', text: 'ا'.repeat(700_000) })
+    // document questions never yield a suggestion
+    expect(r).toMatchObject({ ok: true, result: { truncated: true, suggestion: null } })
+    const w = await s.ask({ kind: 'selection', question: 'س', text: 'كتب' })
+    expect(w).toMatchObject({ ok: true, result: { suggestion: 'كَتَبَ' } })
+  })
+  it('sends a 100k-char document whole, with no truncation', async () => {
+    const s = svc()
+    s.saveKey(KEY)
+    s.setConfig({ enabled: true })
+    s.acceptConsent()
+    const r = await s.ask({ kind: 'document', question: 'س', text: 'ب'.repeat(100_000) })
+    expect(r).toMatchObject({ ok: true, result: { truncated: false } })
+    expect(calls.at(-1)!.body.length).toBeGreaterThan(100_000)
   })
   it('rejects oversized / empty questions', async () => {
     const s = svc()

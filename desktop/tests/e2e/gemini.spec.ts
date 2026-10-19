@@ -21,6 +21,8 @@ let fake: Server
 let wordReply =
   'السؤال عن الإعراب: الفاعل مرفوع.\n```mizaj-suggestion\nذَهَبَ الوَلَدُ إِلَى المَدْرَسَةِ\n```'
 let failStatus: number | null = null
+type Fake = { status?: number; json: unknown }
+let override: ((body: string) => Fake | null) | null = null
 const requests: { method: string; url: string; key: string | undefined; body: string }[] = []
 const gen = () => requests.filter((r) => r.url.includes(':generateContent'))
 
@@ -100,6 +102,12 @@ test.beforeAll(async () => {
             ]
           })
         )
+        return
+      }
+      const ov = req.url?.includes(':generateContent') ? override?.(body) : null
+      if (ov) {
+        res.statusCode = ov.status ?? 200
+        res.end(JSON.stringify(ov.json))
         return
       }
       if (req.url?.includes(':generateContent') && failStatus) {
@@ -278,6 +286,110 @@ test('a suggestion that changes base letters is text only (no apply)', async () 
   await expect(t('gemini-apply')).toHaveCount(0)
   expect(await docText()).toBe(SENTENCE)
   await page.keyboard.press('Escape')
+})
+
+test('long documents are sent whole; markdown renders; no suggestion for document questions', async () => {
+  const memo = `${'فقرة من المذكرة القانونية. '.repeat(4000)}النهاية-الفريدة`
+  await setDoc(memo, 0)
+  override = () => ({
+    json: {
+      candidates: [
+        {
+          content: {
+            parts: [
+              { text: 'تفكير داخلي', thought: true },
+              { text: '**الدفع الإجرائي:** نص\n\n1. أول\n2. ثان\n' },
+              { text: '<img src=x onerror=alert(1)>\n```mizaj-suggestion\nكَتَبَ\n```' }
+            ]
+          },
+          finishReason: 'STOP'
+        }
+      ]
+    }
+  })
+  await t('toggle-gemini-panel').click()
+  await t('gemini-question').fill('لخّص المذكرة')
+  await t('gemini-send').click()
+  const ans = t('gemini-answer').last()
+  await expect(ans.locator('strong')).toHaveText('الدفع الإجرائي:')
+  await expect(ans.locator('li')).toHaveCount(2)
+  await expect(ans).not.toContainText('**')
+  await expect(ans).not.toContainText('تفكير داخلي')
+  await expect(ans.locator('img')).toHaveCount(0)
+  await expect(t('gemini-truncated')).toHaveCount(0)
+  await expect(t('gemini-suggestion')).toHaveCount(0)
+  expect(gen().at(-1)!.body).toContain('النهاية-الفريدة')
+  expect(gen().at(-1)!.body).toContain('maxOutputTokens')
+  override = null
+})
+
+test('answer cut at the output limit offers «متابعة» which continues it', async () => {
+  let n = 0
+  override = (body) => {
+    n++
+    const cont = body.includes('"role":"model"')
+    return {
+      json: {
+        candidates: [
+          {
+            content: { parts: [{ text: cont ? ' وتتمة الإجابة.' : 'بداية الإجابة 2. **الدفع' }] },
+            finishReason: cont ? 'STOP' : 'MAX_TOKENS'
+          }
+        ]
+      }
+    }
+  }
+  await t('gemini-question').fill('سؤال طويل')
+  await t('gemini-send').click()
+  await expect(t('gemini-cutoff')).toContainText('انقطعت الإجابة لطولها')
+  await t('gemini-continue').click()
+  await expect(t('gemini-cutoff')).toHaveCount(0)
+  await expect(t('gemini-answer').last()).toContainText('وتتمة الإجابة')
+  await expect(t('gemini-answer').last()).toContainText('بداية الإجابة')
+  expect(n).toBe(2)
+  override = null
+})
+
+test('safety / recitation finish reasons give clear Arabic messages', async () => {
+  override = () => ({ json: { candidates: [{ finishReason: 'RECITATION' }] } })
+  await t('gemini-question').fill('سؤال')
+  await t('gemini-send').click()
+  await expect(t('gemini-error').last()).toContainText('نصاً محمياً')
+  override = () => ({ json: { promptFeedback: { blockReason: 'SAFETY' } } })
+  await t('gemini-question').fill('سؤال')
+  await t('gemini-send').click()
+  await expect(t('gemini-error').last()).toContainText('السلامة')
+  override = null
+})
+
+test('quota with a short RetryInfo delay counts down and retries once; a long one explains', async () => {
+  let n = 0
+  const quota = (sec: string) => ({
+    status: 429,
+    json: {
+      error: {
+        status: 'RESOURCE_EXHAUSTED',
+        details: [{ '@type': 'type.googleapis.com/google.rpc.RetryInfo', retryDelay: sec }]
+      }
+    }
+  })
+  override = () => {
+    n++
+    return n === 1 ? quota('1s') : null
+  }
+  await t('gemini-question').fill('سؤال حصة')
+  await t('gemini-send').click()
+  await expect(t('gemini-countdown')).toContainText('ثانية')
+  await expect(t('gemini-answer').last()).toContainText('هذا جواب عن المستند', { timeout: 15000 })
+  expect(n).toBe(2)
+  override = () => quota('120s')
+  await t('gemini-question').fill('سؤال حصة 2')
+  await t('gemini-send').click()
+  await expect(t('gemini-error').last()).toContainText('120')
+  await expect(t('gemini-error').last()).toContainText('flash-lite')
+  await expect(t('gemini-countdown')).toHaveCount(0)
+  override = null
+  await t('right-panel-close').click()
 })
 
 test('quota errors are shown in Arabic; clearing the key turns the assistant off', async () => {

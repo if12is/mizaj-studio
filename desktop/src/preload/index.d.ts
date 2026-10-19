@@ -49,11 +49,14 @@ declare global {
     id: string
     display: string
   }
-  type GeminiOutcome<T> = ({ ok: true } & T) | { ok: false; code: string; message: string }
+  type GeminiOutcome<T> =
+    | ({ ok: true } & T)
+    | { ok: false; code: string; message: string; retryAfterSec?: number }
   interface GeminiAskResultDto {
     text: string
     suggestion: string | null
     truncated: boolean
+    cutoff: boolean
     provider: 'api' | 'cli'
   }
   interface GeminiBridge {
@@ -71,9 +74,15 @@ declare global {
     detectCli(): Promise<GeminiStateDto['cli']>
     ask(
       req:
-        | { kind: 'document'; question: string; text: string }
-        | { kind: 'word'; question: string; word: string; sentence: string }
-        | { kind: 'selection'; question: string; text: string }
+        | { kind: 'document'; question: string; text: string; continueFrom?: string }
+        | { kind: 'word'; question: string; word: string; sentence: string; continueFrom?: string }
+        | {
+            kind: 'selection'
+            question: string
+            text: string
+            context?: string
+            continueFrom?: string
+          }
     ): Promise<GeminiOutcome<{ result: GeminiAskResultDto }>>
   }
 

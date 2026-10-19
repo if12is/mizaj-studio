@@ -137,8 +137,11 @@ function run(l: Launch, d: CliDeps, stdin: string | null, timeoutMs: number): Pr
       reject(new GeminiError('cli_missing'))
       return
     }
-    let out = ''
-    let err = ''
+    // Collect raw bytes and decode once: a multi-byte UTF-8 character may be split across chunks.
+    const outChunks: Buffer[] = []
+    const errChunks: Buffer[] = []
+    let outBytes = 0
+    let errBytes = 0
     let timedOut = false
     let truncated = false
     let done = false
@@ -153,20 +156,37 @@ function run(l: Launch, d: CliDeps, stdin: string | null, timeoutMs: number): Pr
       timedOut = true
       child.kill()
     }, timeoutMs)
-    child.stdout?.on('data', (b: Buffer) => {
-      if (out.length + b.length > MAX_OUTPUT_BYTES) {
+    child.stdout?.on('data', (b: Buffer | string) => {
+      const buf = typeof b === 'string' ? Buffer.from(b, 'utf8') : b
+      if (outBytes + buf.length > MAX_OUTPUT_BYTES) {
         truncated = true
-        out += b.toString('utf8').slice(0, Math.max(0, MAX_OUTPUT_BYTES - out.length))
+        outChunks.push(buf.subarray(0, Math.max(0, MAX_OUTPUT_BYTES - outBytes)))
+        outBytes = MAX_OUTPUT_BYTES
         child.kill()
-      } else out += b.toString('utf8')
+      } else {
+        outChunks.push(buf)
+        outBytes += buf.length
+      }
     })
-    child.stderr?.on('data', (b: Buffer) => {
-      if (err.length < 8192) err += b.toString('utf8')
+    child.stderr?.on('data', (b: Buffer | string) => {
+      if (errBytes < 8192) {
+        const buf = typeof b === 'string' ? Buffer.from(b, 'utf8') : b
+        errChunks.push(buf)
+        errBytes += buf.length
+      }
     })
     child.on('error', (e: NodeJS.ErrnoException) =>
       finish(new GeminiError(e.code === 'ENOENT' ? 'cli_missing' : 'cli_failed'))
     )
-    child.on('close', (code) => finish({ stdout: out, stderr: err, code, timedOut, truncated }))
+    child.on('close', (code) =>
+      finish({
+        stdout: new TextDecoder('utf-8').decode(Buffer.concat(outChunks)),
+        stderr: new TextDecoder('utf-8').decode(Buffer.concat(errChunks)),
+        code,
+        timedOut,
+        truncated
+      })
+    )
     child.stdin?.on('error', () => undefined) // CLI may exit before reading stdin
     if (stdin !== null) child.stdin?.end(stdin, 'utf8')
     else child.stdin?.end()

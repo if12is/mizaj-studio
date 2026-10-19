@@ -6,6 +6,9 @@ import { useQualityStore } from '@renderer/stores/quality'
 import { diffMarkEdits } from '@renderer/editor/markEdits'
 import { stripMarks } from '@renderer/editor/arabic'
 import { notify } from '@renderer/api/toast'
+import { renderMarkdown } from '@renderer/lib/safeMarkdown'
+
+type Req = Parameters<ReturnType<typeof useGeminiStore>['ask']>[0]
 
 interface Turn {
   id: number
@@ -14,6 +17,10 @@ interface Turn {
   answer: string | null
   error: string | null
   truncated: boolean
+  cutoff: boolean
+  /** seconds left before the automatic quota retry */
+  countdown: number | null
+  req: Req | null
   suggestion: string | null
   /** selection the suggestion refers to (apply is offered only if its base letters are identical) */
   sel: { from: number; to: number; text: string } | null
@@ -46,6 +53,9 @@ async function send(): Promise<void> {
     answer: null,
     error: null,
     truncated: false,
+    cutoff: false,
+    countdown: null,
+    req: null,
     suggestion: null,
     sel: null,
     applied: false
@@ -59,24 +69,67 @@ async function send(): Promise<void> {
       return
     }
     turn.sel = s
-    req = { kind: 'selection', question: q, text: s.text }
+    req = {
+      kind: 'selection',
+      question: q,
+      text: s.text,
+      context: sentenceAround(acc.getText(), s)
+    }
   } else req = { kind: 'document', question: q, text: acc.getText() }
+  turn.req = req
   turns.value.push(turn)
   question.value = ''
+  await run(turn.id, req, false)
+}
+
+/** The sentence containing the selection (context for word questions). */
+function sentenceAround(
+  doc: string,
+  s: { from: number; to: number; text: string }
+): string | undefined {
+  if (doc.slice(s.from, s.to) !== s.text) return undefined
+  const stop = /[.!؟?؛\n]/
+  let a = s.from
+  while (a > 0 && !stop.test(doc[a - 1])) a--
+  let b = s.to
+  while (b < doc.length && !stop.test(doc[b])) b++
+  const sent = doc.slice(a, Math.min(b + 1, doc.length)).trim()
+  return sent && sent.length <= 2000 ? sent : undefined
+}
+
+const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms))
+
+async function run(id: number, req: Req, cont: boolean, retried = false): Promise<void> {
   busy.value = true
+  const t = turns.value.find((x) => x.id === id)!
   try {
-    const r = await gemini.ask(req)
-    const t = turns.value.find((x) => x.id === turn.id)!
+    const prior = cont ? t.answer ?? '' : ''
+    const r = await gemini.ask(cont ? ({ ...req, continueFrom: prior } as Req) : req)
     if (r.ok) {
-      t.answer = r.text || '(لا نص)'
+      t.error = null
+      t.answer = cont ? `${prior}${/\s$/.test(prior) ? '' : ' '}${r.text}` : r.text || '(لا نص)'
       t.truncated = r.truncated
-      t.suggestion = r.suggestion
+      t.cutoff = r.cutoff
+      if (!cont) t.suggestion = r.suggestion
+    } else if (r.retryAfterSec !== null && r.retryAfterSec <= 30 && !retried) {
+      // quota with a short wait: count down, then retry once automatically
+      for (let left = Math.ceil(r.retryAfterSec) + 1; left > 0; left--) {
+        t.countdown = left
+        await sleep(1000)
+      }
+      t.countdown = null
+      await run(id, req, cont, true)
+      return
     } else t.error = r.message
   } finally {
     busy.value = false
     await nextTick()
     list.value?.scrollTo({ top: list.value.scrollHeight })
   }
+}
+
+function resume(t: Turn): void {
+  if (t.req && !busy.value) void run(t.id, t.req, true)
 }
 
 function apply(t: Turn): void {
@@ -123,7 +176,14 @@ function apply(t: Turn): void {
             <br />
             {{ t.question }}
           </p>
-          <p v-if="t.answer === null && !t.error" class="text-slate-500">جاري الاستشارة...</p>
+          <p
+            v-if="t.countdown !== null"
+            class="rounded bg-mizaj-amber/20 p-2 text-mizaj-amber"
+            data-testid="gemini-countdown"
+          >
+            تجاوزتَ حدّ الاستخدام؛ ستُعاد المحاولة تلقائياً بعد {{ t.countdown }} ثانية…
+          </p>
+          <p v-else-if="t.answer === null && !t.error" class="text-slate-500">جاري الاستشارة...</p>
           <p
             v-if="t.error"
             class="rounded bg-mizaj-amber/20 p-2 text-mizaj-amber"
@@ -135,12 +195,25 @@ function apply(t: Turn): void {
             <p v-if="t.truncated" class="text-xs text-mizaj-amber" data-testid="gemini-truncated">
               اقتُطع جزء من المستند لطوله قبل إرساله؛ قد لا تشمل الإجابة كل النص.
             </p>
-            <p
-              class="whitespace-pre-wrap rounded border p-2 dark:border-slate-600"
+            <!-- eslint-disable-next-line vue/no-v-html -- escaped by renderMarkdown (no raw HTML passes) -->
+            <div
+              class="gemini-md rounded border p-2 dark:border-slate-600"
+              dir="rtl"
               data-testid="gemini-answer"
-            >
-              {{ t.answer }}
-            </p>
+              v-html="renderMarkdown(t.answer)"
+            ></div>
+            <div v-if="t.cutoff" class="flex items-center gap-2" data-testid="gemini-cutoff">
+              <span class="text-xs text-mizaj-amber">انقطعت الإجابة لطولها.</span>
+              <button
+                type="button"
+                class="rounded border px-3 py-1 hover:bg-slate-100 disabled:opacity-50 dark:border-slate-600 dark:hover:bg-slate-700"
+                :disabled="busy"
+                data-testid="gemini-continue"
+                @click="resume(t)"
+              >
+                متابعة
+              </button>
+            </div>
             <div
               v-if="t.suggestion"
               class="rounded border border-dashed p-2 dark:border-slate-500"

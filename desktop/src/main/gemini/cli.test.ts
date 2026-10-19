@@ -63,6 +63,14 @@ describe('resolveLaunch (no shell, no user text in argv)', () => {
 })
 
 describe.runIf(posix)('fake gemini on PATH', () => {
+  it('decodes UTF-8 once: a multi-byte Arabic character split across chunks stays intact', async () => {
+    const d = fake(`
+      const b = Buffer.from('بالنسبة للمدعى عليهم', 'utf8')
+      process.stdout.write(b.subarray(0, 5))
+      setTimeout(() => { process.stdout.write(b.subarray(5)); }, 80)
+    `)
+    expect(await askCli('x', d)).toBe('بالنسبة للمدعى عليهم')
+  })
   it('finds it and reads the version', async () => {
     const d = fake(
       `if (process.argv.includes('--version')) console.log('0.9.1'); else process.exit(1)`

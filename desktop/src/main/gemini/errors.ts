@@ -7,6 +7,9 @@ export type GeminiErrorCode =
   | 'offline'
   | 'timeout'
   | 'safety'
+  | 'recitation'
+  | 'blocked_other'
+  | 'empty'
   | 'bad_request'
   | 'bad_response'
   | 'cli_missing'
@@ -24,6 +27,9 @@ const MESSAGES: Record<GeminiErrorCode, string> = {
   offline: 'تعذر الاتصال بـ Google. تحقق من اتصالك بالإنترنت.',
   timeout: 'انتهت مهلة الانتظار قبل وصول الرد. أعد المحاولة.',
   safety: 'حجب Gemini هذا الطلب لأسباب تتعلق بالسلامة، فلا يوجد رد.',
+  recitation: 'أوقف Gemini الرد لأنه يطابق نصاً محمياً (استشهاد حرفي). أعد صياغة السؤال.',
+  blocked_other: 'أوقف Gemini الرد لسبب غير محدد. أعد المحاولة أو جرّب نموذجاً آخر.',
+  empty: 'لم يُنتج النموذج نصاً (استنفد حدّ الإخراج في التفكير). أعد المحاولة أو اختر نموذجاً أخف.',
   bad_request: 'رفض Gemini الطلب (قد يكون النموذج المحدد غير مدعوم). جرّب نموذجاً آخر.',
   bad_response: 'ردّ Gemini بصيغة غير متوقعة.',
   cli_missing: 'لم يُعثر على Gemini CLI على هذا الجهاز.',
@@ -37,11 +43,18 @@ const MESSAGES: Record<GeminiErrorCode, string> = {
 export class GeminiError extends Error {
   constructor(
     readonly code: GeminiErrorCode,
-    message?: string
+    message?: string,
+    /** seconds Google asked us to wait (quota), when known */
+    readonly retryAfterSec?: number
   ) {
     super(message ?? MESSAGES[code])
     this.name = 'GeminiError'
   }
+}
+
+export function quotaMessage(sec?: number): string {
+  if (!sec) return MESSAGES.quota
+  return `تجاوزتَ حدّ الاستخدام (الحصة) لدى Google. المدة المطلوبة للانتظار نحو ${Math.ceil(sec)} ثانية. يمكنك اختيار نموذج أخف (مثل flash-lite) من الإعدادات أو التبديل إلى Gemini CLI.`
 }
 
 export function messageFor(code: GeminiErrorCode): string {
