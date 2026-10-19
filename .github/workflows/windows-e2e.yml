@@ -84,6 +84,14 @@ jobs:
           npm run build
           npx electron-builder --win --publish never
 
+      # CI runner only: the freshly built, unsigned installer intermittently crashes (0xC0000005)
+      # while Defender real-time scanning inspects it. Exclude the build and install folders here
+      # to tell a scanner interaction apart from a real installer bug (users are not affected by this).
+      - name: Exclude build and install folders from Defender (runner only)
+        run: |
+          Add-MpPreference -ExclusionPath "$env:GITHUB_WORKSPACE\desktop\dist", "$env:LOCALAPPDATA\Programs\Mizaj Studio", "$env:TEMP"
+          Write-Host "::notice title=Defender::runner exclusions added for dist, install dir and TEMP"
+
       - name: Silently install the NSIS build
         id: inst
         run: |
