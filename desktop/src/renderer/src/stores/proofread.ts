@@ -3,6 +3,8 @@ import { computed, ref, shallowRef } from 'vue'
 import { useApi } from '@renderer/api'
 import { notify } from '@renderer/api/toast'
 import { useEditorStore } from './editor'
+import { recordEvent } from './history'
+import { EVENT_LABELS, acceptedLabel } from '@renderer/history/logic'
 import { useSettingsStore } from './settings'
 import {
   acceptedEdits,
@@ -67,10 +69,15 @@ export const useProofreadStore = defineStore('proofread', () => {
     }
   }
 
-  function applyEditsToEditor(edits: ReturnType<typeof acceptedEdits>): boolean {
+  function applyEditsToEditor(edits: ReturnType<typeof acceptedEdits>, label?: string): boolean {
     if (!edits.length) return true
+    const before = editor.accessor?.getText()
     const ok = editor.accessor?.applyEdits(edits) ?? false
     if (!ok) notify('تغيّر النص أثناء المراجعة؛ أعد التدقيق.', { kind: 'info' })
+    else {
+      recordEvent(EVENT_LABELS.beforeProofread, before)
+      recordEvent(label ?? acceptedLabel(edits.length))
+    }
     return ok
   }
 
@@ -153,7 +160,7 @@ export const useProofreadStore = defineStore('proofread', () => {
       // punctuation only, applied without asking; base letters are never touched silently
       const edits = autoEdits(res.items, sel.from)
       const left = res.items.filter((i) => i.category !== 'punctuation').length
-      if (edits.length && applyEditsToEditor(edits)) {
+      if (edits.length && applyEditsToEditor(edits, EVENT_LABELS.autoPunct)) {
         notify(
           `طُبّق ${edits.length} تصحيح ترقيم قبل التشكيل` +
             (left ? `، وبقي ${left} اقتراح للمراجعة (زر «تدقيق ثم تشكيل»).` : '.'),

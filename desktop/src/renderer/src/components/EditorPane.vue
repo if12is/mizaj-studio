@@ -51,6 +51,7 @@ import { stripMarks } from '@renderer/editor/arabic'
 import { isolateHistory } from '@codemirror/commands'
 import { useTts } from '@renderer/composables/useTts'
 import FindBar from './FindBar.vue'
+import HistoryButton from './history/HistoryButton.vue'
 import { useEditorQuality } from '@renderer/composables/useEditorQuality'
 import { useQuranDetect } from '@renderer/composables/useQuranDetect'
 import { useQualityStore } from '@renderer/stores/quality'
@@ -652,6 +653,7 @@ const btnCls =
       >
         بحث واستبدال
       </button>
+      <HistoryButton />
       <button
         :class="[btnCls, tts.speaking.value ? 'border-mizaj-emerald' : '']"
         data-testid="tts-read"

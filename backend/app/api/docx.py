@@ -10,6 +10,7 @@ from pydantic import BaseModel
 from app.api.documents import count_words
 from app.api.settings import DEFAULTS
 from app.core import security
+from app.core import versions as vs
 from app.core.database import connect, now_iso, write
 from app.core.errors import MizajError, not_found, validation_error
 from app.engine.executor import run_blocking
@@ -76,6 +77,8 @@ def _do_import(db_path: Path, path: Path, project_id: int, title: str | None) ->
                 (project_id, name, text, str(path), count_words(text), ts, ts),
             )
             doc_id = cur.lastrowid
+            if text:
+                vs.record_version(conn, doc_id, text, kind="initial", label=vs.LABEL_IMPORT)
             conn.execute(
                 "INSERT INTO recent_files(file_path, document_id, last_opened_at) VALUES (?,?,?) "
                 "ON CONFLICT(file_path) DO UPDATE SET document_id=excluded.document_id, "

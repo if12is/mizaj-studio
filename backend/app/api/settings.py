@@ -42,6 +42,10 @@ def _validate(key: str, value: str) -> None:
             raise validation_error(
                 "editor_font_size must be an integer between 12 and 48", {"key": key}
             )
+    if key in ("history_retention_days", "history_retention_keep"):
+        lo, hi = (1, 3650) if key.endswith("days") else (10, 100_000)
+        if not (value.isascii() and value.isdigit() and lo <= int(value) <= hi):
+            raise validation_error(f"{key} must be an integer between {lo} and {hi}", {"key": key})
     if key == "editor_font" and not value.strip():
         raise validation_error("editor_font must not be empty", {"key": key})
 
