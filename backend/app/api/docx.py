@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field
 
 from app.api.documents import count_words
 from app.api.settings import DEFAULTS
+from app.core import search as fts
 from app.core import security
 from app.core import versions as vs
 from app.core.database import connect, now_iso, write
@@ -79,6 +80,7 @@ def _do_import(db_path: Path, path: Path, project_id: int, title: str | None) ->
             doc_id = cur.lastrowid
             if text:
                 vs.record_version(conn, doc_id, text, kind="initial", label=vs.LABEL_IMPORT)
+            fts.index_document(conn, doc_id)
             conn.execute(
                 "INSERT INTO recent_files(file_path, document_id, last_opened_at) VALUES (?,?,?) "
                 "ON CONFLICT(file_path) DO UPDATE SET document_id=excluded.document_id, "

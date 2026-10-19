@@ -131,6 +131,7 @@ onBeforeUnmount(() => {
         data-testid="spotlight-ring"
       />
       <div
+        v-if="spotlight.text"
         class="pointer-events-none fixed z-[61] max-w-xs rounded bg-slate-900 px-3 py-2 text-xs text-white shadow-lg"
         :style="{
           top:

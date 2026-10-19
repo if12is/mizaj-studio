@@ -5,6 +5,7 @@ import { registerFileIpc, dialogPaths } from './fileIpc'
 import { handleSecure, isTrustedSender } from './ipcGuard'
 import { MAX_NAME_LENGTH } from './security'
 import { openGuide, safeAnchor } from './guide'
+import { parsePrintRequest, printSheets } from './print'
 
 export const FLUSH_TIMEOUT_MS = 2000
 
@@ -83,6 +84,15 @@ export function registerIpc(getStatus: () => SidecarStatus, apiToken: string): v
       // The only way the token reaches the renderer (never logged, never in a URL).
       token: apiToken
     }
+  })
+  // first-run tour: test runs with an isolated profile (MIZAJ_USER_DATA_DIR) do not auto-start it
+  handleSecure('app:flags', () => ({
+    autoTour: !process.env.MIZAJ_USER_DATA_DIR || process.env.MIZAJ_E2E_TOUR === '1'
+  }))
+  handleSecure('print:run', async (_e, raw: unknown) => {
+    const req = parsePrintRequest(raw)
+    if (typeof req === 'string') return { ok: false, error: req }
+    return printSheets(req)
   })
   handleSecure('window:minimize', (e) => winOf(e)?.minimize())
   handleSecure('window:toggle-maximize', (e) => {

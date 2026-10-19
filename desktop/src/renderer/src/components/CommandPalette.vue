@@ -4,12 +4,14 @@
  * `buildEntries`: the command registry, settings sections, projects/documents (backend API via
  * the projects store), recent files and guide topics. Enter runs, Esc closes.
  */
-import { computed, nextTick, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { SETTINGS_SECTION_LABELS } from '@renderer/commands/labels'
 import { listCommands } from '@renderer/commands/registry'
 import { useFocusTrap } from '@renderer/composables/useFocusTrap'
 import { buildEntries, flatten, searchEntries, type PaletteEntry } from '@renderer/search/entries'
 import { listGuideTopics } from '@renderer/search/guide'
+import { highlightParts, MIN_QUERY, searchContent } from '@renderer/search/content'
+import { openAtMatch } from '@renderer/search/openAt'
 import { usePaletteStore } from '@renderer/stores/palette'
 import { useProjectsStore } from '@renderer/stores/projects'
 import { SETTINGS_SECTIONS, useSettingsStore } from '@renderer/stores/settings'
@@ -35,8 +37,47 @@ function openProject(projectId: number): void {
   if (first) void props.openDocument(first.id)
 }
 
+// «في المحتوى»: full-text hits from the backend index for what is typed (debounced)
+type ContentHits = NonNullable<Parameters<typeof buildEntries>[0]['content']>
+const contentHits = ref<ContentHits>([])
+let contentSeq = 0
+let contentTimer: ReturnType<typeof setTimeout> | null = null
+watch(query, (q) => {
+  if (contentTimer) clearTimeout(contentTimer)
+  const my = ++contentSeq
+  if (q.trim().length < MIN_QUERY) {
+    contentHits.value = []
+    return
+  }
+  contentTimer = setTimeout(() => {
+    searchContent(q.trim(), { limit: 6, snippets: 1 })
+      .then((r) => {
+        if (my !== contentSeq) return
+        contentHits.value = r.results.flatMap((d) =>
+          d.snippets.slice(0, 1).map((s) => ({
+            documentId: d.document_id,
+            title: d.title,
+            projectName: d.project_name,
+            text: s.text,
+            marks: s.ranges,
+            offset: s.offset
+          }))
+        )
+      })
+      .catch(() => {
+        if (my === contentSeq) contentHits.value = []
+      })
+  }, 200)
+})
+onBeforeUnmount(() => {
+  if (contentTimer) clearTimeout(contentTimer)
+  contentSeq++
+})
+
 const entries = computed(() =>
   buildEntries({
+    content: contentHits.value,
+    openContent: (id, offset, len) => void openAtMatch(props.openDocument, id, offset, len),
     commands: listCommands(),
     settingsSections: SETTINGS_SECTIONS.map((id) => ({
       id,
@@ -171,8 +212,16 @@ onMounted(() => {
             @click="runEntry(it)"
           >
             <span class="min-w-0 truncate">
-              {{ it.title }}
-              <span v-if="it.subtitle" class="ms-2 text-xs text-slate-500">{{ it.subtitle }}</span>
+              <template v-if="it.marks">
+                <template v-for="(p, pi) in highlightParts(it.title, it.marks)" :key="pi">
+                  <mark v-if="p.mark" class="search-mark">{{ p.text }}</mark>
+                  <template v-else>{{ p.text }}</template>
+                </template>
+              </template>
+              <template v-else>{{ it.title }}</template>
+              <span v-if="it.subtitle" class="ms-2 text-xs text-slate-500 dark:text-slate-300">{{
+                it.subtitle
+              }}</span>
             </span>
             <kbd
               v-if="it.shortcut"

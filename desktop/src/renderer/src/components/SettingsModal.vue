@@ -8,6 +8,7 @@ import type { SettingsSection } from '@renderer/stores/settings'
 import { useFocusTrap } from '@renderer/composables/useFocusTrap'
 import { notify } from '@renderer/api/toast'
 import { useEditorStore } from '@renderer/stores/editor'
+import { useExtrasStore } from '@renderer/stores/extras'
 import { useApi } from '@renderer/api'
 import { useUpdaterStore } from '@renderer/stores/updater'
 import { useSidecarStore } from '@renderer/stores/sidecar'
@@ -138,6 +139,12 @@ async function applyPack(): Promise<void> {
 }
 
 const editorStore = useEditorStore()
+const extras = useExtrasStore()
+/** «جولة تعريفية»: close the settings, then run the guided tour again */
+function startTour(): void {
+  settings.closeSettings()
+  extras.tourActive = true
+}
 async function exportDiag(): Promise<void> {
   try {
     const path = await window.mizajAPI?.exportDiagnostics()
@@ -397,6 +404,9 @@ const btn =
                   @click="editorStore.shortcutsOpen = true"
                 >
                   اختصارات لوحة المفاتيح
+                </button>
+                <button :class="btn" data-testid="open-tour" @click="startTour">
+                  جولة تعريفية
                 </button>
                 <button :class="btn" data-testid="open-about" @click="editorStore.aboutOpen = true">
                   حول مِزَاج والتراخيص

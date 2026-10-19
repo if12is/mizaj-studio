@@ -34,6 +34,8 @@ import { usePaletteStore } from './stores/palette'
 import { findCommandForKey, runCommand } from './commands/registry'
 import type { TabViewState } from './tabs/viewState'
 import { notify } from './api/toast'
+import { touchRecentFile } from './lib/recentFiles'
+import { useExtrasStore } from './stores/extras'
 
 // dialogs are separate chunks: fetched the first time they open
 const SettingsModal = lazyDialog(() => import('./components/SettingsModal.vue'))
@@ -48,6 +50,9 @@ const GeminiConsentDialog = lazyDialog(() => import('./components/GeminiConsentD
 const ProofreadDialog = lazyDialog(() => import('./components/ProofreadDialog.vue'))
 const OneStepSummaryDialog = lazyDialog(() => import('./components/OneStepSummaryDialog.vue'))
 const TrackedExportDialog = lazyDialog(() => import('./components/files/TrackedExportDialog.vue'))
+const SearchPanel = lazyDialog(() => import('./components/SearchPanel.vue'))
+const PrintPreviewDialog = lazyDialog(() => import('./components/print/PrintPreviewDialog.vue'))
+const TourHost = lazyDialog(() => import('./components/tour/TourHost.vue'))
 
 const sidecar = useSidecarStore()
 const projects = useProjectsStore()
@@ -58,6 +63,7 @@ const files = useFileStore()
 const gemini = useGeminiStore()
 const tabs = useTabsStore()
 const palette = usePaletteStore()
+const extras = useExtrasStore()
 const pane = ref<InstanceType<typeof EditorPane> | null>(null)
 
 const autosave = createAutosave({
@@ -126,12 +132,16 @@ async function activateTab(id: string, force = false): Promise<void> {
   projects.setCurrentDocument(d)
   autosave.setDocument(d.id)
   if (snap) pane.value?.restoreState(snap)
-  else pane.value?.setText(d.raw_content)
+  else {
+    pane.value?.setText(d.raw_content)
+    pane.value?.restoreView(d.id) // cursor + scroll where the user stopped
+  }
   if (snap && target.dirty) autosave.markDirty() // unsaved text that could not be stored yet
   editor.loadManualEdits(d.id, settings.values)
   if (d.diacritized_content) editor.diacritizedDocs = { ...editor.diacritizedDocs, [d.id]: true }
   tabs.assign(id, { documentId: d.id, projectId: d.project_id, title: d.title })
   tabs.touchRecent({ documentId: d.id, projectId: d.project_id, title: d.title })
+  touchRecentFile({ documentId: d.id, projectId: d.project_id, title: d.title })
 }
 
 /** Open a document: focus its tab if it is open, else reuse an empty active tab, else add a tab. */
@@ -270,6 +280,7 @@ const flushNow = (): void => void autosave.flush()
 let offFlush: (() => void) | undefined
 let offCommands: (() => void) | undefined
 let offGuide: (() => void) | undefined
+let offExtras: (() => void) | undefined
 let unmounted = false
 
 async function bootstrap(): Promise<void> {
@@ -281,6 +292,9 @@ async function bootstrap(): Promise<void> {
   } catch {
     /* error toast shown by api client */
   }
+  extras.shellReady = true
+  // first run: the guided tour (a separate chunk, off the startup path)
+  whenIdle(() => void import('./tour/autostart').then((m) => m.maybeStartTour()), 1200)
 }
 
 /** App-wide key bindings come from the command registry (Ctrl+K, Ctrl+T, Ctrl+W, Ctrl+Tab...). */
@@ -317,9 +331,14 @@ onMounted(async () => {
   offFlush = window.mizajAPI?.onBeforeQuitFlush(() => autosave.flush())
   files.registerHooks({ flush: () => autosave.flush(), openDocument })
   // the command registry and guide topics are a separate chunk: off the startup path
-  void Promise.all([import('./commands/builtin'), import('@renderer/search/guideTopics')]).then(
-    ([{ registerBuiltinCommands }, { registerQuickGuideTopics }]) => {
+  void Promise.all([
+    import('./commands/builtin'),
+    import('@renderer/search/guideTopics'),
+    import('./commands/extras')
+  ]).then(
+    ([{ registerBuiltinCommands }, { registerQuickGuideTopics }, { registerExtraCommands }]) => {
       if (unmounted) return
+      offExtras = registerExtraCommands()
       offCommands = registerBuiltinCommands({
         editorActions: () => pane.value?.actions,
         newTab: () => void newTab(),
@@ -346,6 +365,7 @@ onBeforeUnmount(() => {
   unmounted = true
   offCommands?.()
   offGuide?.()
+  offExtras?.()
   window.removeEventListener('blur', flushNow)
   window.removeEventListener('beforeunload', flushNow)
   offFlush?.()
@@ -459,6 +479,13 @@ onBeforeUnmount(() => {
     <MotionTransition name="m-modal">
       <CommandPalette v-if="palette.open" :open-document="openDocument" />
     </MotionTransition>
+    <MotionTransition name="m-modal">
+      <SearchPanel v-if="extras.searchOpen" :open-document="openDocument" />
+    </MotionTransition>
+    <MotionTransition name="m-modal">
+      <PrintPreviewDialog v-if="extras.printOpen" :flush="autosave.flush" />
+    </MotionTransition>
+    <TourHost v-if="extras.tourActive" />
     <MotionTransition name="m-modal">
       <SettingsModal v-if="settings.settingsOpen" @close="settings.closeSettings()" />
     </MotionTransition>

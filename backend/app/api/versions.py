@@ -10,6 +10,7 @@ from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel, Field
 
 from app.api.deps import get_db
+from app.core import search as fts
 from app.core import versions as vs
 from app.core.database import now_iso, write
 from app.core.errors import not_found, validation_error
@@ -174,4 +175,5 @@ def restore_version(did: int, vid: int, body: RestoreBody, db: Db) -> dict[str, 
                 "SELECT id FROM document_versions WHERE document_id=? ORDER BY id DESC LIMIT 1",
                 (did,),
             ).fetchone()["id"]
+        fts.index_document(db, did)
     return {"version": vs.meta(_version(db, did, new_id)), "content": text}

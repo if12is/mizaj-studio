@@ -28,6 +28,7 @@ from app.api import (
     proofread,
     quran,
     resources,
+    search,
     settings,
     spelling,
     tashkeel,
@@ -39,6 +40,7 @@ from app.api import io as io_api
 from app.api import irab as irab_api
 from app.api import legal as legal_api
 from app.api import names as names_api
+from app.core import search as search_index
 from app.core import security
 from app.core.database import DB_NAME
 from app.core.errors import MizajError, install_handlers
@@ -78,6 +80,7 @@ def create_app(
             str(exc),
         ) from exc
     seed_templates(db_path)
+    search_index.ensure_index(db_path)  # documents that predate the search index
     env_token = os.environ.pop(security.TOKEN_ENV, "") or None
     token = api_token or env_token
     if not token:
@@ -127,6 +130,7 @@ def create_app(
         resources,
         tools,
         versions,
+        search,
     ):
         app.include_router(mod.router)
     _recover_interrupted_jobs(data_dir, db_path)

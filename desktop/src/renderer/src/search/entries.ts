@@ -1,7 +1,14 @@
 import type { Command } from '@renderer/commands/registry'
 import { bestScore } from './fuzzy'
 
-export type GroupId = 'recent' | 'command' | 'settings' | 'project' | 'document' | 'guide'
+export type GroupId =
+  | 'recent'
+  | 'command'
+  | 'settings'
+  | 'project'
+  | 'document'
+  | 'content'
+  | 'guide'
 
 /** Display order of the palette groups. */
 export const GROUPS: { id: GroupId; label: string }[] = [
@@ -10,6 +17,7 @@ export const GROUPS: { id: GroupId; label: string }[] = [
   { id: 'settings', label: 'الإعدادات' },
   { id: 'project', label: 'المشاريع' },
   { id: 'document', label: 'المستندات' },
+  { id: 'content', label: 'في المحتوى' },
   { id: 'guide', label: 'الدليل' }
 ]
 
@@ -20,6 +28,8 @@ export interface PaletteEntry {
   subtitle?: string
   shortcut?: string
   keywords?: string[]
+  /** highlighted [start, end) ranges inside `title` (content search hits) */
+  marks?: [number, number][]
   run: () => unknown
 }
 
@@ -38,6 +48,16 @@ export interface PaletteSources {
   documents: Record<number, { id: number; title: string }[]>
   recent: { documentId: number; projectId: number; title: string }[]
   guide: GuideTopic[]
+  /** full-text hits for the current query (backend search); already filtered by the server */
+  content?: {
+    documentId: number
+    title: string
+    projectName: string
+    text: string
+    marks: [number, number][]
+    offset: number
+  }[]
+  openContent?: (documentId: number, offset: number, length: number) => void
   openSettings: (section: string) => void
   openProject: (projectId: number) => void
   openDocument: (documentId: number) => void
@@ -90,6 +110,18 @@ export function buildEntries(s: PaletteSources): PaletteEntry[] {
         subtitle: p.name,
         run: () => s.openDocument(d.id)
       })
+  for (const [i, h] of (s.content ?? []).entries())
+    out.push({
+      id: `content:${h.documentId}:${i}`,
+      group: 'content',
+      title: h.text,
+      subtitle: `${h.title} · ${h.projectName}`,
+      marks: h.marks,
+      run: () => {
+        const m = h.marks[0]
+        s.openContent?.(h.documentId, h.offset, m ? m[1] - m[0] : 0)
+      }
+    })
   for (const g of s.guide)
     out.push({
       id: `guide:${g.id}`,
@@ -126,6 +158,8 @@ export function searchEntries(entries: PaletteEntry[], query: string): ResultGro
       const cap = LIMIT_EMPTY[g.id]
       if (cap === undefined) continue
       items = own.slice(0, cap)
+    } else if (g.id === 'content') {
+      items = own // already matched by the backend (diacritics-insensitive full-text search)
     } else {
       items = own
         .map((e, i) => ({ e, i, s: bestScore(q, [e.title, ...(e.keywords ?? []), e.subtitle]) }))

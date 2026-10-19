@@ -107,6 +107,15 @@ declare global {
       token: string
     }>
     onSidecarStatus(cb: (s: SidecarStatus) => void): () => void
+    getFlags(): Promise<{ autoTour: boolean }>
+    printSheets(req: {
+      html: string
+      widthPt: number
+      heightPt: number
+      pages: number
+      mode: 'print' | 'pdf'
+      targetPath?: string
+    }): Promise<{ ok: true; pages: number } | { ok: false; error: string }>
     windowMinimize(): Promise<void>
     windowToggleMaximize(): Promise<void>
     windowClose(): Promise<void>

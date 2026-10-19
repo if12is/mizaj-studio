@@ -484,3 +484,21 @@ html.hc .cm-lowconf {
   direction: ltr;
   unicode-bidi: isolate;
 }
+
+/* ---- full-text search hits (search panel + palette «في المحتوى»): dark text on amber, AA in both themes ---- */
+.search-mark {
+  background: #fde68a;
+  color: #1e293b;
+  border-radius: 2px;
+  padding: 0 1px;
+}
+
+/* ---- dark mode: muted text must stay AA (4.5:1) on slate-900/800 surfaces; slate-500 (#64748b) was 3.75:1 ---- */
+.dark .text-slate-500,
+.dark .placeholder\:text-slate-500::placeholder {
+  color: #94a3b8;
+}
+/* white text on the brand emerald (#10B981) is only 2.5:1: filled emerald controls use emerald-700 (5.5:1) */
+.bg-mizaj-emerald.text-white {
+  background-color: #047857;
+}
