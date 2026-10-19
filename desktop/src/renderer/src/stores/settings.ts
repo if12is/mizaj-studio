@@ -116,18 +116,25 @@ export const useSettingsStore = defineStore('settings', () => {
   }
 
   /** Applies immediately (optimistic), then persists; rolls back on failure. */
+  const pending = new Map<string, { seq: number; value: string }>()
   async function update(patch: SettingsMap): Promise<void> {
     const seq = ++updateSeq
     const prev = values.value
+    // keys whose newest local value is still on its way to the server
+    for (const k of Object.keys(patch)) pending.set(k, { seq, value: patch[k] })
     values.value = { ...prev, ...patch }
     applyToDom()
     try {
       const echo = await useApi().put<SettingsMap>('/api/settings', patch)
-      // Only the newest request may overwrite local state: an older response would flip back a
-      // control the user already changed again (rapid toggles). The newest echo contains
-      // every earlier patch because the server applies requests in order.
-      if (seq === updateSeq) values.value = { ...DEFAULT_SETTINGS, ...echo }
+      // Requests can finish out of order (a debounced panel-size save racing a dock toggle):
+      // an echo never overrides a value the user set later and the server has not confirmed.
+      for (const k of Object.keys(patch)) if (pending.get(k)?.seq === seq) pending.delete(k)
+      const local: SettingsMap = {}
+      for (const [k, p] of pending) local[k] = p.value
+      if (seq === updateSeq || pending.size === 0)
+        values.value = { ...DEFAULT_SETTINGS, ...echo, ...local }
     } catch {
+      for (const k of Object.keys(patch)) if (pending.get(k)?.seq === seq) pending.delete(k)
       if (seq === updateSeq) values.value = prev
     }
     applyToDom()

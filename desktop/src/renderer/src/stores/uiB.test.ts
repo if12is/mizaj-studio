@@ -222,3 +222,31 @@ describe('online store', () => {
     expect(calls).toHaveLength(0)
   })
 })
+
+describe('settings store: out-of-order saves', () => {
+  it('a stale echo never undoes a newer local change that is still in flight', async () => {
+    const s = useSettingsStore()
+    const resolvers: (() => void)[] = []
+    // the server answers the dock toggle with the dock value it had before the panel-size save
+    vi.stubGlobal('fetch', (_u: string, init?: RequestInit) => {
+      const body = JSON.parse(String(init?.body))
+      const echo = body.panel_dock
+        ? { panel_dock: 'side', panel_height: '300' }
+        : { panel_dock: 'bottom', panel_height: body.panel_height }
+      return new Promise<Response>((res) =>
+        resolvers.push(() => res(new Response(JSON.stringify(echo), { status: 200 })))
+      )
+    })
+    const dock = s.update({ panel_dock: 'side' })
+    const size = s.update({ panel_height: '316' })
+    await vi.waitFor(() => expect(resolvers).toHaveLength(2))
+    resolvers[1]() // the newer request (size) answers first, echoing the old dock
+    await size
+    expect(s.values.panel_dock).toBe('side')
+    expect(s.values.panel_height).toBe('316')
+    resolvers[0]()
+    await dock
+    expect(s.values.panel_dock).toBe('side')
+    vi.stubGlobal('fetch', fakeFetch)
+  })
+})
