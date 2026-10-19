@@ -35,6 +35,7 @@ const setDoc = (t: string) =>
   }, t)
 async function setSetting(testid: string, value: string): Promise<void> {
   await text('open-settings').click()
+  await text('settings-mode-advanced').click()
   await text(testid).selectOption(value)
   await text('settings-close').click()
   await expect(text('settings-modal')).toHaveCount(0)

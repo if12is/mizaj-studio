@@ -3,6 +3,7 @@ import MotionTransition from '@renderer/components/ui/MotionTransition.vue'
 import MotionGroup from '@renderer/components/ui/MotionGroup.vue'
 import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import TitleBar from './components/TitleBar.vue'
+import AppIcon from './components/ui/AppIcon.vue'
 import Sidebar from './components/Sidebar.vue'
 import EditorPane from './components/EditorPane.vue'
 import StatusBar from './components/StatusBar.vue'
@@ -384,21 +385,53 @@ onBeforeUnmount(() => {
       <div class="flex min-w-0 flex-1 flex-col">
         <main class="flex min-h-0 min-w-0 flex-1 flex-col" aria-label="المحتوى الرئيسي">
           <div
-            class="flex items-center justify-between border-b border-slate-200 px-3 py-1 dark:border-slate-700"
+            class="grid grid-cols-[1fr_auto_1fr] items-center gap-3 border-b border-slate-200 bg-slate-50 px-3 py-1.5 dark:border-slate-700 dark:bg-slate-900/40"
+            data-testid="menubar"
           >
-            <div class="flex items-center gap-2">
+            <div class="flex items-center gap-2" role="group" aria-label="القوائم">
               <FileMenu />
-              <span class="text-sm font-semibold" data-testid="doc-title">
+            </div>
+            <div
+              class="flex max-w-[28rem] items-center gap-2 truncate rounded-full border px-3 py-0.5 text-sm"
+              :class="
+                projects.currentDocument
+                  ? 'border-slate-300 bg-white font-semibold dark:border-slate-600 dark:bg-slate-800'
+                  : 'border-dashed border-slate-300 text-slate-500 dark:border-slate-600'
+              "
+              :title="projects.currentDocument?.title ?? ''"
+              data-testid="doc-pill"
+            >
+              <span
+                v-if="projects.currentDocument"
+                class="h-2 w-2 shrink-0 rounded-full"
+                :class="
+                  editor.saveState === 'saved' ? 'bg-mizaj-emerald' : 'animate-pulse bg-mizaj-amber'
+                "
+                :title="
+                  editor.saveState === 'saved'
+                    ? 'محفوظ'
+                    : editor.saveState === 'saving'
+                      ? 'جاري الحفظ'
+                      : 'تعديلات غير محفوظة'
+                "
+                data-testid="doc-modified-dot"
+                :data-state="editor.saveState"
+              />
+              <span class="truncate" data-testid="doc-title">
                 {{ projects.currentDocument?.title ?? 'لم يتم اختيار مستند' }}
               </span>
             </div>
-            <button
-              class="rounded px-2 py-1 text-sm hover:bg-slate-200 dark:hover:bg-slate-700"
-              data-testid="open-settings"
-              @click="settings.openSettings()"
-            >
-              الإعدادات
-            </button>
+            <div class="flex justify-end">
+              <button
+                class="flex items-center gap-1.5 rounded-md border border-slate-300 bg-slate-100 px-3 py-1 text-sm hover:border-mizaj-emerald/60 hover:bg-slate-200 dark:border-slate-600 dark:bg-slate-700/60 dark:hover:bg-slate-700"
+                data-testid="open-settings"
+                title="الإعدادات"
+                @click="settings.openSettings()"
+              >
+                <AppIcon name="settings" :size="14" />
+                الإعدادات
+              </button>
+            </div>
           </div>
           <EditorPane
             ref="pane"

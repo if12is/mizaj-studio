@@ -48,6 +48,7 @@ test('settings modal transitions in and out, tabs cross-fade without errors', as
   const errors: string[] = []
   page.on('pageerror', (e) => errors.push(e.message))
   await t('open-settings').click()
+  await t('settings-mode-advanced').click()
   await expect(t('settings-modal')).toBeVisible()
   for (const k of ['dictionary', 'quran', 'general']) await t(`tab-${k}`).click()
   await expect(t('tab-general')).toHaveAttribute('aria-selected', 'true')
@@ -66,6 +67,7 @@ test('a tashkeel run with fade-in finishes and leaves no fade classes behind', a
 test('reduced motion removes the modal lingering (instant detach)', async () => {
   await page.emulateMedia({ reducedMotion: 'reduce' })
   await t('open-settings').click()
+  await t('settings-mode-advanced').click()
   await expect(t('settings-modal')).toBeVisible()
   await t('settings-close').click()
   expect(await t('settings-modal').count()).toBe(0)

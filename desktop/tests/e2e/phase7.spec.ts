@@ -152,6 +152,7 @@ test('zoom shortcuts persist; high contrast applies a black/white palette', asyn
   await expect.poll(size).toBe('20px')
 
   await text('open-settings').click()
+  await text('settings-mode-advanced').click()
   await text('setting-high-contrast').selectOption('true')
   await expect
     .poll(() => page.evaluate(() => document.documentElement.classList.contains('hc')))
@@ -177,6 +178,7 @@ test('keyboard-only: skip links, dialog focus trap + Escape, shortcuts dialog, l
   await expect(text('shortcuts-dialog')).toHaveCount(0)
   // settings dialog traps focus: tabbing many times never leaves it
   await text('open-settings').click()
+  await text('settings-mode-advanced').click()
   for (let i = 0; i < 40; i++) await page.keyboard.press('Tab')
   expect(
     await page.evaluate(() => !!document.activeElement?.closest('[data-testid=settings-modal]'))
@@ -211,6 +213,7 @@ test('axe-core: no serious or critical accessibility violations', async () => {
   // and with the settings dialog + right panel open
   await text('toggle-legal-panel').click()
   await text('open-settings').click()
+  await text('settings-mode-advanced').click()
   const bad2 = serious(JSON.parse((await run()) as string))
   expect(bad2, JSON.stringify(bad2, null, 1)).toEqual([])
   await page.keyboard.press('Escape')
@@ -244,6 +247,7 @@ test('diagnostics bundle is a local zip without document text; about dialog show
   const secret = 'نص سري جداً من مستند المستخدم لا يجب أن يظهر في أي مكان'
   await setDoc(secret)
   await text('open-settings').click()
+  await text('settings-mode-advanced').click()
   rmSync(diagPath, { force: true })
   await text('diag-export').click()
   await expect.poll(() => existsSync(diagPath), { timeout: 15_000 }).toBe(true)

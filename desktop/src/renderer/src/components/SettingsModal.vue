@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import AppIcon from '@renderer/components/ui/AppIcon.vue'
 import { useReducedMotion } from '@renderer/lib/motion'
 import { computed, defineAsyncComponent, onMounted, ref } from 'vue'
 import { lazyPanel } from '@renderer/lib/lazy'
@@ -21,7 +22,7 @@ const settings = useSettingsStore()
 const sidecar = useSidecarStore()
 // bound to the store so a request from inside the dialog (e.g. "install Quran") switches the tab
 const tab = computed<SettingsSection>({
-  get: () => settings.settingsSection,
+  get: () => (settings.settingsAdvanced ? settings.settingsSection : 'general'),
   set: (v) => (settings.settingsSection = v)
 })
 
@@ -147,6 +148,13 @@ async function exportDiag(): Promise<void> {
 }
 
 const field = 'rounded border px-2 py-1 dark:border-slate-600 dark:bg-slate-800'
+const sec = 'rounded-lg border border-slate-200 p-3 dark:border-slate-700'
+const secTitle = 'text-base font-semibold'
+const secDesc = 'mb-3 mt-0.5 text-xs text-slate-500 dark:text-slate-400'
+const hint = 'text-xs text-slate-500 dark:text-slate-400'
+const grid = 'grid grid-cols-[1fr_auto] items-center gap-x-4 gap-y-3'
+const btn =
+  'rounded border px-3 py-1 hover:bg-slate-100 disabled:opacity-50 dark:border-slate-600 dark:hover:bg-slate-700'
 </script>
 
 <template>
@@ -170,7 +178,35 @@ const field = 'rounded border px-2 py-1 dark:border-slate-600 dark:bg-slate-800'
           &#10005;
         </button>
       </div>
-      <div class="mb-3 flex flex-wrap gap-x-2 border-b dark:border-slate-700" role="tablist">
+      <div
+        class="mb-3 inline-flex rounded-lg border border-slate-300 p-0.5 text-sm dark:border-slate-600"
+        role="group"
+        aria-label="مستوى الإعدادات"
+      >
+        <button
+          v-for="[adv, label, id] in [
+            [false, 'إعدادات أساسية', 'settings-mode-basic'],
+            [true, 'إعدادات متقدمة', 'settings-mode-advanced']
+          ] as const"
+          :key="id"
+          class="rounded-md px-4 py-1"
+          :class="
+            settings.settingsAdvanced === adv
+              ? 'bg-mizaj-emerald font-semibold text-white'
+              : 'hover:bg-slate-100 dark:hover:bg-slate-700'
+          "
+          :aria-pressed="settings.settingsAdvanced === adv"
+          :data-testid="id"
+          @click="settings.setAdvanced(adv)"
+        >
+          {{ label }}
+        </button>
+      </div>
+      <div
+        v-if="settings.settingsAdvanced"
+        class="mb-3 flex flex-wrap gap-x-2 border-b dark:border-slate-700"
+        role="tablist"
+      >
         <button
           v-for="[k, label] in tabs"
           :key="k"
@@ -181,276 +217,346 @@ const field = 'rounded border px-2 py-1 dark:border-slate-600 dark:bg-slate-800'
           :data-testid="`tab-${k}`"
           @click="tab = k"
         >
-          {{ label }}
+          {{ k === 'general' ? 'عام (متقدم)' : label }}
         </button>
       </div>
 
       <Transition name="m-tab" :mode="reduced ? undefined : 'out-in'" :css="!reduced">
         <div :key="tab">
-          <div v-if="tab === 'general'" class="grid grid-cols-2 items-center gap-3 text-sm">
-            <label for="s-engine">وضع المحرك</label>
-            <select
-              id="s-engine"
-              :class="field"
-              :value="settings.values.engine_mode"
-              data-testid="setting-engine-mode"
-              @change="settings.update({ engine_mode: ($event.target as HTMLSelectElement).value })"
-            >
-              <option value="fast">سريع</option>
-              <option
-                value="accurate"
-                :disabled="sidecar.accurateMissing"
-                :title="
-                  sidecar.accurateMissing
-                    ? 'النموذج الدقيق غير متوفر. ثبّت حزمة النماذج من الإعدادات.'
-                    : ''
-                "
-              >
-                دقيق
-              </option>
-            </select>
-
-            <label for="s-level">مستوى التشكيل</label>
-            <select
-              id="s-level"
-              :class="field"
-              :value="settings.values.tashkeel_level"
-              data-testid="setting-tashkeel-level"
-              @change="
-                settings.update({ tashkeel_level: ($event.target as HTMLSelectElement).value })
-              "
-            >
-              <option value="full">كامل</option>
-              <option value="irab_only">أواخر الكلمات (الإعراب)</option>
-              <option value="essential">إلزامي: أواخر الكلمات والتنوين والشدة</option>
-              <option value="minimal">الحد الأدنى (فك اللبس)</option>
-              <option value="legal">قانوني (حيث يزيل اللبس)</option>
-            </select>
-
-            <label for="s-proofread">التدقيق قبل التشكيل</label>
-            <select
-              id="s-proofread"
-              :class="field"
-              :value="settings.values.proofread_before_tashkeel"
-              data-testid="setting-proofread-before"
-              @change="
-                settings.update({
-                  proofread_before_tashkeel: ($event.target as HTMLSelectElement).value
-                })
-              "
-            >
-              <option v-for="[v, label] in BEFORE_TASHKEEL_OPTIONS" :key="v" :value="v">
-                {{ label }}
-              </option>
-            </select>
-
-            <label for="s-ya">الياء آخر الكلمة</label>
-            <select
-              id="s-ya"
-              :class="field"
-              :value="settings.values.ya_style"
-              data-testid="setting-ya-style"
-              @change="settings.update({ ya_style: ($event.target as HTMLSelectElement).value })"
-            >
-              <option v-for="[v, label] in YA_STYLE_OPTIONS" :key="v" :value="v">
-                {{ label }}
-              </option>
-            </select>
-
-            <label for="s-font">خط المحرر</label>
-            <select
-              id="s-font"
-              :class="field"
-              :value="settings.values.editor_font"
-              data-testid="setting-editor-font"
-              @change="settings.update({ editor_font: ($event.target as HTMLSelectElement).value })"
-            >
-              <option value="Amiri">أميري</option>
-              <option value="Cairo">القاهرة</option>
-            </select>
-
-            <label for="s-size">حجم الخط ({{ fontSize }})</label>
-            <input
-              id="s-size"
-              v-model.number="fontSize"
-              type="range"
-              min="12"
-              max="48"
-              data-testid="setting-font-size"
-              @change="settings.update({ editor_font_size: String(fontSize) })"
-            />
-
-            <label for="s-colored">تلوين الحركات</label>
-            <input
-              id="s-colored"
-              type="checkbox"
-              :checked="settings.colored"
-              data-testid="setting-colored"
-              @change="
-                settings.update({
-                  colored_diacritics: String(($event.target as HTMLInputElement).checked)
-                })
-              "
-            />
-
-            <label for="s-theme">السمة</label>
-            <select
-              id="s-theme"
-              :class="field"
-              :value="settings.values.theme"
-              data-testid="setting-theme"
-              @change="settings.update({ theme: ($event.target as HTMLSelectElement).value })"
-            >
-              <option value="dark">ليلي</option>
-              <option value="light">نهاري</option>
-            </select>
-
-            <label for="s-hc">التباين العالي</label>
-            <select
-              id="s-hc"
-              :class="field"
-              :value="settings.values.high_contrast"
-              data-testid="setting-high-contrast"
-              @change="
-                settings.update({ high_contrast: ($event.target as HTMLSelectElement).value })
-              "
-            >
-              <option value="auto">حسب النظام</option>
-              <option value="true">مفعّل</option>
-              <option value="false">معطّل</option>
-            </select>
-          </div>
-          <div
-            v-if="tab === 'general'"
-            class="mt-4 border-t pt-3 text-sm dark:border-slate-700"
-            data-testid="spell-settings"
-          >
-            <h3 class="mb-2 font-semibold">التدقيق الإملائي</h3>
-            <label class="flex items-center gap-2">
-              <input
-                type="checkbox"
-                :checked="settings.values.spell_check_enabled !== 'false'"
-                data-testid="setting-spell-enabled"
-                @change="
-                  settings.update({
-                    spell_check_enabled: String(($event.target as HTMLInputElement).checked)
-                  })
-                "
-              />
-              تفعيل التدقيق الإملائي أثناء الكتابة
-            </label>
-            <div class="mt-1 flex flex-wrap gap-4">
-              <label
-                v-for="[key, label] in [
-                  ['spell_cat_spelling', 'إملائي (قاموس)'],
-                  ['spell_cat_pattern', 'أخطاء شائعة'],
-                  ['spell_cat_punctuation', 'ترقيم']
-                ]"
-                :key="key"
-                class="flex items-center gap-1"
-              >
-                <input
-                  type="checkbox"
-                  :checked="settings.values[key] !== 'false'"
-                  :data-testid="`setting-${key.replace(/_/g, '-')}`"
+          <div v-if="tab === 'general'" class="space-y-4 text-sm" data-testid="settings-general">
+            <!-- ============ BASIC ============ -->
+            <section :class="sec" data-testid="sec-tashkeel">
+              <h3 :class="[secTitle, 'flex items-center gap-1.5']">
+                <AppIcon name="tashkeel" :size="16" class="text-mizaj-emerald" />التشكيل
+              </h3>
+              <p :class="secDesc">اختر سرعة المحرك ومقدار الحركات التي تُضاف إلى النص.</p>
+              <div :class="grid">
+                <div>
+                  <label for="s-engine" class="font-medium">وضع المحرك</label>
+                  <p :class="hint">«سريع» لمعظم الاستخدام، «دقيق» أبطأ وأدق.</p>
+                </div>
+                <select
+                  id="s-engine"
+                  :class="field"
+                  :value="settings.values.engine_mode"
+                  data-testid="setting-engine-mode"
                   @change="
-                    settings.update({ [key]: String(($event.target as HTMLInputElement).checked) })
+                    settings.update({ engine_mode: ($event.target as HTMLSelectElement).value })
+                  "
+                >
+                  <option value="fast">سريع</option>
+                  <option
+                    value="accurate"
+                    :disabled="sidecar.accurateMissing"
+                    :title="
+                      sidecar.accurateMissing
+                        ? 'النموذج الدقيق غير متوفر. ثبّت حزمة النماذج من الإعدادات.'
+                        : ''
+                    "
+                  >
+                    دقيق
+                  </option>
+                </select>
+
+                <div>
+                  <label for="s-level" class="font-medium">مستوى التشكيل</label>
+                  <p :class="hint">كامل، أو الحد الأدنى لفك اللبس فقط.</p>
+                </div>
+                <select
+                  id="s-level"
+                  :class="field"
+                  :value="settings.values.tashkeel_level"
+                  data-testid="setting-tashkeel-level"
+                  @change="
+                    settings.update({ tashkeel_level: ($event.target as HTMLSelectElement).value })
+                  "
+                >
+                  <option value="full">كامل</option>
+                  <option value="irab_only">أواخر الكلمات (الإعراب)</option>
+                  <option value="essential">إلزامي: أواخر الكلمات والتنوين والشدة</option>
+                  <option value="minimal">الحد الأدنى (فك اللبس)</option>
+                  <option value="legal">قانوني (حيث يزيل اللبس)</option>
+                </select>
+              </div>
+            </section>
+
+            <section :class="sec" data-testid="sec-appearance">
+              <h3 :class="[secTitle, 'flex items-center gap-1.5']">
+                <AppIcon name="color" :size="16" class="text-mizaj-emerald" />الخط والمظهر
+              </h3>
+              <p :class="secDesc">شكل المحرر وقراءة النص.</p>
+              <div :class="grid">
+                <label for="s-font" class="font-medium">خط المحرر</label>
+                <select
+                  id="s-font"
+                  :class="field"
+                  :value="settings.values.editor_font"
+                  data-testid="setting-editor-font"
+                  @change="
+                    settings.update({ editor_font: ($event.target as HTMLSelectElement).value })
+                  "
+                >
+                  <option value="Amiri">أميري</option>
+                  <option value="Cairo">القاهرة</option>
+                </select>
+
+                <label for="s-size" class="font-medium">حجم الخط ({{ fontSize }})</label>
+                <input
+                  id="s-size"
+                  v-model.number="fontSize"
+                  type="range"
+                  min="12"
+                  max="48"
+                  data-testid="setting-font-size"
+                  @change="settings.update({ editor_font_size: String(fontSize) })"
+                />
+
+                <label for="s-theme" class="font-medium">السمة</label>
+                <select
+                  id="s-theme"
+                  :class="field"
+                  :value="settings.values.theme"
+                  data-testid="setting-theme"
+                  @change="settings.update({ theme: ($event.target as HTMLSelectElement).value })"
+                >
+                  <option value="dark">ليلي</option>
+                  <option value="light">نهاري</option>
+                </select>
+
+                <div>
+                  <label for="s-colored" class="font-medium">تلوين الحركات</label>
+                  <p :class="hint">تظهر الحركات بلون مميز لتسهيل المراجعة.</p>
+                </div>
+                <input
+                  id="s-colored"
+                  type="checkbox"
+                  class="h-4 w-4"
+                  :checked="settings.colored"
+                  data-testid="setting-colored"
+                  @change="
+                    settings.update({
+                      colored_diacritics: String(($event.target as HTMLInputElement).checked)
+                    })
                   "
                 />
-                {{ label }}
+              </div>
+            </section>
+
+            <section :class="sec" data-testid="spell-settings">
+              <h3 :class="[secTitle, 'flex items-center gap-1.5']">
+                <AppIcon name="spell" :size="16" class="text-mizaj-emerald" />التدقيق الإملائي
+              </h3>
+              <p :class="secDesc">يضع خطاً تحت الكلمات المشكوك فيها أثناء الكتابة.</p>
+              <label class="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  class="h-4 w-4"
+                  :checked="settings.values.spell_check_enabled !== 'false'"
+                  data-testid="setting-spell-enabled"
+                  @change="
+                    settings.update({
+                      spell_check_enabled: String(($event.target as HTMLInputElement).checked)
+                    })
+                  "
+                />
+                تفعيل التدقيق الإملائي أثناء الكتابة
               </label>
-            </div>
-          </div>
-          <div v-if="tab === 'general'" class="mt-4 border-t pt-3 text-sm dark:border-slate-700">
-            <h3 class="mb-2 font-semibold">النماذج</h3>
-            <p data-testid="pack-status">
-              الإصدار المثبّت:
-              <b data-testid="pack-version">{{ pack?.version ?? 'غير محدد' }}</b>
-              <span v-if="pack?.models_source" class="text-slate-500">
-                — {{ sourceLabel[pack.models_source] ?? pack.models_source }}
-              </span>
-            </p>
-            <button
-              class="mt-2 rounded border px-3 py-1 hover:bg-slate-100 disabled:opacity-50 dark:border-slate-600 dark:hover:bg-slate-700"
-              :disabled="packBusy"
-              data-testid="pack-apply"
-              @click="applyPack"
-            >
-              تحديث النماذج من ملف (.mizajpack)
-            </button>
+              <div v-if="settings.settingsAdvanced" class="mt-2 flex flex-wrap gap-4">
+                <label
+                  v-for="[key, label] in [
+                    ['spell_cat_spelling', 'إملائي (قاموس)'],
+                    ['spell_cat_pattern', 'أخطاء شائعة'],
+                    ['spell_cat_punctuation', 'ترقيم']
+                  ]"
+                  :key="key"
+                  class="flex items-center gap-1"
+                >
+                  <input
+                    type="checkbox"
+                    :checked="settings.values[key] !== 'false'"
+                    :data-testid="`setting-${key.replace(/_/g, '-')}`"
+                    @change="
+                      settings.update({
+                        [key]: String(($event.target as HTMLInputElement).checked)
+                      })
+                    "
+                  />
+                  {{ label }}
+                </label>
+              </div>
+            </section>
+
+            <section :class="sec" data-testid="help-section">
+              <h3 :class="[secTitle, 'flex items-center gap-1.5']">
+                <AppIcon name="help" :size="16" class="text-mizaj-emerald" />المساعدة
+              </h3>
+              <div class="flex flex-wrap gap-2">
+                <button
+                  :class="btn"
+                  data-testid="open-shortcuts"
+                  @click="editorStore.shortcutsOpen = true"
+                >
+                  اختصارات لوحة المفاتيح
+                </button>
+                <button :class="btn" data-testid="open-about" @click="editorStore.aboutOpen = true">
+                  حول مِزَاج والتراخيص
+                </button>
+              </div>
+            </section>
+
             <p
-              v-if="packMsg"
-              class="mt-2"
-              :class="packMsg.ok ? 'text-mizaj-emerald' : 'text-red-500'"
-              data-testid="pack-result"
+              v-if="!settings.settingsAdvanced"
+              class="rounded-md bg-slate-100 p-2 text-xs text-slate-600 dark:bg-slate-900/60 dark:text-slate-300"
+              data-testid="advanced-hint"
             >
-              {{ packMsg.text }}
-            </p>
-          </div>
-          <div
-            v-if="tab === 'general'"
-            class="mt-4 border-t pt-3 text-sm dark:border-slate-700"
-            data-testid="help-section"
-          >
-            <h3 class="mb-2 font-semibold">المساعدة</h3>
-            <div class="flex flex-wrap gap-2">
+              تحتاج خيارات أكثر (دقة الهمزات والياء، التباين العالي، النماذج، التحديثات، القاموس…)؟
               <button
-                class="rounded border px-3 py-1 hover:bg-slate-100 dark:border-slate-600 dark:hover:bg-slate-700"
-                data-testid="diag-export"
-                @click="exportDiag"
+                class="font-semibold text-mizaj-emerald underline"
+                @click="settings.setAdvanced(true)"
               >
-                إنشاء حزمة تشخيص
+                افتح الإعدادات المتقدمة
               </button>
-              <button
-                class="rounded border px-3 py-1 hover:bg-slate-100 dark:border-slate-600 dark:hover:bg-slate-700"
-                data-testid="open-shortcuts"
-                @click="editorStore.shortcutsOpen = true"
-              >
-                اختصارات لوحة المفاتيح
-              </button>
-              <button
-                class="rounded border px-3 py-1 hover:bg-slate-100 dark:border-slate-600 dark:hover:bg-slate-700"
-                data-testid="open-about"
-                @click="editorStore.aboutOpen = true"
-              >
-                حول مِزَاج والتراخيص
-              </button>
-            </div>
-            <p class="mt-1 text-xs text-slate-500">
-              حزمة التشخيص ملف محلي (سجلات منقّاة وإصدارات وإعدادات، بلا نص مستنداتك)؛ لا يُرسل شيء
-              عبر الشبكة.
             </p>
-          </div>
-          <div
-            v-if="tab === 'general'"
-            class="mt-4 border-t pt-3 text-sm dark:border-slate-700"
-            data-testid="updates-section"
-          >
-            <h3 class="mb-2 font-semibold">التحديثات</h3>
-            <label class="flex items-center gap-2">
-              <input
-                type="checkbox"
-                :checked="settings.values.auto_update_check !== 'false'"
-                data-testid="setting-auto-update"
-                @change="
-                  settings.update({
-                    auto_update_check: String(($event.target as HTMLInputElement).checked)
-                  })
-                "
-              />
-              التحقق التلقائي من التحديثات
-            </label>
-            <p class="mt-1 text-xs text-slate-500">
-              الاتصال الوحيد بالإنترنت: فحص إصدارات المشروع على GitHub فقط.
-            </p>
-            <button
-              class="mt-2 rounded border px-3 py-1 hover:bg-slate-100 dark:border-slate-600 dark:hover:bg-slate-700"
-              data-testid="update-check"
-              @click="updater.check()"
-            >
-              التحقق من التحديثات
-            </button>
-            <p v-if="updateText" class="mt-2" data-testid="update-status">{{ updateText }}</p>
+
+            <!-- ============ ADVANCED ============ -->
+            <template v-if="settings.settingsAdvanced">
+              <section :class="sec" data-testid="sec-accuracy">
+                <h3 :class="[secTitle, 'flex items-center gap-1.5']">
+                  <AppIcon name="proofread" :size="16" class="text-mizaj-emerald" />دقة النص العربي
+                </h3>
+                <p :class="secDesc">
+                  تتحكم في ما يُراجع قبل التشكيل وفي كتابة الياء؛ تؤثر مباشرة على نتيجة التشكيل.
+                </p>
+                <div :class="grid">
+                  <div>
+                    <label for="s-proofread" class="font-medium">التدقيق قبل التشكيل</label>
+                    <p :class="hint">مراجعة الهمزات والإملاء والترقيم قبل إضافة الحركات.</p>
+                  </div>
+                  <select
+                    id="s-proofread"
+                    :class="field"
+                    :value="settings.values.proofread_before_tashkeel"
+                    data-testid="setting-proofread-before"
+                    @change="
+                      settings.update({
+                        proofread_before_tashkeel: ($event.target as HTMLSelectElement).value
+                      })
+                    "
+                  >
+                    <option v-for="[v, label] in BEFORE_TASHKEEL_OPTIONS" :key="v" :value="v">
+                      {{ label }}
+                    </option>
+                  </select>
+
+                  <div>
+                    <label for="s-ya" class="font-medium">الياء آخر الكلمة</label>
+                    <p :class="hint">كتابة الياء المنقوطة أو المقصورة.</p>
+                  </div>
+                  <select
+                    id="s-ya"
+                    :class="field"
+                    :value="settings.values.ya_style"
+                    data-testid="setting-ya-style"
+                    @change="
+                      settings.update({ ya_style: ($event.target as HTMLSelectElement).value })
+                    "
+                  >
+                    <option v-for="[v, label] in YA_STYLE_OPTIONS" :key="v" :value="v">
+                      {{ label }}
+                    </option>
+                  </select>
+                </div>
+              </section>
+
+              <section :class="sec" data-testid="sec-access">
+                <h3 :class="[secTitle, 'flex items-center gap-1.5']">
+                  <AppIcon name="review" :size="16" class="text-mizaj-emerald" />إمكانية الوصول
+                </h3>
+                <p :class="secDesc">للقراءة بوضوح أكبر.</p>
+                <div :class="grid">
+                  <label for="s-hc" class="font-medium">التباين العالي</label>
+                  <select
+                    id="s-hc"
+                    :class="field"
+                    :value="settings.values.high_contrast"
+                    data-testid="setting-high-contrast"
+                    @change="
+                      settings.update({
+                        high_contrast: ($event.target as HTMLSelectElement).value
+                      })
+                    "
+                  >
+                    <option value="auto">حسب النظام</option>
+                    <option value="true">مفعّل</option>
+                    <option value="false">معطّل</option>
+                  </select>
+                </div>
+              </section>
+
+              <section :class="sec">
+                <h3 :class="secTitle">النماذج</h3>
+                <p :class="secDesc">نماذج التشكيل المثبّتة على جهازك.</p>
+                <p data-testid="pack-status">
+                  الإصدار المثبّت:
+                  <b data-testid="pack-version">{{ pack?.version ?? 'غير محدد' }}</b>
+                  <span v-if="pack?.models_source" class="text-slate-500">
+                    — {{ sourceLabel[pack.models_source] ?? pack.models_source }}
+                  </span>
+                </p>
+                <button
+                  :class="[btn, 'mt-2']"
+                  :disabled="packBusy"
+                  data-testid="pack-apply"
+                  @click="applyPack"
+                >
+                  تحديث النماذج من ملف (.mizajpack)
+                </button>
+                <p
+                  v-if="packMsg"
+                  class="mt-2"
+                  :class="packMsg.ok ? 'text-mizaj-emerald' : 'text-red-500'"
+                  data-testid="pack-result"
+                >
+                  {{ packMsg.text }}
+                </p>
+              </section>
+
+              <section :class="sec" data-testid="updates-section">
+                <h3 :class="secTitle">التحديثات</h3>
+                <p :class="secDesc">
+                  الاتصال الوحيد بالإنترنت: فحص إصدارات المشروع على GitHub فقط.
+                </p>
+                <label class="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    class="h-4 w-4"
+                    :checked="settings.values.auto_update_check !== 'false'"
+                    data-testid="setting-auto-update"
+                    @change="
+                      settings.update({
+                        auto_update_check: String(($event.target as HTMLInputElement).checked)
+                      })
+                    "
+                  />
+                  التحقق التلقائي من التحديثات
+                </label>
+                <button :class="[btn, 'mt-2']" data-testid="update-check" @click="updater.check()">
+                  التحقق من التحديثات
+                </button>
+                <p v-if="updateText" class="mt-2" data-testid="update-status">{{ updateText }}</p>
+              </section>
+
+              <section :class="sec">
+                <h3 :class="secTitle">التشخيص</h3>
+                <p :class="secDesc">
+                  حزمة التشخيص ملف محلي (سجلات منقّاة وإصدارات وإعدادات، بلا نص مستنداتك)؛ لا يُرسل
+                  شيء عبر الشبكة.
+                </p>
+                <button :class="btn" data-testid="diag-export" @click="exportDiag">
+                  إنشاء حزمة تشخيص
+                </button>
+              </section>
+            </template>
           </div>
           <DictionaryPanel v-else-if="tab === 'dictionary'" />
           <GlossaryPanel v-else-if="tab === 'glossary'" />

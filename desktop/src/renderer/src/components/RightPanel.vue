@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import AppIcon, { type IconName } from '@renderer/components/ui/AppIcon.vue'
 import { useReducedMotion } from '@renderer/lib/motion'
 import MotionTransition from '@renderer/components/ui/MotionTransition.vue'
 import { useEditorStore } from '@renderer/stores/editor'
@@ -66,6 +67,26 @@ const TITLES: Record<string, string> = {
   gemini: 'اسأل عن المستند',
   spelling: 'قائمة الأخطاء الإملائية'
 }
+const ICONS: Record<string, IconName> = {
+  legal: 'legal',
+  poetry: 'poetry',
+  quality: 'quality',
+  gemini: 'gemini',
+  spelling: 'list'
+}
+const icon = computed<IconName>(() => ICONS[editor.rightPanel ?? 'spelling'] ?? 'list')
+// brief highlight when a panel opens or switches, so the user sees what the click affected
+const flash = ref(false)
+let flashTimer: ReturnType<typeof setTimeout> | undefined
+watch(
+  () => editor.rightPanel,
+  (p) => {
+    if (!p) return
+    flash.value = true
+    clearTimeout(flashTimer)
+    flashTimer = setTimeout(() => (flash.value = false), 800)
+  }
+)
 const title = computed(() => TITLES[editor.rightPanel ?? 'spelling'] ?? TITLES.spelling)
 
 const key = (): string => (dock.value === 'side' ? 'panel_width' : 'panel_height')
@@ -119,7 +140,18 @@ function onHandleKey(e: KeyboardEvent): void {
   live.value = next
   void settings.update({ [key()]: String(next) }).then(() => (live.value = null))
 }
-onBeforeUnmount(stopDrag)
+/** Esc closes the top-most panel (menus, dialogs, the find bar and previews take Esc first). */
+function onEscape(e: KeyboardEvent): void {
+  if (e.key !== 'Escape' || e.defaultPrevented || !visible.value) return
+  if (document.querySelector('[aria-modal="true"]')) return
+  if (editor.findOpen || editor.pendingCount > 0) return
+  editor.rightPanel = null
+}
+onMounted(() => window.addEventListener('keydown', onEscape))
+onBeforeUnmount(() => {
+  window.removeEventListener('keydown', onEscape)
+  stopDrag()
+})
 
 const toggleCollapsed = (): Promise<void> =>
   settings.update({ panel_collapsed: String(!collapsed.value) })
@@ -133,11 +165,12 @@ const toggleDock = (): Promise<void> =>
       v-if="visible"
       ref="aside"
       class="relative flex shrink-0 flex-col bg-slate-50 dark:bg-slate-900/60"
-      :class="
+      :class="[
         dock === 'side'
           ? 'border-r border-slate-200 dark:border-slate-700'
-          : 'border-t border-slate-200 dark:border-slate-700'
-      "
+          : 'border-t border-slate-200 dark:border-slate-700',
+        flash ? 'm-flash-ring' : ''
+      ]"
       :style="style"
       data-testid="right-panel"
       :data-panel="editor.rightPanel"
@@ -168,9 +201,10 @@ const toggleDock = (): Promise<void> =>
         :class="[collapsed && dock === 'side' ? 'flex-col px-1' : 'border-b dark:border-slate-700']"
       >
         <h2
-          class="text-sm font-semibold"
+          class="flex items-center gap-1.5 text-sm font-semibold"
           :class="collapsed && dock === 'side' ? '[writing-mode:vertical-rl]' : ''"
         >
+          <AppIcon :name="icon" :size="15" class="text-mizaj-emerald" />
           {{ title }}
         </h2>
         <div class="flex items-center gap-1">
@@ -180,7 +214,7 @@ const toggleDock = (): Promise<void> =>
             data-testid="panel-dock-toggle"
             @click="toggleDock"
           >
-            {{ dock === 'side' ? '⬓' : '◧' }}
+            <AppIcon name="dock" :size="14" :class="dock === 'side' ? '' : 'rotate-90'" />
           </button>
           <button
             :aria-label="collapsed ? 'توسيع اللوحة' : 'طي اللوحة'"
@@ -188,14 +222,16 @@ const toggleDock = (): Promise<void> =>
             data-testid="panel-collapse-toggle"
             @click="toggleCollapsed"
           >
-            {{ collapsed ? '▸' : '▾' }}
+            <AppIcon name="collapse" :size="14" :class="collapsed ? '-rotate-90' : ''" />
           </button>
           <button
-            aria-label="إغلاق"
+            class="rounded px-1.5 hover:bg-red-500/20 hover:text-red-500"
+            aria-label="إغلاق اللوحة"
+            title="إغلاق اللوحة (Esc)"
             data-testid="right-panel-close"
             @click="editor.rightPanel = null"
           >
-            ✕
+            <AppIcon name="close" :size="14" />
           </button>
         </div>
       </div>
