@@ -42,7 +42,21 @@ try {
   # Arabic built from code points so the script is safe regardless of how the file is decoded.
   $sample = -join ([char[]](0x0643, 0x062A, 0x0627, 0x0628, 0x0020, 0x062C, 0x0645, 0x064A, 0x0644))
   $body = [Text.Encoding]::UTF8.GetBytes((@{ text = $sample; mode = 'accurate' } | ConvertTo-Json))
-  $r = Invoke-RestMethod "$base/api/tashkeel" -Method Post -ContentType 'application/json; charset=utf-8' -Body $body
+  # The accurate model loads in the background after READY; until then the API answers 503
+  # (the app retries the same way). Wait for it instead of failing on the first try.
+  $r = $null
+  $until = (Get-Date).AddSeconds(180)
+  while (-not $r) {
+    try {
+      $r = Invoke-RestMethod "$base/api/tashkeel" -Method Post -ContentType 'application/json; charset=utf-8' -Body $body
+    }
+    catch {
+      $code = $_.Exception.Response.StatusCode.value__
+      if ($code -ne 503 -or (Get-Date) -gt $until) { throw }
+      Write-Host 'accurate engine still loading (503); retrying'
+      Start-Sleep -Seconds 3
+    }
+  }
   Write-Host "tashkeel -> $($r.text) (engine=$($r.engine))"
   if ($r.text -notmatch '[\u064B-\u0652]') { throw "No diacritics in output: $($r.text)" }
   Write-Host 'frozen engine smoke test PASSED'

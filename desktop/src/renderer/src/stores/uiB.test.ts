@@ -250,3 +250,25 @@ describe('settings store: out-of-order saves', () => {
     vi.stubGlobal('fetch', fakeFetch)
   })
 })
+
+describe('settings store: late echo of an older save', () => {
+  it('is ignored once a newer save has been applied', async () => {
+    const s = useSettingsStore()
+    const resolvers: (() => void)[] = []
+    vi.stubGlobal('fetch', (_u: string, init?: RequestInit) => {
+      const body = JSON.parse(String(init?.body))
+      return new Promise<Response>((res) =>
+        resolvers.push(() => res(new Response(JSON.stringify(body), { status: 200 })))
+      )
+    })
+    const collapse = s.update({ panel_collapsed: 'true' })
+    const expand = s.update({ panel_collapsed: 'false' })
+    await vi.waitFor(() => expect(resolvers).toHaveLength(2))
+    resolvers[1]()
+    await expand
+    resolvers[0]() // the collapse echo arrives last
+    await collapse
+    expect(s.values.panel_collapsed).toBe('false')
+    vi.stubGlobal('fetch', fakeFetch)
+  })
+})

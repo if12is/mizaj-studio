@@ -117,6 +117,7 @@ export const useSettingsStore = defineStore('settings', () => {
 
   /** Applies immediately (optimistic), then persists; rolls back on failure. */
   const pending = new Map<string, { seq: number; value: string }>()
+  let appliedSeq = 0
   async function update(patch: SettingsMap): Promise<void> {
     const seq = ++updateSeq
     const prev = values.value
@@ -131,8 +132,11 @@ export const useSettingsStore = defineStore('settings', () => {
       for (const k of Object.keys(patch)) if (pending.get(k)?.seq === seq) pending.delete(k)
       const local: SettingsMap = {}
       for (const [k, p] of pending) local[k] = p.value
-      if (seq === updateSeq || pending.size === 0)
+      // an older echo arriving after a newer one is stale: never apply it
+      if (seq > appliedSeq) {
+        appliedSeq = seq
         values.value = { ...DEFAULT_SETTINGS, ...echo, ...local }
+      }
     } catch {
       for (const k of Object.keys(patch)) if (pending.get(k)?.seq === seq) pending.delete(k)
       if (seq === updateSeq) values.value = prev
