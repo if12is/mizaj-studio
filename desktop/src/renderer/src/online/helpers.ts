@@ -40,6 +40,8 @@ export interface Resource {
   license_url: string
   attribution: string
   notes: string
+  notice_ar?: string
+  requires?: string[]
   requires_user_file: boolean
   installed: { path: string; sha256: string; source: string } | null
   job: ResourceJob | null
@@ -74,7 +76,9 @@ export const RESOURCE_KIND_LABEL: Record<string, string> = {
   'quran-text': 'نص القرآن',
   'spell-dictionary': 'قاموس إملاء',
   corpus: 'مدونة',
-  models: 'نماذج'
+  models: 'نماذج',
+  'tts-engine': 'محرك نطق',
+  'tts-voice': 'صوت نطق'
 }
 
 export interface ToolsStatus {

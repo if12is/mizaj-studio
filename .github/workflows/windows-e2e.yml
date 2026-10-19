@@ -223,3 +223,30 @@ jobs:
         if: always()
         run: |
           Get-Process notepad, WINWORD -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+
+  piper-smoke:
+    name: Piper TTS (real engine + voice, Arabic WAV)
+    runs-on: windows-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Parse the smoke script with Windows PowerShell 5.1
+        shell: powershell
+        run: |
+          $errs = $null; $tok = $null
+          [void][System.Management.Automation.Language.Parser]::ParseFile("$PWD\desktop\tests\win-smoke\piper-smoke.ps1", [ref]$tok, [ref]$errs)
+          if ($errs.Count) { $errs | ForEach-Object { Write-Host "::error::$($_.Message)" }; exit 1 }
+
+      # keyed by the pinned hashes: a catalog bump (new file) is a new cache entry
+      - name: Cache the Piper engine and voice
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}\piper-cache
+          key: piper-${{ runner.os }}-${{ hashFiles('backend/app/resources/catalog.json') }}
+
+      - name: Download (sha256-verified), synthesize and validate the WAV
+        run: ./desktop/tests/win-smoke/piper-smoke.ps1 -Cache "$env:RUNNER_TEMP\piper-cache"

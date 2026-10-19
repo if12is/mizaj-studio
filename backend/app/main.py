@@ -33,6 +33,7 @@ from app.api import (
     spelling,
     tashkeel,
     tools,
+    tts,
     versions,
 )
 from app.api import docx as docx_api
@@ -131,6 +132,7 @@ def create_app(
         tools,
         versions,
         search,
+        tts,
     ):
         app.include_router(mod.router)
     _recover_interrupted_jobs(data_dir, db_path)
@@ -142,7 +144,9 @@ def _recover_interrupted_jobs(data_dir: Path, db_path: Path) -> None:
     try:
         from app.io import batch
         from app.resources import manager as resources_manager
+        from app.tts import piper
 
+        piper.cleanup_stale(data_dir)
         resources_manager.recover(data_dir, db_path)
         batch.recover(data_dir)
     except Exception:  # noqa: BLE001 - recovery must never prevent startup

@@ -23,3 +23,8 @@ All FastAPI error responses follow a strict JSON envelope:
 | `ERR_HOST_NOT_ALLOWED` | `421` | `Host` header is not `127.0.0.1` / `localhost` (DNS-rebinding protection) | None (request is rejected) |
 | `ERR_PAYLOAD_TOO_LARGE` | `413` | Request body over 64 MiB or a field over its length limit | Ask the user to split the document |
 | `ERR_FILE_TOO_LARGE` | `413` | Input file over the per-format size limit | Show the limit and suggest another file |
+| `ERR_PIPER_MISSING` | `409` | Piper read-aloud selected but the optional engine/voice resource is not installed | Offer the download in Settings; fall back to the system voice |
+| `ERR_PIPER_BLOCKED` | `409` | `piper.exe` is missing after install or blocked (Windows Defender quarantine, `ERROR_VIRUS_INFECTED`) | Explain Defender, point to `WINDOWS_DEFENDER.md`; fall back to the system voice |
+| `ERR_PIPER_SPAWN_FAILED` | `500` | `piper.exe` could not be started (permissions, other OS error) | Fall back to the system voice |
+| `ERR_PIPER_FAILED` | `500` | Piper exited non-zero or produced no valid WAV | Fall back to the system voice |
+| `ERR_PIPER_TIMEOUT` | `504` | One sentence took longer than 60 s to synthesize | Fall back to the system voice |

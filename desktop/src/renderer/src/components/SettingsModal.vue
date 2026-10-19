@@ -107,6 +107,20 @@ async function loadPack(): Promise<void> {
 }
 onMounted(() => void loadPack())
 
+// read-aloud: Piper is selectable only once its engine and voice are installed
+const piperReady = ref(false)
+async function loadPiper(): Promise<void> {
+  try {
+    piperReady.value = (
+      await useApi().get<{ available: boolean }>('/api/tts/piper/status', true)
+    ).available
+  } catch {
+    piperReady.value = false
+  }
+}
+onMounted(() => void loadPiper())
+const lengthScale = computed(() => Number(settings.values.tts_length_scale) || 1)
+
 async function applyPack(): Promise<void> {
   const api = window.mizajAPI
   const path = api?.showOpenPackDialog
@@ -393,6 +407,74 @@ const btn =
                   {{ label }}
                 </label>
               </div>
+            </section>
+
+            <section :class="sec" data-testid="sec-tts">
+              <h3 :class="[secTitle, 'flex items-center gap-1.5']">
+                <AppIcon name="read" :size="16" class="text-mizaj-emerald" />القراءة بصوت عالٍ
+              </h3>
+              <p :class="secDesc">
+                صوت النظام أو صوت Piper الطبيعي (يعمل على جهازك دون إنترنت بعد تنزيله من «الاتصال
+                والموارد المجانية»).
+              </p>
+              <label class="flex items-center gap-2">
+                الصوت
+                <select
+                  :class="[field, 'min-w-48']"
+                  :value="piperReady ? settings.values.tts_engine : 'system'"
+                  data-testid="setting-tts-engine"
+                  @change="
+                    settings.update({ tts_engine: ($event.target as HTMLSelectElement).value })
+                  "
+                >
+                  <option value="system">صوت النظام</option>
+                  <option value="piper" :disabled="!piperReady">Piper — كريم (طبيعي)</option>
+                </select>
+              </label>
+              <p
+                v-if="!piperReady"
+                class="mt-1 text-xs text-slate-500"
+                data-testid="tts-piper-hint"
+              >
+                Piper غير مثبّت بعد: نزّل «محرك Piper» و«صوت كريم» من تبويب الاتصال والموارد
+                المجانية (متقدم).
+              </p>
+              <label class="mt-2 flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  class="h-4 w-4"
+                  :checked="settings.values.tts_diacritized !== 'false'"
+                  data-testid="setting-tts-diacritized"
+                  @change="
+                    settings.update({
+                      tts_diacritized: String(($event.target as HTMLInputElement).checked)
+                    })
+                  "
+                />
+                اقرأ النص بعد التشكيل
+              </label>
+              <label class="mt-2 flex items-center gap-2">
+                السرعة
+                <input
+                  type="range"
+                  min="0.6"
+                  max="1.6"
+                  step="0.05"
+                  :value="(1 / lengthScale).toFixed(2)"
+                  dir="ltr"
+                  data-testid="setting-tts-speed"
+                  @change="
+                    settings.update({
+                      tts_length_scale: (
+                        1 / Number(($event.target as HTMLInputElement).value)
+                      ).toFixed(3)
+                    })
+                  "
+                />
+                <span class="text-xs text-slate-500" data-testid="tts-speed-value">
+                  {{ (1 / lengthScale).toFixed(2) }}×
+                </span>
+              </label>
             </section>
 
             <section :class="sec" data-testid="help-section">

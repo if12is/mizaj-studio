@@ -40,6 +40,13 @@ ALLOWED_HOSTS: set[str] = {
     "release-assets.githubusercontent.com",
     "raw.githubusercontent.com",
     "codeload.github.com",
+    # Hugging Face (Piper voices): the resolve URL redirects to its CDN hosts
+    "huggingface.co",
+    "cdn-lfs.huggingface.co",
+    "cdn-lfs.hf.co",
+    "cdn-lfs-us-1.hf.co",
+    "cas-bridge.xethub.hf.co",
+    "hf.co",
 }
 REQUEST_LOG: deque[dict[str, Any]] = deque(maxlen=200)
 _lock = threading.Lock()

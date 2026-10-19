@@ -86,6 +86,13 @@ export const FEATURES = {
     description: 'يحفظ نسخاً من عملك لتعود إلى أي منها.',
     badge: false
   },
+  readAloud: {
+    title: 'القراءة بصوت عالٍ (Piper)',
+    selector: '[data-testid="tts-read"]',
+    where: 'شريط الأدوات ← قراءة بصوت عالٍ',
+    description:
+      'زر القراءة يستخدم الآن صوت Piper الطبيعي (يمكنك تغيير الصوت والسرعة من الإعدادات).'
+  },
   gemini: {
     title: 'مساعد Gemini',
     selector: '[data-testid="toggle-gemini-panel"]',
@@ -103,7 +110,10 @@ export const RESOURCE_FEATURE: Record<string, FeatureId> = {
   'catt-eo-onnx': 'tashkeelModels',
   'mizaj-legal-terms': 'packs',
   'mizaj-names-eg-gulf-levant': 'packs',
-  'mizaj-official-phrases': 'packs'
+  'mizaj-official-phrases': 'packs',
+  // announced only once BOTH the engine and the voice are installed (stores/online.ts)
+  'piper-engine-win': 'readAloud',
+  'piper-voice-ar-jo-kareem-medium': 'readAloud'
 }
 
 export const featureOf = (resourceId: string): FeatureId | null =>

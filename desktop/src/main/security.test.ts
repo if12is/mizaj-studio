@@ -44,6 +44,7 @@ describe('CSP', () => {
     expect(csp).toContain("frame-ancestors 'none'")
     expect(csp).toContain("connect-src 'self' http://127.0.0.1:*;")
     expect(csp).toContain("img-src 'self' data: blob:")
+    expect(csp).toContain("media-src 'self' blob:")
     expect(buildCsp({ dev: true })).toContain('ws://localhost:*')
   })
 })

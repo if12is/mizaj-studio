@@ -30,6 +30,8 @@ ENUMS: dict[str, set[str]] = {
     "ya_style": {"standard", "egyptian"},
     "proofread_before_tashkeel": {"ask", "auto_punct", "off"},
     "proofread_onestep_auto_base": {"true", "false"},
+    "tts_engine": {"system", "piper"},
+    "tts_diacritized": {"true", "false"},
 }
 
 
@@ -47,6 +49,13 @@ def _validate(key: str, value: str) -> None:
         lo, hi = (1, 3650) if key.endswith("days") else (10, 100_000)
         if not (value.isascii() and value.isdigit() and lo <= int(value) <= hi):
             raise validation_error(f"{key} must be an integer between {lo} and {hi}", {"key": key})
+    if key == "tts_length_scale":
+        try:
+            ok = 0.5 <= float(value) <= 2.0
+        except ValueError:
+            ok = False
+        if not ok:
+            raise validation_error("tts_length_scale must be between 0.5 and 2.0", {"key": key})
     if key == "editor_font" and not value.strip():
         raise validation_error("editor_font must not be empty", {"key": key})
 

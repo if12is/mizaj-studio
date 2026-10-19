@@ -6,6 +6,7 @@ import hashlib
 import json
 import shutil
 import threading
+import zipfile
 from pathlib import Path
 from typing import Any
 
@@ -69,6 +70,61 @@ def listing(data_dir: Path, db_path: Path) -> dict[str, Any]:
     return {"online_resources": enabled, "resources": items}
 
 
+def _verified(path: Path, sha256: str) -> bool:
+    try:
+        return path.is_file() and downloads._sha256_file(path) == sha256.lower()
+    except OSError:
+        return False
+
+
+def _post_install(data_dir: Path, r: dict[str, Any]) -> None:
+    """Resources with `extract_to` are zip archives unpacked (safely) next to the download."""
+    sub = r.get("extract_to")
+    if not sub:
+        return
+    base = res_dir(data_dir, r["id"])
+    zip_extract(base / r["filename"], base / sub, int(r.get("extract_max_bytes") or 500_000_000))
+
+
+def zip_extract(archive: Path, dest: Path, max_bytes: int) -> None:
+    """Extract `archive` into a fresh `dest`: no absolute/`..` paths, no symlinks, size-capped."""
+    tmp = dest.with_name(dest.name + ".tmp")
+    shutil.rmtree(tmp, ignore_errors=True)
+    tmp.mkdir(parents=True)
+    root = tmp.resolve()
+    total = 0
+    try:
+        with zipfile.ZipFile(archive) as z:
+            for info in z.infolist():
+                total += info.file_size
+                target = (tmp / info.filename).resolve()
+                mode = info.external_attr >> 16
+                if (
+                    total > max_bytes
+                    or not target.is_relative_to(root)
+                    or (mode & 0o170000) == 0o120000
+                ):
+                    raise zipfile.BadZipFile("unsafe archive")
+                if info.is_dir():
+                    target.mkdir(parents=True, exist_ok=True)
+                    continue
+                target.parent.mkdir(parents=True, exist_ok=True)
+                with z.open(info) as src, open(target, "wb") as out:
+                    shutil.copyfileobj(src, out)
+        # the archive has one top-level folder (piper/): flatten it
+        kids = list(tmp.iterdir())
+        src_dir = kids[0] if len(kids) == 1 and kids[0].is_dir() else tmp
+        shutil.rmtree(dest, ignore_errors=True)
+        shutil.move(str(src_dir), str(dest))
+    except (zipfile.BadZipFile, OSError) as exc:
+        raise MizajError(
+            "ERR_DOWNLOAD_FAILED", 422, "تعذر فك ضغط الملف المنزَّل.",
+            "Archive could not be extracted safely.", {"reason": type(exc).__name__},
+        ) from exc  # fmt: skip
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
 def _write_meta(data_dir: Path, r: dict[str, Any], digest: str, how: str) -> dict[str, Any]:
     meta = {
         "id": r["id"],
@@ -80,6 +136,10 @@ def _write_meta(data_dir: Path, r: dict[str, Any], digest: str, how: str) -> dic
         "source": how,
         "path": str(res_dir(data_dir, r["id"]) / r["filename"]),
     }
+    if r.get("extract_to"):
+        meta["extracted_to"] = str(res_dir(data_dir, r["id"]) / r["extract_to"])
+    if r.get("extra_files"):
+        meta["files"] = [x["filename"] for x in r["extra_files"]]
     (res_dir(data_dir, r["id"]) / "installed.json").write_text(
         json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8"
     )
@@ -144,6 +204,19 @@ def _launch(job: Job, data_dir: Path, db_path: Path, r: dict[str, Any]) -> None:
 
     def run() -> None:
         try:
+            # small companion files first, the main (large) file last: an interrupted run then
+            # always leaves the resumable state under the main key
+            extras = r.get("extra_files") or []
+            for i, x in enumerate(extras):
+                xdest = res_dir(data_dir, rid) / x["filename"]
+                if _verified(xdest, x["sha256"]):
+                    continue
+                downloads.fetch(
+                    x["url"], xdest, data_dir=data_dir, key=f"{dl_key(rid)}-x{i}", db_path=db_path,
+                    expected_sha256=x["sha256"], expected_size=x.get("size"),
+                    cancelled=lambda: job.cancelled, on_wait=waiting,
+                    extra={"filename": x["filename"], "license_accepted": True},
+                )  # fmt: skip
             dest = res_dir(data_dir, rid) / r["filename"]
             digest = downloads.fetch(
                 r["url"],
@@ -158,6 +231,7 @@ def _launch(job: Job, data_dir: Path, db_path: Path, r: dict[str, Any]) -> None:
                 on_wait=waiting,
                 extra={"resource_id": rid, "filename": r["filename"], "license_accepted": True},
             )
+            _post_install(data_dir, r)
             job.update(result=_write_meta(data_dir, r, digest, "download"), resumable=False)
             job.finish("done")
         except MizajError as exc:
@@ -262,4 +336,5 @@ def import_file(data_dir: Path, rid: str, src: Path, accept_license: bool) -> di
     d = res_dir(data_dir, rid)
     d.mkdir(parents=True, exist_ok=True)
     shutil.copyfile(src, d / r["filename"])
+    _post_install(data_dir, r)
     return _write_meta(data_dir, r, digest, "user-file")

@@ -28,6 +28,10 @@ export const DEFAULT_SETTINGS: SettingsMap = {
   // «تدقيق وتشكيل» in one step: hamza/spelling/ya fixes auto-accepted (true) or reviewed (false)
   proofread_onestep_auto_base: 'false',
   theme: 'dark',
+  // read-aloud: system | piper; read the diacritized text (Piper); Piper length_scale (>1 = slower)
+  tts_engine: 'system',
+  tts_diacritized: 'true',
+  tts_length_scale: '1',
   // side panel layout: size in px ('' = default), dock side|bottom, collapsed true|false
   panel_width: '',
   panel_height: '',

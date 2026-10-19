@@ -38,6 +38,18 @@ export const useOnlineStore = defineStore('online', () => {
     await Promise.all([loadStatus(), loadResources()])
   }
 
+  const PIPER_IDS = ['piper-engine-win', 'piper-voice-ar-jo-kareem-medium']
+  /** «تم التفعيل … تجده الآن في»: Piper read-aloud only counts once engine AND voice are installed. */
+  function announceResource(rid: string): void {
+    const f = featureOf(rid)
+    if (!f) return
+    if (f === 'readAloud') {
+      const ready = PIPER_IDS.every((id) => resources.value.find((r) => r.id === id)?.installed)
+      if (!ready) return
+    }
+    announceFeature(f)
+  }
+
   async function loadResources(): Promise<void> {
     try {
       const r = await useApi().get<{ resources: Resource[] }>('/api/resources', true)
@@ -79,11 +91,8 @@ export const useOnlineStore = defineStore('online', () => {
             setTimeout(() => void tick(), 500)
           )
         else {
-          if (j.status === 'done') {
-            const f = featureOf(rid)
-            if (f) announceFeature(f)
-          }
           await Promise.all([loadResources(), loadStatus()])
+          if (j.status === 'done') announceResource(rid)
         }
       } catch {
         /* job vanished: refresh the list */
@@ -144,9 +153,8 @@ export const useOnlineStore = defineStore('online', () => {
         true
       )
       message.value = { ok: true, text: 'تم استيراد الملف وتسجيل ترخيصه.' }
-      const f = featureOf(rid)
-      if (f) announceFeature(f)
       await loadResources()
+      announceResource(rid)
     } catch (e) {
       message.value = { ok: false, text: onlineErrorText(e) }
     }

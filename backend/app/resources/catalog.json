@@ -91,6 +91,46 @@
       "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
       "attribution": "Mizaj Studio contributors (CC0 1.0)",
       "notes": "Domain pack (.mizajpack v2). Downloaded from the latest GitHub release; import it from the packs screen. Needs expert review before professional use."
+    },
+    {
+      "id": "piper-engine-win",
+      "name": "Piper TTS engine (Windows amd64, 2023.11.14-2)",
+      "kind": "tts-engine",
+      "url": "https://github.com/rhasspy/piper/releases/download/2023.11.14-2/piper_windows_amd64.zip",
+      "filename": "piper_windows_amd64.zip",
+      "sha256": "f3c58906402b24f3a96d92145f58acba6d86c9b5db896d207f78dc80811efcea",
+      "size": 22477236,
+      "extract_to": "piper",
+      "extract_max_bytes": 120000000,
+      "license": "MIT",
+      "license_url": "https://github.com/rhasspy/piper/blob/master/LICENSE.md",
+      "attribution": "Piper, Rhasspy / Michael Hansen (rhasspy/piper). Bundles espeak-ng (GPL-3.0) and onnxruntime (MIT).",
+      "notes": "Local neural speech engine for natural Arabic read-aloud. The executable is not code-signed: Windows Defender / SmartScreen may warn or quarantine it (see WINDOWS_DEFENDER.md). Extracted to <data>/resources/piper-engine-win/piper."
+    },
+    {
+      "id": "piper-voice-ar-jo-kareem-medium",
+      "name": "Piper voice ar_JO-kareem-medium (Arabic, male, 22.05 kHz)",
+      "kind": "tts-voice",
+      "url": "https://huggingface.co/rhasspy/piper-voices/resolve/main/ar/ar_JO/kareem/medium/ar_JO-kareem-medium.onnx",
+      "filename": "ar_JO-kareem-medium.onnx",
+      "sha256": "9e95cab07b679da603bba17c4dec7ab3111320571964ee95c0379603c086491e",
+      "size": 63201294,
+      "extra_files": [
+        {
+          "url": "https://huggingface.co/rhasspy/piper-voices/resolve/main/ar/ar_JO/kareem/medium/ar_JO-kareem-medium.onnx.json",
+          "filename": "ar_JO-kareem-medium.onnx.json",
+          "sha256": "ea6d9b9d9076dbdb6bf5c98c6a141ef154959d2359709b37855727964e7d6c4d",
+          "size": 5024
+        }
+      ],
+      "requires": [
+        "piper-engine-win"
+      ],
+      "license": "Unspecified",
+      "license_url": "https://huggingface.co/rhasspy/piper-voices/blob/main/ar/ar_JO/kareem/medium/MODEL_CARD",
+      "attribution": "rhasspy/piper-voices (ar_JO kareem, medium); dataset github.com/AliMokhammad/arabicttstrain.",
+      "notice_ar": "ترخيص بيانات تدريب هذا الصوت غير محدد من مصدره؛ يُنزَّل للاستخدام الشخصي على جهازك فقط",
+      "notes": "Not bundled and never redistributed by Mizaj Studio: a user-initiated download from Hugging Face. Requires the Piper engine resource. Includes the .onnx.json config (5 KB)."
     }
   ]
 }

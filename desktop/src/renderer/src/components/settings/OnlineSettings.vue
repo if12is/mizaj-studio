@@ -153,6 +153,20 @@ const toolOn = (t: (typeof toolKeys)[number]): boolean =>
           </p>
           <p class="text-xs text-slate-500">{{ r.attribution }}</p>
           <p v-if="r.notes" class="text-xs text-slate-500" dir="ltr">{{ r.notes }}</p>
+          <p
+            v-if="r.notice_ar"
+            class="rounded bg-amber-50 p-1 text-xs text-amber-800 dark:bg-amber-900/30 dark:text-amber-200"
+            data-testid="resource-notice"
+          >
+            {{ r.notice_ar }}
+          </p>
+          <p
+            v-if="r.requires?.length"
+            class="text-xs text-slate-500"
+            data-testid="resource-requires"
+          >
+            يحتاج أيضاً تنزيل: {{ r.requires.join('، ') }}
+          </p>
 
           <div v-if="jobActive(r.job)" class="space-y-1" data-testid="resource-progress">
             <div

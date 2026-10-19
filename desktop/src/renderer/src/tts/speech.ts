@@ -42,3 +42,54 @@ export function splitForSpeech(text: string, maxLen = 220): string[] {
 
 export const NO_VOICE_MESSAGE =
   'لا يوجد صوت عربي محلي مثبّت على هذا الجهاز. ثبّت حزمة اللغة العربية للنطق من إعدادات النظام (Windows: الإعدادات ← الوقت واللغة ← الكلام). لا تُستخدم الأصوات السحابية حفاظاً على الخصوصية.'
+
+export interface SpeechChunk {
+  text: string
+  /** offsets of the chunk in the source text (for highlighting) */
+  from: number
+  to: number
+}
+
+/**
+ * Sentence chunks WITH their offsets, for Piper: small pieces so the first sound starts fast.
+ * Splits on sentence punctuation and line breaks; over-long sentences are cut at spaces.
+ */
+export function splitSentences(text: string, maxLen = 160): SpeechChunk[] {
+  const out: SpeechChunk[] = []
+  const re = /[^.!؟?؛;\n]+[.!؟?؛;]*/g
+  let m: RegExpExecArray | null
+  const push = (raw: string, base: number): void => {
+    const lead = raw.length - raw.trimStart().length
+    const t = raw.trim()
+    if (!/[\p{L}\p{N}]/u.test(t)) return
+    out.push({ text: t, from: base + lead, to: base + lead + t.length })
+  }
+  while ((m = re.exec(text))) {
+    const seg = m[0]
+    if (seg.length <= maxLen) {
+      push(seg, m.index)
+      continue
+    }
+    let start = 0
+    while (start < seg.length) {
+      let end = Math.min(seg.length, start + maxLen)
+      if (end < seg.length) {
+        const sp = seg.lastIndexOf(' ', end)
+        if (sp > start) end = sp
+      }
+      push(seg.slice(start, end), m.index + start)
+      start = end
+    }
+  }
+  return out
+}
+
+/** Has at least one Arabic letter and no diacritic mark at all. */
+export const needsDiacritics = (t: string): boolean => /[ء-ي]/.test(t) && !/[ً-ْٰ]/.test(t)
+
+export const clampLengthScale = (v: unknown): number => {
+  const n = Number(v)
+  return Number.isFinite(n) ? Math.min(2, Math.max(0.5, n)) : 1
+}
+
+export const PIPER_FALLBACK_NOTICE = 'تعذّر صوت Piper، فتمت القراءة بصوت النظام.'

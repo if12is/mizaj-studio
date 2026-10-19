@@ -38,6 +38,15 @@ registerSecret(apiToken)
 if (process.env.MIZAJ_E2E_EXPOSE_TOKEN === '1') process.env.MIZAJ_API_TOKEN = apiToken
 else delete process.env.MIZAJ_API_TOKEN
 
+// Test-only: a fake piper executable for the read-aloud E2E. The sidecar honours it only together
+// with MIZAJ_ALLOW_TEST_HOOKS=1, which is set here for UNPACKAGED builds only; packaged builds
+// strip both so a user's environment can never redirect Piper to another program.
+if (!app.isPackaged && process.env.MIZAJ_E2E_FAKE_PIPER) process.env.MIZAJ_ALLOW_TEST_HOOKS = '1'
+else {
+  delete process.env.MIZAJ_ALLOW_TEST_HOOKS
+  delete process.env.MIZAJ_E2E_FAKE_PIPER
+}
+
 const appLocation: AppLocation = {
   rendererUrl: process.env.ELECTRON_RENDERER_URL ?? null,
   indexHtmlPath: resolve(__dirname, '../renderer/index.html')

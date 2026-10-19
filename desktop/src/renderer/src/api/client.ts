@@ -111,6 +111,49 @@ export class ApiClient {
     return (await res.json()) as T
   }
 
+  /** POST JSON, get a binary body back (e.g. a WAV). Errors are always silent here. */
+  async postBlob(path: string, body: unknown, signal?: AbortSignal): Promise<Blob> {
+    await waitForConfig()
+    let base = this.o.getBaseUrl()
+    if (!base)
+      throw new ApiError(
+        0,
+        'ERR_BACKEND_UNAVAILABLE',
+        'المحرك الخلفي غير جاهز بعد.',
+        'Backend is not ready'
+      )
+    const f = this.o.fetchImpl ?? fetch
+    const send = (b: string): Promise<Response> =>
+      f(b + path, {
+        method: 'POST',
+        headers: withToken(
+          { 'Content-Type': 'application/json' },
+          (this.o.getToken ?? getApiToken)()
+        ),
+        body: JSON.stringify(body),
+        signal
+      })
+    let res: Response
+    try {
+      res = await send(base)
+      if (res.status === 401) {
+        await refreshConfig()
+        base = this.o.getBaseUrl() ?? base
+        res = await send(base)
+      }
+    } catch (e) {
+      if (e instanceof DOMException && e.name === 'AbortError') throw e
+      throw new ApiError(
+        0,
+        'ERR_NETWORK',
+        'تعذر الاتصال بالمحرك الخلفي.',
+        e instanceof Error ? e.message : 'network error'
+      )
+    }
+    if (!res.ok) throw await parseError(res)
+    return await res.blob()
+  }
+
   get = <T>(path: string, silent = false): Promise<T> =>
     this.request<T>('GET', path, undefined, silent)
   post = <T>(path: string, body?: unknown): Promise<T> => this.request<T>('POST', path, body ?? {})

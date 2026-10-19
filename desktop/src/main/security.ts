@@ -43,6 +43,7 @@ export function buildCsp(opts: { dev?: boolean } = {}): string {
     "script-src 'self'",
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data: blob:",
+    "media-src 'self' blob:", // read-aloud WAV (Piper) played from a blob URL
     "font-src 'self' data:",
     `connect-src ${connect.join(' ')}`,
     "object-src 'none'",
@@ -101,6 +102,7 @@ export function isAppUrl(raw: unknown, loc: AppLocation): boolean {
 export const EXTERNAL_HOST_ALLOWLIST = [
   'tanzil.net',
   'github.com',
+  'huggingface.co', // voice model card (license link in the resource catalog)
   'microsoft.com', // learn.microsoft.com, support.microsoft.com, ...
   'tesseract-ocr.github.io',
   'aistudio.google.com', // where the user creates a Gemini API key

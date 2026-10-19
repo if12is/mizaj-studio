@@ -26,6 +26,7 @@ import EnginePill from './ui/EnginePill.vue'
 import { lazyDialog, lazyPanel } from '@renderer/lib/lazy'
 import { markEditorReady } from '@renderer/lib/boot'
 import { freshExtension } from '@renderer/editor/fresh'
+import { highlightRead, readAloudExtension } from '@renderer/editor/readAloud'
 import { getViewPos, saveViewPos } from '@renderer/lib/recentFiles'
 import { useExtrasStore } from '@renderer/stores/extras'
 
@@ -113,6 +114,15 @@ const flushMarks = throttle2(() => {
 }, 300)
 
 const tts = useTts()
+function readAloud(): void {
+  const info = editor.accessor?.selectionInfo()
+  void tts.toggle(editor.accessor?.getReadText() ?? '', {
+    offset: info?.from ?? 0,
+    highlight: (r) => {
+      if (view) highlightRead(view, r)
+    }
+  })
+}
 
 // «عرض الصفحة»: server-rendered, Word-like read-only view (CodeMirror stays mounted underneath)
 const pageView = ref(false)
@@ -338,6 +348,7 @@ function extensions(): Extension[] {
     keymap.of([...defaultKeymap, ...historyKeymap]),
     readOnlyCompartment.of(EditorState.readOnly.of(false)),
     freshExtension(),
+    readAloudExtension(),
     EditorView.lineWrapping,
     EditorView.perLineTextDirection.of(true),
     richPasteHandler(() => true),
@@ -642,7 +653,7 @@ defineExpose({
     togglePageView,
     toggleReview,
     exportDocx,
-    toggleTts: () => tts.toggle(editor.accessor?.getReadText() ?? ''),
+    toggleTts: () => readAloud(),
     focus: () => view?.focus()
   }
 })
@@ -865,9 +876,20 @@ const btnCls =
         name="القراءة بصوت عالٍ"
         icon="read"
         data-testid="tts-read"
-        @click="tts.toggle(editor.accessor?.getReadText() ?? '')"
+        @click="readAloud()"
       >
         {{ tts.speaking.value ? 'إيقاف القراءة' : 'قراءة بصوت عالٍ' }}
+      </ToolbarToggle>
+      <ToolbarToggle
+        v-if="tts.speaking.value"
+        :on="tts.paused.value"
+        name="إيقاف مؤقت للقراءة"
+        icon="read"
+        quiet
+        data-testid="tts-pause"
+        @click="tts.paused.value ? tts.resume() : tts.pause()"
+      >
+        {{ tts.paused.value ? 'متابعة القراءة' : 'إيقاف مؤقت' }}
       </ToolbarToggle>
       <ToolbarToggle
         :on="quality.review.active"
