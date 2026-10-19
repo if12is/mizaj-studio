@@ -278,17 +278,27 @@ test('popup window is frameless, always on top, sandboxed; IPC is restricted per
       alwaysOnTop: w.isAlwaysOnTop(),
       resizable: w.isResizable(),
       visible: w.isVisible(),
-      frameless: w.getContentBounds().height === w.getBounds().height,
       sandboxed: prefs.sandbox,
       isolated: prefs.contextIsolation,
       node: prefs.nodeIntegration
     }
   })
+  // frameless = no title bar: content and window heights match. The window manager may still be
+  // settling the bounds right after the popup shows, so poll instead of reading once.
+  await expect
+    .poll(() =>
+      app.evaluate(({ BrowserWindow }) => {
+        const w = BrowserWindow.getAllWindows().find((x) =>
+          x.webContents.getURL().includes('popup=1')
+        )
+        return w ? w.getContentBounds().height === w.getBounds().height : null
+      })
+    )
+    .toBe(true)
   expect(info).toMatchObject({
     alwaysOnTop: true,
     resizable: false,
     visible: true,
-    frameless: true,
     sandboxed: true,
     isolated: true,
     node: false
