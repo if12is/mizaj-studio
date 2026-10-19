@@ -200,7 +200,8 @@ jobs:
         shell: powershell
         run: |
           $bad = 0
-          foreach ($f in (Get-ChildItem desktop/resources/systemwide/*.ps1), (Get-Item desktop/tests/win-smoke/word-fixture.ps1)) {
+          $files = @(Get-ChildItem desktop/resources/systemwide/*.ps1) + @(Get-Item desktop/tests/win-smoke/word-fixture.ps1)
+          foreach ($f in $files) {
             $errs = $null; $tok = $null
             [void][System.Management.Automation.Language.Parser]::ParseFile($f.FullName, [ref]$tok, [ref]$errs)
             if ($errs.Count) { $errs | ForEach-Object { Write-Host "::error file=$($f.FullName),line=$($_.Extent.StartLineNumber)::$($_.Message)" }; $bad++ }
