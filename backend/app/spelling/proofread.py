@@ -749,6 +749,8 @@ def punctuation_items(text: str, masker: Masker, opt: ProofreadOptions) -> list[
         s, e = i["start"], i["end"]
         if i["code"] == "PUNCT_DOUBLE_SPACE" and (not 2 <= e - s <= 3 or "\t" in text[s:e]):
             continue  # long runs are layout alignment (headers, columns), not typos
+        if i["code"] == "PUNCT_DOUBLE_SPACE" and e < n and text[e] in "،؛:.!؟?;":
+            continue  # «بصفتهم   .»: the space-before-punctuation fix removes the whole run
         out.append(
             _pi(text, s, e, i["suggestions"][0], i["code"], i["message_ar"], i["confidence"])
         )

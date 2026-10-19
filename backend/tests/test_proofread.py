@@ -430,3 +430,8 @@ def test_punctuation_never_glues_words():
     assert fixed("على نحـو ما لا يماري", cats=("punctuation",)) == "على نحـو ما لا يماري"
     assert fixed('قضت بأن :" الرسوم', cats=("punctuation",)) == 'قضت بأن: "الرسوم'
     assert fixed("قال ، نعم", cats=("punctuation",)) == "قال، نعم"
+
+
+def test_several_spaces_before_punctuation_are_all_removed():
+    assert fixed("قال بصفتهم   . ثم", cats=("punctuation",)) == "قال بصفتهم. ثم"
+    assert fixed("أولا  : عدم قبول", cats=("punctuation",)) == "أولا: عدم قبول"
