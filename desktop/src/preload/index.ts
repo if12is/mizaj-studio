@@ -43,7 +43,7 @@ const mizajAPI = {
     ipcRenderer.on('sidecar:status-changed', handler)
     return () => ipcRenderer.removeListener('sidecar:status-changed', handler)
   },
-  getFlags: (): Promise<{ autoTour: boolean }> => ipcRenderer.invoke('app:flags'),
+  getFlags: (): Promise<{ autoTour: boolean; toolbarAll: boolean }> => ipcRenderer.invoke('app:flags'),
   printSheets: (req: {
     html: string
     widthPt: number

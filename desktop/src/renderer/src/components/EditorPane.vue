@@ -658,6 +658,33 @@ defineExpose({
   }
 })
 
+// basic toolbar by default; the rest sits behind «متقدم…» (remembered per machine)
+const ADV_KEY = 'mizaj.toolbarAdvanced'
+function readAdvanced(): boolean | null {
+  try {
+    const v = localStorage.getItem(ADV_KEY)
+    return v === null ? null : v === '1'
+  } catch {
+    return null
+  }
+}
+const advancedTools = ref(readAdvanced() ?? false)
+function setAdvancedTools(on: boolean): void {
+  advancedTools.value = on
+  try {
+    localStorage.setItem(ADV_KEY, on ? '1' : '0')
+  } catch {
+    /* per-viewer convenience only */
+  }
+}
+if (readAdvanced() === null)
+  void window.mizajAPI
+    ?.getFlags?.()
+    .then((f) => {
+      if (f.toolbarAll) advancedTools.value = true
+    })
+    .catch(() => undefined)
+
 const runBusy = computed(() => editor.runState === 'running' || editor.runState === 'waiting')
 function startTashkeel(): void {
   if (runBusy.value) return void notify('التشكيل جارٍ بالفعل، انتظر حتى ينتهي.', { kind: 'info' })
@@ -830,15 +857,6 @@ const btnCls =
         مقارنة
       </ToolbarToggle>
       <ToolbarToggle
-        :on="editor.showStats"
-        name="إحصائيات"
-        icon="stats"
-        data-testid="toggle-stats"
-        @click="editor.showStats = !editor.showStats"
-      >
-        إحصائيات
-      </ToolbarToggle>
-      <ToolbarToggle
         action
         icon="export"
         name="تصدير DOCX"
@@ -850,17 +868,6 @@ const btnCls =
         تصدير DOCX
       </ToolbarToggle>
       <ToolbarToggle
-        action
-        icon="tashkeel"
-        name="تشكيل الفقرة"
-        shortcut="Ctrl+Alt+T"
-        message="جارٍ تشكيل الفقرة الحالية…"
-        data-testid="toolbar-tashkeel-paragraph"
-        @click="paragraphRun"
-      >
-        تشكيل الفقرة (مراجعة)
-      </ToolbarToggle>
-      <ToolbarToggle
         :on="editor.findOpen"
         name="بحث واستبدال"
         icon="find"
@@ -869,27 +876,6 @@ const btnCls =
         @click="editor.findOpen = !editor.findOpen"
       >
         بحث واستبدال
-      </ToolbarToggle>
-      <HistoryButton />
-      <ToolbarToggle
-        :on="tts.speaking.value"
-        name="القراءة بصوت عالٍ"
-        icon="read"
-        data-testid="tts-read"
-        @click="readAloud()"
-      >
-        {{ tts.speaking.value ? 'إيقاف القراءة' : 'قراءة بصوت عالٍ' }}
-      </ToolbarToggle>
-      <ToolbarToggle
-        v-if="tts.speaking.value"
-        :on="tts.paused.value"
-        name="إيقاف مؤقت للقراءة"
-        icon="read"
-        quiet
-        data-testid="tts-pause"
-        @click="tts.paused.value ? tts.resume() : tts.pause()"
-      >
-        {{ tts.paused.value ? 'متابعة القراءة' : 'إيقاف مؤقت' }}
       </ToolbarToggle>
       <ToolbarToggle
         :on="quality.review.active"
@@ -900,61 +886,6 @@ const btnCls =
         @click="toggleReview"
       >
         وضع المراجعة
-      </ToolbarToggle>
-      <ToolbarToggle
-        action
-        icon="normalize"
-        name="توحيد النص"
-        message="فُتحت نافذة توحيد النص"
-        data-testid="toolbar-normalize"
-        @click="quality.normalizeOpen = true"
-      >
-        توحيد النص
-      </ToolbarToggle>
-      <ToolbarToggle
-        :on="quality.poetryOn"
-        name="وضع الشعر"
-        icon="poetry"
-        data-testid="poetry-toggle"
-        :disabled-reason="projects.currentDocument ? undefined : 'افتح مستنداً أولاً'"
-        @click="quality.setPoetry(!quality.poetryOn)"
-      >
-        وضع الشعر
-      </ToolbarToggle>
-      <ToolbarToggle
-        panel
-        :on="editor.rightPanel === 'quality'"
-        name="جودة التحرير"
-        icon="quality"
-        shortcut="Esc للإغلاق"
-        data-testid="toggle-quality-panel"
-        @click="editor.rightPanel = editor.rightPanel === 'quality' ? null : 'quality'"
-      >
-        جودة التحرير
-      </ToolbarToggle>
-      <ToolbarToggle
-        panel
-        :on="editor.rightPanel === 'poetry'"
-        name="تحليل البحر"
-        icon="poetry"
-        shortcut="Esc للإغلاق"
-        data-testid="toggle-poetry-panel"
-        @click="editor.rightPanel = editor.rightPanel === 'poetry' ? null : 'poetry'"
-      >
-        تحليل البحر
-      </ToolbarToggle>
-      <ToolbarToggle
-        action
-        quiet
-        icon="spell"
-        name="تدقيق إملائي"
-        shortcut="Ctrl+Shift+L"
-        :busy="spellBusy"
-        :disabled-reason="spellBusy ? 'التدقيق جارٍ الآن' : undefined"
-        data-testid="toolbar-spell"
-        @click="runSpell"
-      >
-        {{ spellBusy ? 'جارٍ التدقيق…' : 'تدقيق إملائي' }}
       </ToolbarToggle>
       <ToolbarToggle
         panel
@@ -980,35 +911,142 @@ const btnCls =
         اسأل عن المستند
       </ToolbarToggle>
       <ToolbarToggle
-        panel
-        :on="editor.rightPanel === 'legal'"
-        name="أدوات قانونية"
-        icon="legal"
-        shortcut="Esc للإغلاق"
-        data-testid="toggle-legal-panel"
-        @click="editor.rightPanel = editor.rightPanel === 'legal' ? null : 'legal'"
+        :on="advancedTools"
+        name="أدوات متقدمة"
+        icon="settings"
+        data-testid="toolbar-advanced"
+        @click="setAdvancedTools(!advancedTools)"
       >
-        أدوات قانونية
+        {{ advancedTools ? 'إخفاء المتقدم' : 'متقدم…' }}
       </ToolbarToggle>
-      <ToolbarToggle
-        :on="!caseCard.hidden"
-        name="بطاقة القضية"
-        icon="legal"
-        data-testid="case-card-toggle"
-        :disabled-reason="projects.currentDocument ? undefined : 'افتح مستنداً أولاً'"
-        @click="caseCard.toggleHidden()"
-      >
-        بطاقة القضية
-      </ToolbarToggle>
-      <button
-        class="rounded bg-mizaj-amber/20 px-2 py-1 text-mizaj-amber hover:bg-mizaj-amber/30"
-        data-testid="load-sample"
-        title="تحميل نص تجريبي طويل لتجربة التشكيل"
-        @click="onLoadSample"
-      >
-        <AppIcon name="sample" :size="14" class="me-1 inline align-middle" />
-        تحميل النص التجريبي
-      </button>
+      <template v-if="advancedTools">
+        <ToolbarToggle
+          :on="editor.showStats"
+          name="إحصائيات"
+          icon="stats"
+          data-testid="toggle-stats"
+          @click="editor.showStats = !editor.showStats"
+        >
+          إحصائيات
+        </ToolbarToggle>
+        <ToolbarToggle
+          action
+          icon="tashkeel"
+          name="تشكيل الفقرة"
+          shortcut="Ctrl+Alt+T"
+          message="جارٍ تشكيل الفقرة الحالية…"
+          data-testid="toolbar-tashkeel-paragraph"
+          @click="paragraphRun"
+        >
+          تشكيل الفقرة (مراجعة)
+        </ToolbarToggle>
+        <HistoryButton />
+        <ToolbarToggle
+          :on="tts.speaking.value"
+          name="القراءة بصوت عالٍ"
+          icon="read"
+          data-testid="tts-read"
+          @click="readAloud()"
+        >
+          {{ tts.speaking.value ? 'إيقاف القراءة' : 'قراءة بصوت عالٍ' }}
+        </ToolbarToggle>
+        <ToolbarToggle
+          v-if="tts.speaking.value"
+          :on="tts.paused.value"
+          name="إيقاف مؤقت للقراءة"
+          icon="read"
+          quiet
+          data-testid="tts-pause"
+          @click="tts.paused.value ? tts.resume() : tts.pause()"
+        >
+          {{ tts.paused.value ? 'متابعة القراءة' : 'إيقاف مؤقت' }}
+        </ToolbarToggle>
+        <ToolbarToggle
+          action
+          icon="normalize"
+          name="توحيد النص"
+          message="فُتحت نافذة توحيد النص"
+          data-testid="toolbar-normalize"
+          @click="quality.normalizeOpen = true"
+        >
+          توحيد النص
+        </ToolbarToggle>
+        <ToolbarToggle
+          :on="quality.poetryOn"
+          name="وضع الشعر"
+          icon="poetry"
+          data-testid="poetry-toggle"
+          :disabled-reason="projects.currentDocument ? undefined : 'افتح مستنداً أولاً'"
+          @click="quality.setPoetry(!quality.poetryOn)"
+        >
+          وضع الشعر
+        </ToolbarToggle>
+        <ToolbarToggle
+          panel
+          :on="editor.rightPanel === 'quality'"
+          name="جودة التحرير"
+          icon="quality"
+          shortcut="Esc للإغلاق"
+          data-testid="toggle-quality-panel"
+          @click="editor.rightPanel = editor.rightPanel === 'quality' ? null : 'quality'"
+        >
+          جودة التحرير
+        </ToolbarToggle>
+        <ToolbarToggle
+          panel
+          :on="editor.rightPanel === 'poetry'"
+          name="تحليل البحر"
+          icon="poetry"
+          shortcut="Esc للإغلاق"
+          data-testid="toggle-poetry-panel"
+          @click="editor.rightPanel = editor.rightPanel === 'poetry' ? null : 'poetry'"
+        >
+          تحليل البحر
+        </ToolbarToggle>
+        <ToolbarToggle
+          action
+          quiet
+          icon="spell"
+          name="تدقيق إملائي"
+          shortcut="Ctrl+Shift+L"
+          :busy="spellBusy"
+          :disabled-reason="spellBusy ? 'التدقيق جارٍ الآن' : undefined"
+          data-testid="toolbar-spell"
+          @click="runSpell"
+        >
+          {{ spellBusy ? 'جارٍ التدقيق…' : 'تدقيق إملائي' }}
+        </ToolbarToggle>
+        <ToolbarToggle
+          panel
+          :on="editor.rightPanel === 'legal'"
+          name="أدوات قانونية"
+          icon="legal"
+          shortcut="Esc للإغلاق"
+          data-testid="toggle-legal-panel"
+          @click="editor.rightPanel = editor.rightPanel === 'legal' ? null : 'legal'"
+        >
+          أدوات قانونية
+        </ToolbarToggle>
+        <ToolbarToggle
+          :on="!caseCard.hidden"
+          name="بطاقة القضية"
+          icon="legal"
+          data-testid="case-card-toggle"
+          :disabled-reason="projects.currentDocument ? undefined : 'افتح مستنداً أولاً'"
+          @click="caseCard.toggleHidden()"
+        >
+          بطاقة القضية
+        </ToolbarToggle>
+        <button
+          class="rounded bg-mizaj-amber/20 px-2 py-1 text-mizaj-amber hover:bg-mizaj-amber/30"
+          data-testid="load-sample"
+          title="تحميل نص تجريبي طويل لتجربة التشكيل"
+          @click="onLoadSample"
+        >
+          <AppIcon name="sample" :size="14" class="me-1 inline align-middle" />
+          تحميل النص التجريبي
+        </button>
+      </template>
     </div>
     <LearnPrompt />
     <CaseCard />

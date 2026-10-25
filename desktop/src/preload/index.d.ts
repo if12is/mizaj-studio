@@ -217,7 +217,7 @@ declare global {
       token: string
     }>
     onSidecarStatus(cb: (s: SidecarStatus) => void): () => void
-    getFlags(): Promise<{ autoTour: boolean }>
+    getFlags(): Promise<{ autoTour: boolean; toolbarAll: boolean }>
     printSheets(req: {
       html: string
       widthPt: number

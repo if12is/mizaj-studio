@@ -120,7 +120,9 @@ export function registerIpc(getStatus: () => SidecarStatus, apiToken: string): v
   })
   // first-run tour: test runs with an isolated profile (MIZAJ_USER_DATA_DIR) do not auto-start it
   handleSecure('app:flags', () => ({
-    autoTour: !process.env.MIZAJ_USER_DATA_DIR || process.env.MIZAJ_E2E_TOUR === '1'
+    autoTour: !process.env.MIZAJ_USER_DATA_DIR || process.env.MIZAJ_E2E_TOUR === '1',
+    // isolated test profiles start with every toolbar button visible
+    toolbarAll: !!process.env.MIZAJ_USER_DATA_DIR && process.env.MIZAJ_E2E_TOOLBAR_BASIC !== '1'
   }))
   handleSecure('print:run', async (_e, raw: unknown) => {
     const req = parsePrintRequest(raw)
