@@ -112,7 +112,14 @@ const mizajAPI = {
       ipcRenderer.invoke('gemini:session-get', docId, text),
     sessionReset: (docId: number): Promise<unknown> =>
       ipcRenderer.invoke('gemini:session-reset', docId),
-    ask: (req: unknown): Promise<unknown> => ipcRenderer.invoke('gemini:ask', req)
+    ask: (req: unknown, streamId?: string): Promise<unknown> =>
+      ipcRenderer.invoke('gemini:ask', req, streamId),
+    cancel: (streamId: string): Promise<void> => ipcRenderer.invoke('gemini:cancel', streamId),
+    onChunk: (cb: (m: { id: string; delta: string }) => void): (() => void) => {
+      const handler = (_e: unknown, m: { id: string; delta: string }): void => cb(m)
+      ipcRenderer.on('gemini:chunk', handler)
+      return () => ipcRenderer.removeListener('gemini:chunk', handler)
+    }
   },
   // «مِزَاج في أي برنامج»: settings page and the floating popup (main validates every call)
   systemwide: {

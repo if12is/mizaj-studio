@@ -79,13 +79,13 @@ function svc(): GeminiService {
     fetch: fakeFetch,
     sleep: async () => {}
   })
-  s.saveKey(KEY)
+  new GeminiKeyStore(join(dir, 'k.bin'), storage).save(KEY)
   s.setConfig({ enabled: true, model: 'gemini-2.5-flash' })
   s.acceptConsent()
   return s
 }
 
-const gens = (): Call[] => calls.filter((c) => c.url.includes(':generateContent'))
+const gens = (): Call[] => calls.filter((c) => c.url.includes(':streamGenerateContent'))
 const creates = (): Call[] => calls.filter((c) => c.url.endsWith('/cachedContents'))
 const SMALL = 'نص قصير للمستند'
 const BIG = 'كلمة '.repeat(CACHE_MIN_CHARS / 4)

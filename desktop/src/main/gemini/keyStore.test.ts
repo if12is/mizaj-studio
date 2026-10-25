@@ -2,7 +2,7 @@ import { mkdtempSync, readFileSync, existsSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { GeminiKeyStore, isPlausibleKey, maskKey, type SafeStorageLike } from './keyStore'
+import { GeminiKeyStore, isAcceptableKey, maskKey, type SafeStorageLike } from './keyStore'
 
 const KEY = 'AIzaSyDUMMYKEYFORTESTS1234567890abcd'
 
@@ -50,12 +50,26 @@ describe('GeminiKeyStore', () => {
     expect(existsSync(f)).toBe(false)
     expect(s.load()).toBeNull()
   })
-  it('rejects implausible keys and clears', () => {
+  it('has no format check: any key shape is accepted (AIza…, AQ…, short, odd symbols)', () => {
+    for (const k of [KEY, 'AQ.Ab8RN6Jabcdefghijklmnop-qrstuv_wxyz', 'AQabc', 'x', 'a.b/c+d=e~1']) {
+      const s = new GeminiKeyStore(join(dir, 'k.bin'), fakeStorage())
+      expect(isAcceptableKey(k), k).toBe(true)
+      expect(s.save(k), k).toEqual({ ok: true })
+      expect(s.load()).toBe(k)
+    }
+  })
+  it('rejects only empty input and bad characters, and clears', () => {
     const f = join(dir, 'k.bin')
     const s = new GeminiKeyStore(f, fakeStorage())
-    expect(s.save('short')).toEqual({ ok: false, reason: 'invalid' })
+    expect(s.save('')).toEqual({ ok: false, reason: 'invalid' })
+    expect(s.save('   ')).toEqual({ ok: false, reason: 'invalid' })
     expect(s.save('has space in it which is long enough')).toEqual({ ok: false, reason: 'invalid' })
-    expect(isPlausibleKey(KEY)).toBe(true)
+    expect(s.save('line\nbreak')).toEqual({ ok: false, reason: 'invalid' })
+    expect(s.save('tab\there')).toEqual({ ok: false, reason: 'invalid' })
+    expect(s.save('مفتاح')).toEqual({ ok: false, reason: 'invalid' })
+    expect(isAcceptableKey('a'.repeat(513))).toBe(false)
+    expect(isAcceptableKey(KEY)).toBe(true)
+    expect(s.save(`  ${KEY}\n`)).toEqual({ ok: true }) // surrounding whitespace is trimmed
     s.save(KEY)
     s.clear()
     expect(s.load()).toBeNull()

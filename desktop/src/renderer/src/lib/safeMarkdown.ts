@@ -64,3 +64,20 @@ export function renderMarkdown(src: string): string {
   closeList()
   return out.join('')
 }
+
+const FENCE_OPEN = '```mizaj-suggestion'
+
+/**
+ * While an answer is still streaming, hide the machine-readable suggestion block: complete ones are
+ * removed, and an unfinished one (or a partial opener at the very end) is cut off, so the user
+ * never sees raw fence text flicker by.
+ */
+export function hideSuggestionFence(text: string): string {
+  const closed = text.replace(/```mizaj-suggestion[^\S\n]*\n[\s\S]*?```/g, '')
+  const i = closed.indexOf(FENCE_OPEN)
+  if (i >= 0) return closed.slice(0, i)
+  for (let k = Math.min(closed.length, FENCE_OPEN.length - 1); k > 0; k--) {
+    if (closed.endsWith(FENCE_OPEN.slice(0, k))) return closed.slice(0, closed.length - k)
+  }
+  return closed
+}

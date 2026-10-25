@@ -58,6 +58,30 @@ export function registerGemini(): GeminiService {
     svc.getSession(docId, text)
   )
   handleSecure('gemini:session-reset', (_e, docId: unknown) => svc.resetSession(docId))
-  handleSecure('gemini:ask', (_e, req: unknown) => svc.ask(req as never))
+  // Streaming: the renderer picks a stream id, receives `gemini:chunk` {id, delta} events while
+  // the request runs, and may call `gemini:cancel` (aborts the request cleanly). The key is never
+  // part of any message.
+  const live = new Map<string, AbortController>()
+  const ID_RE = /^[A-Za-z0-9_-]{1,64}$/
+  handleSecure('gemini:ask', async (e, req: unknown, streamId?: unknown) => {
+    if (typeof streamId !== 'string' || !ID_RE.test(streamId)) return svc.ask(req as never)
+    live.get(streamId)?.abort()
+    const ac = new AbortController()
+    live.set(streamId, ac)
+    const sender = e.sender
+    try {
+      return await svc.ask(req as never, {
+        signal: ac.signal,
+        onText: (delta) => {
+          if (!sender.isDestroyed()) sender.send('gemini:chunk', { id: streamId, delta })
+        }
+      })
+    } finally {
+      if (live.get(streamId) === ac) live.delete(streamId)
+    }
+  })
+  handleSecure('gemini:cancel', (_e, streamId: unknown) => {
+    if (typeof streamId === 'string') live.get(streamId)?.abort()
+  })
   return svc
 }

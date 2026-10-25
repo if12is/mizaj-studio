@@ -6,6 +6,7 @@ import {
   userContent,
   type Content,
   type Sleep,
+  type Usage,
   listModels,
   FALLBACK_MODELS,
   pickDefaultModel,
@@ -15,7 +16,7 @@ import {
 } from './api'
 import { GeminiConfigStore, type GeminiConfig } from './config'
 import { GeminiError, messageFor } from './errors'
-import { GeminiKeyStore, isPlausibleKey, maskKey } from './keyStore'
+import { GeminiKeyStore, isAcceptableKey, maskKey } from './keyStore'
 import {
   buildDocumentPrompt,
   buildWordPrompt,
@@ -76,6 +77,7 @@ export interface AskResult extends ParsedReply {
   truncated: boolean
   /** the answer stopped at the output limit: offer «متابعة» */
   cutoff: boolean
+  usage: Usage
   /** the document context was re-sent because its text changed since the last question */
   contextRefreshed: boolean
   /** how the document prefix was served: explicit cache, plain (implicit caching), or no session */
@@ -114,6 +116,15 @@ function fail(e: unknown): {
   return { ok: false, code: 'bad_response', message: messageFor('bad_response') }
 }
 
+const INVALID_SHAPE_MESSAGE =
+  'المفتاح فارغ أو يحتوي مسافات أو أسطراً أو رموزاً غير مسموحة. الصقه كما هو من Google.'
+
+/** Per-request streaming hooks (IPC supplies them; tests may omit). */
+export interface AskIO {
+  signal?: AbortSignal
+  onText?: (delta: string) => void
+}
+
 export interface ServiceDeps {
   keys: GeminiKeyStore
   config: GeminiConfigStore
@@ -143,6 +154,18 @@ export class GeminiService {
     }
   }
 
+  private streamOpts(io: AskIO): {
+    signal?: AbortSignal
+    onText?: (d: string) => void
+    idleMs: number
+  } {
+    return {
+      signal: io.signal,
+      onText: io.onText,
+      idleMs: this.d.config.get().idleTimeoutSec * 1000
+    }
+  }
+
   private remember(models: ModelInfo[]): void {
     this.limits = new Map(models.map((m) => [m.id, m]))
   }
@@ -157,18 +180,56 @@ export class GeminiService {
     return this.snapshot()
   }
 
-  saveKey(key: unknown): Outcome<{ state: GeminiState }> {
+  /**
+   * Saves the key (encrypted), then checks it live with Google. A key Google rejects is not kept
+   * (the previous key, if any, is restored). If the check could not run (offline/quota) the key
+   * stays saved and `check` carries the reason.
+   */
+  async saveKey(key: unknown): Promise<
+    Outcome<{
+      state: GeminiState
+      check:
+        | { ok: true; models: ModelInfo[]; defaultModel: string }
+        | { ok: false; code: string; message: string }
+    }>
+  > {
     const k = typeof key === 'string' ? key.trim() : ''
-    if (!isPlausibleKey(k))
-      return { ok: false, code: 'invalid_key', message: messageFor('invalid_key') }
+    if (!isAcceptableKey(k))
+      return { ok: false, code: 'invalid_key', message: INVALID_SHAPE_MESSAGE }
+    const prev = this.d.keys.load()
     const r = this.d.keys.save(k)
     if (!r.ok)
       return {
         ok: false,
         code: r.reason === 'unavailable' ? 'unavailable' : 'invalid_key',
-        message: messageFor(r.reason === 'unavailable' ? 'unavailable' : 'invalid_key')
+        message: r.reason === 'unavailable' ? messageFor('unavailable') : INVALID_SHAPE_MESSAGE
       }
-    return { ok: true, state: this.snapshot() }
+    const check = await this.checkKey(k)
+    if (!check.ok && check.code === 'invalid_key') {
+      if (prev) this.d.keys.save(prev)
+      else this.d.keys.clear()
+      return check
+    }
+    return { ok: true, state: this.snapshot(), check }
+  }
+
+  /** Cheap live check: models.list with the key in the header; only the response validity counts. */
+  private async checkKey(
+    key: string
+  ): Promise<
+    | { ok: true; models: ModelInfo[]; defaultModel: string }
+    | { ok: false; code: string; message: string; retryAfterSec?: number }
+  > {
+    try {
+      const models = await listModels(this.d.fetch, this.d.base, key)
+      this.remember(models)
+      return { ok: true, models, defaultModel: pickDefaultModel(models) }
+    } catch (e) {
+      // models.list has no request body to get wrong: a 400/404 there means the key
+      if (e instanceof GeminiError && e.code === 'bad_request')
+        return fail(new GeminiError('invalid_key'))
+      return fail(e)
+    }
   }
 
   clearKey(): GeminiState {
@@ -183,14 +244,9 @@ export class GeminiService {
     const key =
       typeof candidate === 'string' && candidate.trim() ? candidate.trim() : this.d.keys.load()
     if (!key) return fail(new GeminiError('no_key'))
-    if (!isPlausibleKey(key)) return fail(new GeminiError('invalid_key'))
-    try {
-      const models = await listModels(this.d.fetch, this.d.base, key)
-      this.remember(models)
-      return { ok: true, models, defaultModel: pickDefaultModel(models) }
-    } catch (e) {
-      return fail(e)
-    }
+    if (!isAcceptableKey(key))
+      return { ok: false, code: 'invalid_key', message: INVALID_SHAPE_MESSAGE }
+    return this.checkKey(key)
   }
 
   /** Live model list with the stored key; offline fallback only when Google is unreachable. */
@@ -212,7 +268,7 @@ export class GeminiService {
     }
   }
 
-  async ask(req: AskRequest): Promise<Outcome<{ result: AskResult }>> {
+  async ask(req: AskRequest, io: AskIO = {}): Promise<Outcome<{ result: AskResult }>> {
     try {
       const cfg = this.d.config.get()
       if (!cfg.enabled) throw new GeminiError('disabled')
@@ -229,7 +285,7 @@ export class GeminiService {
       const docId = (req as { docId?: unknown }).docId
       if (docId !== undefined && req.kind !== 'word') {
         if (!isValidDocId(docId)) throw new GeminiError('bad_request')
-        return await this.askInSession(req, docId, q, model, info, continueFrom)
+        return await this.askInSession(req, docId, q, model, info, continueFrom, io)
       }
       let prompt: string
       let truncated = false
@@ -269,7 +325,8 @@ export class GeminiService {
       const g = await generate(this.d.fetch, this.d.base, key, model, system, prompt, {
         outputTokenLimit: info?.outputTokenLimit,
         continueFrom,
-        sleep: this.d.sleep
+        sleep: this.d.sleep,
+        ...this.streamOpts(io)
       })
       return {
         ok: true,
@@ -277,6 +334,7 @@ export class GeminiService {
           ...parseReply(g.text, req.kind),
           truncated,
           cutoff: g.cutoff,
+          usage: g.usage,
           contextRefreshed: false,
           context: 'none'
         }
@@ -317,7 +375,8 @@ export class GeminiService {
     q: string,
     model: string,
     info: ModelInfo | undefined,
-    continueFrom: string | undefined
+    continueFrom: string | undefined,
+    io: AskIO
   ): Promise<Outcome<{ result: AskResult }>> {
     const docText = req.kind === 'document' ? req.text : (req as { docText?: unknown }).docText
     if (typeof docText !== 'string' || !docText.trim() || docText.length > MAX_DOC_CHARS * 5)
@@ -357,7 +416,11 @@ export class GeminiService {
       userText = CONTINUE_PROMPT
     } else userText = buildSessionQuestion(req.kind, q, sel, sentence)
     const turn: Content[] = [...hist, userContent(userText)]
-    const opts = { outputTokenLimit: info?.outputTokenLimit, sleep: this.d.sleep }
+    const opts = {
+      outputTokenLimit: info?.outputTokenLimit,
+      sleep: this.d.sleep,
+      ...this.streamOpts(io)
+    }
 
     const cacheArgs = {
       f: this.d.fetch,
@@ -423,6 +486,7 @@ export class GeminiService {
         ...parseReply(g.text, req.kind),
         truncated: doc.truncated,
         cutoff: g.cutoff,
+        usage: g.usage,
         contextRefreshed,
         context
       }
