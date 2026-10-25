@@ -21,7 +21,6 @@ import { useSettingsStore } from '@renderer/stores/settings'
 import { useSidecarStore } from '@renderer/stores/sidecar'
 import DropOverlay from './DropOverlay.vue'
 import ProgressBar from './ProgressBar.vue'
-import PageView from './PageView.vue'
 import EnginePill from './ui/EnginePill.vue'
 import { lazyDialog, lazyPanel } from '@renderer/lib/lazy'
 import { markEditorReady } from '@renderer/lib/boot'
@@ -55,7 +54,7 @@ import {
   type PendingItem
 } from '@renderer/editor/pending'
 import { paragraphsFor } from '@renderer/editor/paragraphs'
-import { LONG_LINE_THRESHOLD, longestLine, splitLongLineEdits } from '@renderer/editor/longLines'
+import { LONG_LINE_THRESHOLD, splitLongLineEdits } from '@renderer/editor/longLines'
 import { richPasteHandler } from '@renderer/editor/paste'
 import { stripMarks } from '@renderer/editor/arabic'
 import { isolateHistory } from '@codemirror/commands'
@@ -79,6 +78,7 @@ import CaseCard from './legal/CaseCard.vue'
 import { useCaseCardStore } from '@renderer/stores/caseCard'
 import type { TabViewState } from '@renderer/tabs/viewState'
 import { normalizeSpec } from '@renderer/editor/normalizeEdits'
+const PageView = lazyPanel(() => import('./PageView.vue'))
 
 const props = defineProps<{
   openDocument: (id: number) => Promise<void>
