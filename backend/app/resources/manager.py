@@ -52,6 +52,98 @@ def installed(data_dir: Path, r: dict[str, Any]) -> dict[str, Any] | None:
         return None
 
 
+def dir_size(path: Path) -> int:
+    """Bytes under `path` (0 when missing); symlinks are not followed."""
+    total = 0
+    try:
+        for p in Path(path).rglob("*"):
+            try:
+                if p.is_file() and not p.is_symlink():
+                    total += p.stat().st_size
+            except OSError:
+                continue
+    except OSError:
+        return 0
+    return total
+
+
+def _payload_present(data_dir: Path, r: dict[str, Any]) -> bool:
+    """installed.json is only trusted while the files it describes are still on disk
+    (an antivirus may quarantine an extracted executable)."""
+    base = res_dir(data_dir, r["id"])
+    if r.get("extract_to"):
+        d = base / r["extract_to"]
+        return d.is_dir() and any(d.iterdir())
+    return (base / r["filename"]).is_file()
+
+
+def is_enabled(data_dir: Path, rid: str) -> bool:
+    """Enabled flag lives in installed.json; installs made before the flag existed count as on."""
+    meta = installed(data_dir, {"id": rid})
+    return bool(meta) and meta.get("enabled", True) is not False
+
+
+def update_available(r: dict[str, Any], meta: dict[str, Any] | None) -> bool:
+    """Only when the catalog pins a hash that differs from the installed one."""
+    return bool(meta and r.get("sha256") and meta.get("sha256") != r["sha256"].lower())
+
+
+def is_current(data_dir: Path, r: dict[str, Any]) -> bool:
+    """Installed, files present and identical to the pinned catalog version."""
+    meta = installed(data_dir, r)
+    return meta is not None and _payload_present(data_dir, r) and not update_available(r, meta)
+
+
+def set_enabled(data_dir: Path, rid: str, enabled: bool) -> dict[str, Any]:
+    r = find(rid)
+    meta = installed(data_dir, r)
+    if meta is None or not _payload_present(data_dir, r):
+        raise MizajError(
+            "ERR_RESOURCE_NOT_INSTALLED", 409, "المورد غير مثبّت.", "Resource is not installed.",
+            {"id": rid},
+        )  # fmt: skip
+    meta["enabled"] = bool(enabled)
+    _save_meta(data_dir, rid, meta)
+    return meta
+
+
+def _save_meta(data_dir: Path, rid: str, meta: dict[str, Any]) -> None:
+    p = res_dir(data_dir, rid) / "installed.json"
+    tmp = p.with_name(p.name + ".tmp")
+    tmp.write_text(json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8")
+    tmp.replace(p)
+
+
+def uninstall(data_dir: Path, rid: str) -> dict[str, Any]:
+    """Delete every file of the resource (and any partial download); returns the freed bytes."""
+    r = find(rid)
+    job = _find_job(data_dir, rid)
+    if job is not None and job.status in ("queued", "running"):
+        raise MizajError(
+            "ERR_VALIDATION", 409, "التنزيل جارٍ؛ ألغِه أولاً.", "Download in progress.", {}
+        )
+    base = res_dir(data_dir, rid)
+    freed = dir_size(base)
+    existed = base.exists()
+    try:
+        shutil.rmtree(base)
+    except FileNotFoundError:
+        pass
+    except OSError as exc:
+        raise MizajError(
+            "ERR_UNINSTALL_FAILED", 423, "تعذر حذف الملفات (ربما هي قيد الاستخدام).",
+            "Could not delete the resource files.", {"reason": type(exc).__name__},
+        ) from exc  # fmt: skip
+    downloads.discard(data_dir, dl_key(rid))
+    for i in range(len(r.get("extra_files") or [])):
+        downloads.discard(data_dir, f"{dl_key(rid)}-x{i}")
+    if job is not None:
+        job.update(resumable=False)
+        if not job.finished:
+            job.finish("cancelled")
+    return {"id": rid, "uninstalled": existed, "freed_bytes": freed}
+
+
 def listing(data_dir: Path, db_path: Path) -> dict[str, Any]:
     enabled = net.get_switch(db_path, "online_resources")
     items = []
@@ -59,11 +151,18 @@ def listing(data_dir: Path, db_path: Path) -> dict[str, Any]:
         job = next(
             (j for j in reversed(JOBS.all()) if j.fields.get("resource_id") == r["id"]), None
         )
+        meta = installed(data_dir, r)
+        if meta is not None and not _payload_present(data_dir, r):
+            meta = None  # files vanished (quarantine / manual delete): offer a download again
         items.append(
             {
                 **r,
                 "requires_user_file": r.get("sha256") is None,
-                "installed": installed(data_dir, r),
+                "installed": meta,
+                "enabled": bool(meta) and meta.get("enabled", True) is not False,
+                "installed_size": dir_size(res_dir(data_dir, r["id"])) if meta else None,
+                "download_size": r.get("size"),
+                "update_available": update_available(r, meta),
                 "job": job.snapshot() if job else None,
             }
         )
@@ -126,7 +225,12 @@ def zip_extract(archive: Path, dest: Path, max_bytes: int) -> None:
 
 
 def _write_meta(data_dir: Path, r: dict[str, Any], digest: str, how: str) -> dict[str, Any]:
+    prev = installed(data_dir, r)
+    # Auto-enable what is local and private. A catalog entry marked "network": true (anything
+    # that would use the internet once on) stays opt-in. An update keeps the user's choice.
+    enabled = prev.get("enabled", True) if prev else not r.get("network")
     meta = {
+        "enabled": enabled,
         "id": r["id"],
         "filename": r["filename"],
         "sha256": digest,
@@ -140,9 +244,7 @@ def _write_meta(data_dir: Path, r: dict[str, Any], digest: str, how: str) -> dic
         meta["extracted_to"] = str(res_dir(data_dir, r["id"]) / r["extract_to"])
     if r.get("extra_files"):
         meta["files"] = [x["filename"] for x in r["extra_files"]]
-    (res_dir(data_dir, r["id"]) / "installed.json").write_text(
-        json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8"
-    )
+    _save_meta(data_dir, r["id"], meta)
     return meta
 
 
@@ -165,6 +267,8 @@ def start_download(data_dir: Path, db_path: Path, rid: str, accept_license: bool
             "No pinned checksum: download the file yourself and use /import.",
             {"id": rid, "url": r["url"]},
         )
+    if is_current(data_dir, r):
+        raise already_installed(rid)
     job = _find_job(data_dir, rid)
     if job is not None and job.status in ("queued", "running"):
         return job  # already in progress: never run two writers on the same partial file
@@ -175,6 +279,12 @@ def start_download(data_dir: Path, db_path: Path, rid: str, accept_license: bool
     job.data_dir = Path(data_dir)  # type: ignore[attr-defined]
     _launch(job, data_dir, db_path, r)
     return job
+
+
+def already_installed(rid: str) -> MizajError:
+    return MizajError(
+        "ERR_ALREADY_INSTALLED", 409, "مثبّت بالفعل.", "Already installed.", {"id": rid}
+    )
 
 
 def dl_key(rid: str) -> str:
@@ -194,7 +304,7 @@ def _launch(job: Job, data_dir: Path, db_path: Path, r: dict[str, Any]) -> None:
     job.cancel_event.clear()
     job.status = "running"
     job.finished_at = None
-    job.update(error=None, retrying=None, resumable=True)
+    job.update(error=None, retrying=None, resumable=True, phase="downloading")
 
     def prog(done: int, total: int | None) -> None:
         job.update(bytes_done=done, bytes_total=total, retrying=None)
@@ -231,6 +341,7 @@ def _launch(job: Job, data_dir: Path, db_path: Path, r: dict[str, Any]) -> None:
                 on_wait=waiting,
                 extra={"resource_id": rid, "filename": r["filename"], "license_accepted": True},
             )
+            job.update(phase="installing")
             _post_install(data_dir, r)
             job.update(result=_write_meta(data_dir, r, digest, "download"), resumable=False)
             job.finish("done")

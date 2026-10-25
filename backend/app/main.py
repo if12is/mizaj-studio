@@ -69,6 +69,9 @@ def create_app(
     setup_logging(data_dir)
     db_path = data_dir / DB_NAME
     config.set_data_dir(data_dir)
+    from app.tools import discovery as _tools_discovery
+
+    _tools_discovery.set_data_dir(data_dir)
     # Finish a backup restore that could not swap files while the app was running.
     apply_pending_restore(data_dir, db_path)
     try:

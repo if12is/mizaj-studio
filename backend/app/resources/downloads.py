@@ -158,6 +158,9 @@ def fetch(
         raise ValueError("expected_sha256 is required: unverified downloads are not supported")
     net.require_switch(db_path, switch)
     net._check_url(url)
+    fake = _fake_download(url, Path(dest), key, progress, cancelled, expected_sha256)
+    if fake is not None:
+        return fake
     max_bytes = net.MAX_DOWNLOAD_BYTES if max_bytes is None else max_bytes
     max_seconds = net.MAX_DOWNLOAD_SECONDS if max_seconds is None else max_seconds
     dest = Path(dest)
@@ -255,6 +258,42 @@ def fetch(
     state_path(data_dir, key).unlink(missing_ok=True)
     net._record("download", url, "ok")
     return digest
+
+
+_FAKE_SEEN: set[str] = set()
+
+
+def _fake_download(
+    url: str,
+    dest: Path,
+    key: str,
+    progress: Callable[[int, int | None], None] | None,
+    cancelled: Callable[[], bool] | None,
+    sha256: str,
+) -> str | None:
+    """Test hook for the E2E suite (unpackaged Electron only, `MIZAJ_ALLOW_TEST_HOOKS=1`): no
+    network; writes placeholder bytes and reports the pinned hash as if it had been verified.
+    `MIZAJ_E2E_FAKE_DOWNLOAD` is a comma list: `fail-once` makes the first attempt per key fail
+    (retry test) and `slow` paces the progress so a test can observe it. Never active in
+    production."""
+    raw = os.environ.get("MIZAJ_E2E_FAKE_DOWNLOAD")
+    if not raw or os.environ.get("MIZAJ_ALLOW_TEST_HOOKS") != "1":
+        return None
+    mode = set(raw.split(","))
+    if "fail-once" in mode and key not in _FAKE_SEEN:
+        _FAKE_SEEN.add(key)
+        raise net._net_error("fake network failure")
+    steps = 10 if "slow" in mode else 1
+    for i in range(1, steps + 1):
+        if cancelled and cancelled():
+            raise _cancelled()
+        if progress:
+            progress(i * 100, steps * 100)
+        if "slow" in mode:
+            time.sleep(0.3)
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    dest.write_bytes(b"fake-download:" + url.encode())
+    return sha256.lower()
 
 
 def _wait(delay: float, sleep: Callable[[float], None], check: Callable[[], None]) -> None:

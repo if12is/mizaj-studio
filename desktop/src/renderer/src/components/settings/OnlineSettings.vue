@@ -1,15 +1,10 @@
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, reactive } from 'vue'
+import { onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { useOnlineStore } from '@renderer/stores/online'
 import { useSettingsStore } from '@renderer/stores/settings'
 import { openExternal } from '@renderer/lib/native'
 import GeminiSettings from './GeminiSettings.vue'
-import {
-  STATUS_LABEL,
-  resourceStatus,
-  toolStatus,
-  type FeatureStatus
-} from '@renderer/features/registry'
+import { STATUS_LABEL, toolStatus, type FeatureStatus } from '@renderer/features/registry'
 import {
   LEAVES_AR,
   ONLINE_KEYS,
@@ -18,12 +13,14 @@ import {
   TOOL_INFO,
   formatBytes,
   jobActive,
-  jobPercent
+  jobPercent,
+  resourceState
 } from '@renderer/online/helpers'
 
 const online = useOnlineStore()
 const settings = useSettingsStore()
 const accepted = reactive<Record<string, boolean>>({})
+const confirming = ref<string | null>(null) // resource id awaiting «إلغاء التثبيت» confirmation
 const btn =
   'rounded border px-3 py-1 hover:bg-slate-100 disabled:opacity-50 dark:border-slate-600 dark:hover:bg-slate-700'
 
@@ -37,10 +34,16 @@ onBeforeUnmount(() => online.dispose())
 const isOn = (k: (typeof ONLINE_KEYS)[number]): boolean => settings.values[k] === 'true'
 const toolKeys = ['languagetool', 'tesseract'] as const
 const STATUS_BG: Record<FeatureStatus, string> = {
-  running: 'bg-mizaj-amber',
-  enabled: 'bg-mizaj-emerald',
-  off: 'bg-slate-600',
-  missing: 'bg-slate-500'
+  running: 'bg-emerald-700',
+  enabled: 'bg-emerald-700',
+  off: 'bg-amber-700',
+  missing: 'bg-slate-600'
+}
+const TOOL_TIP: Record<FeatureStatus, string> = {
+  running: 'الأداة موجودة على جهازك وتعمل الآن.',
+  enabled: 'الأداة موجودة على جهازك وتعمل الآن.',
+  off: 'الأداة موجودة لكنها متوقفة. اضغط «تفعيل» (اتصال محلي عبر 127.0.0.1 فقط، لا يغادر شيء جهازك).',
+  missing: 'لم يُعثر على الأداة على جهازك. ثبّتها ثم اضغط «إعادة الكشف».'
 }
 // LanguageTool needs its switch too; Tesseract is used whenever it is detected
 const toolOn = (t: (typeof toolKeys)[number]): boolean =>
@@ -131,17 +134,29 @@ const toolOn = (t: (typeof toolKeys)[number]): boolean =>
           <div class="flex items-center justify-between">
             <b>{{ r.name }}</b>
             <span
-              class="rounded px-2 py-0.5 text-xs text-white"
-              :class="STATUS_BG[resourceStatus(r)]"
-              :data-status="resourceStatus(r)"
-              data-testid="resource-state"
+              class="inline-flex items-center gap-1 rounded px-2 py-0.5 text-xs text-white"
+              :class="resourceState(r).bg"
+              :title="resourceState(r).tip"
+              :data-status="resourceState(r).state"
+              data-testid="resource-chip"
             >
-              {{ STATUS_LABEL[resourceStatus(r)] }}
+              <span aria-hidden="true" data-testid="resource-state-icon">{{
+                resourceState(r).icon
+              }}</span>
+              <span data-testid="resource-state">{{ resourceState(r).label }}</span>
             </span>
           </div>
           <p class="text-xs text-slate-500">
-            {{ RESOURCE_KIND_LABEL[r.kind] ?? r.kind }} — الحجم: {{ formatBytes(r.size) }} —
-            الترخيص:
+            {{ RESOURCE_KIND_LABEL[r.kind] ?? r.kind }} —
+            <template v-if="r.installed">
+              الحجم على القرص:
+              <span data-testid="resource-size">{{ formatBytes(r.installed_size) }}</span>
+            </template>
+            <template v-else>
+              حجم التنزيل:
+              <span data-testid="resource-size">{{ formatBytes(r.download_size ?? r.size) }}</span>
+            </template>
+            — الترخيص:
             <button
               class="text-mizaj-emerald underline"
               dir="ltr"
@@ -191,38 +206,107 @@ const toolOn = (t: (typeof toolKeys)[number]): boolean =>
             </button>
           </div>
           <p
-            v-else-if="r.job && r.job.status === 'failed'"
+            v-else-if="r.job && (r.job.status === 'failed' || r.job.status === 'paused')"
             class="text-xs text-red-500"
             data-testid="resource-error"
           >
             {{ r.job.error?.message_ar ?? 'فشل التنزيل. أعد المحاولة لاحقاً.' }}
           </p>
 
-          <label class="flex items-center gap-2 text-xs">
-            <input v-model="accepted[r.id]" type="checkbox" data-testid="resource-accept" />
-            قرأت الترخيص ({{ r.license }}) وأقبل شروطه
-          </label>
-          <div class="flex flex-wrap gap-2">
-            <button
-              v-if="!r.requires_user_file"
-              :class="btn"
-              :disabled="!accepted[r.id] || !isOn('online_resources') || jobActive(r.job)"
-              :title="!isOn('online_resources') ? 'فعّل تنزيل الموارد أولاً' : ''"
-              data-testid="resource-download"
-              @click="online.download(r.id, !!accepted[r.id])"
+          <!-- installed: never a download button again -->
+          <template v-if="r.installed && !jobActive(r.job)">
+            <label v-if="r.update_available" class="flex items-center gap-2 text-xs">
+              <input v-model="accepted[r.id]" type="checkbox" data-testid="resource-accept" />
+              قرأت الترخيص ({{ r.license }}) وأقبل شروطه
+            </label>
+            <div class="flex flex-wrap gap-2">
+              <button
+                v-if="r.enabled === false"
+                :class="btn"
+                data-testid="resource-enable"
+                @click="online.setEnabled(r.id, true)"
+              >
+                تفعيل
+              </button>
+              <button
+                v-else
+                :class="btn"
+                data-testid="resource-disable"
+                @click="online.setEnabled(r.id, false)"
+              >
+                إيقاف
+              </button>
+              <button
+                v-if="r.update_available"
+                :class="btn"
+                :disabled="!accepted[r.id] || !isOn('online_resources')"
+                :title="
+                  !isOn('online_resources')
+                    ? 'فعّل تنزيل الموارد أولاً'
+                    : 'يتوفر إصدار أحدث في الكتالوج'
+                "
+                data-testid="resource-update"
+                @click="online.download(r.id, !!accepted[r.id])"
+              >
+                تحديث
+              </button>
+              <button
+                v-if="confirming !== r.id"
+                :class="btn"
+                data-testid="resource-uninstall"
+                @click="confirming = r.id"
+              >
+                إلغاء التثبيت
+              </button>
+            </div>
+            <div
+              v-if="confirming === r.id"
+              class="flex flex-wrap items-center gap-2 rounded bg-red-50 p-2 text-xs text-red-800 dark:bg-red-900/30 dark:text-red-200"
+              role="alertdialog"
+              data-testid="resource-uninstall-confirm"
             >
-              تنزيل
-            </button>
-            <button
-              :class="btn"
-              :disabled="!accepted[r.id]"
-              data-testid="resource-import"
-              @click="online.importFile(r.id, !!accepted[r.id])"
-            >
-              استيراد من ملف
-            </button>
-          </div>
-          <p v-if="r.requires_user_file" class="text-xs text-slate-500">
+              <span>
+                سيُحذف «{{ r.name }}» من جهازك ويُحرَّر {{ formatBytes(r.installed_size) }}. متابعة؟
+              </span>
+              <button
+                :class="btn"
+                data-testid="resource-uninstall-yes"
+                @click="(confirming = null), online.uninstall(r.id)"
+              >
+                نعم، احذف
+              </button>
+              <button :class="btn" data-testid="resource-uninstall-no" @click="confirming = null">
+                تراجع
+              </button>
+            </div>
+          </template>
+          <template v-else-if="!jobActive(r.job)">
+            <label class="flex items-center gap-2 text-xs">
+              <input v-model="accepted[r.id]" type="checkbox" data-testid="resource-accept" />
+              قرأت الترخيص ({{ r.license }}) وأقبل شروطه
+            </label>
+            <div class="flex flex-wrap gap-2">
+              <button
+                v-if="!r.requires_user_file"
+                :class="btn"
+                :disabled="!accepted[r.id] || !isOn('online_resources')"
+                :title="!isOn('online_resources') ? 'فعّل تنزيل الموارد أولاً' : ''"
+                data-testid="resource-download"
+                @click="online.download(r.id, !!accepted[r.id])"
+              >
+                {{ resourceState(r).state === 'error' ? 'إعادة المحاولة' : 'تنزيل' }}
+              </button>
+              <button
+                :class="btn"
+                :disabled="!accepted[r.id]"
+                data-testid="resource-import"
+                @click="online.importFile(r.id, !!accepted[r.id])"
+              >
+                استيراد من ملف
+              </button>
+            </div>
+          </template>
+          <p v-if="r.requires_user_file && !r.installed" class="text-xs text-slate-500">
             لا يوجد اختزال مثبّت لهذا المورد؛ نزّله بنفسك من موقعه ثم استورده من ملف.
           </p>
         </li>
@@ -261,6 +345,7 @@ const toolOn = (t: (typeof toolKeys)[number]): boolean =>
             <span
               class="rounded px-2 py-0.5 text-xs text-white"
               :class="STATUS_BG[toolStatus(online.tools?.[t].detected, toolOn(t))]"
+              :title="TOOL_TIP[toolStatus(online.tools?.[t].detected, toolOn(t))]"
               :data-testid="`tool-${t}-state`"
             >
               {{
@@ -268,6 +353,18 @@ const toolOn = (t: (typeof toolKeys)[number]): boolean =>
               }}
             </span>
           </div>
+          <button
+            v-if="
+              t === 'languagetool' &&
+              online.tools?.languagetool.detected &&
+              !isOn('online_languagetool')
+            "
+            :class="btn"
+            data-testid="tool-languagetool-enable"
+            @click="online.setSwitch('online_languagetool', true)"
+          >
+            تفعيل
+          </button>
           <template v-if="online.tools && !online.tools[t].detected">
             <p class="text-xs text-slate-500">{{ TOOL_INFO[t].install }}</p>
             <p

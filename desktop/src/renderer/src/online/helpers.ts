@@ -43,13 +43,22 @@ export interface Resource {
   notice_ar?: string
   requires?: string[]
   requires_user_file: boolean
-  installed: { path: string; sha256: string; source: string } | null
+  installed: { path: string; sha256: string; source: string; enabled?: boolean } | null
+  /** installed AND switched on (the backend auto-enables local, private resources) */
+  enabled?: boolean
+  /** bytes on disk (installed items) / bytes to download (others, null when unknown) */
+  installed_size?: number | null
+  download_size?: number | null
+  /** the catalog pins a different hash than the installed one */
+  update_available?: boolean
   job: ResourceJob | null
 }
 
 export interface ResourceJob {
   id: string
-  status: 'queued' | 'running' | 'done' | 'cancelled' | 'failed'
+  status: 'queued' | 'running' | 'paused' | 'done' | 'cancelled' | 'failed'
+  /** "installing" while an archive is being unpacked after the download */
+  phase?: 'downloading' | 'installing'
   bytes_done: number
   bytes_total: number | null
   error?: { message_ar?: string; error_code?: string }
@@ -67,6 +76,87 @@ export function jobPercent(
 ): number | null {
   if (!j || !j.bytes_total) return null
   return Math.min(100, Math.round((j.bytes_done / j.bytes_total) * 100))
+}
+
+const AR_DIGITS = '٠١٢٣٤٥٦٧٨٩'
+export const arDigits = (n: number): string => String(n).replace(/\d/g, (d) => AR_DIGITS[Number(d)])
+
+export type ResourceState =
+  | 'missing'
+  | 'downloading'
+  | 'installing'
+  | 'enabled'
+  | 'disabled'
+  | 'error'
+
+export interface ResourceStateInfo {
+  state: ResourceState
+  /** chip text (one label per state) */
+  label: string
+  icon: string
+  /** Tailwind background class of the chip */
+  bg: string
+  /** tooltip: what this state means and what to do */
+  tip: string
+}
+
+type StateInput = Pick<Resource, 'installed' | 'job'> & { enabled?: boolean }
+
+/** The one place that turns the backend listing item into a state, label, colour and tooltip. */
+export function resourceState(r: StateInput): ResourceStateInfo {
+  const j = r.job
+  if (jobActive(j)) {
+    if (j!.phase === 'installing')
+      return {
+        state: 'installing',
+        label: 'جارٍ التثبيت…',
+        icon: '⚙',
+        bg: 'bg-sky-700',
+        tip: 'اكتمل التنزيل وجارٍ فك الضغط والتحقق من الملفات. لا تُغلق التطبيق.'
+      }
+    const pct = jobPercent(j)
+    return {
+      state: 'downloading',
+      label: pct === null ? 'جارٍ التنزيل…' : `جارٍ التنزيل… ${arDigits(pct)}٪`,
+      icon: '⬇',
+      bg: 'bg-sky-700',
+      tip: 'يجري تنزيل الملف والتحقق من سلامته (SHA-256). يمكنك إلغاء التنزيل في أي وقت.'
+    }
+  }
+  if (r.installed) {
+    if (r.enabled === false)
+      return {
+        state: 'disabled',
+        label: 'مثبّت — غير مفعّل',
+        icon: '⏸',
+        bg: 'bg-amber-700',
+        tip: 'الملفات موجودة على جهازك لكن المورد متوقف ولا يستخدمه التطبيق. اضغط «تفعيل» ليبدأ العمل.'
+      }
+    return {
+      state: 'enabled',
+      label: 'مثبّت ومفعّل ✓',
+      icon: '✓',
+      bg: 'bg-emerald-700',
+      tip: 'مثبّت على جهازك ويعمل الآن. لا حاجة لتنزيله مرة أخرى.'
+    }
+  }
+  if (j && (j.status === 'failed' || j.status === 'paused')) {
+    const msg = j.error?.message_ar ?? (j.status === 'paused' ? 'انقطع التنزيل' : 'فشل التنزيل')
+    return {
+      state: 'error',
+      label: `خطأ: ${msg}`,
+      icon: '⚠',
+      bg: 'bg-red-700',
+      tip: 'لم يكتمل التنزيل أو التثبيت. اضغط «إعادة المحاولة» (يُكمل التنزيل من حيث توقف).'
+    }
+  }
+  return {
+    state: 'missing',
+    label: 'غير مثبّت',
+    icon: '○',
+    bg: 'bg-slate-600',
+    tip: 'غير موجود على جهازك. نزّله من الأسفل بعد قبول الترخيص.'
+  }
 }
 
 export const jobActive = (j: ResourceJob | null): boolean =>

@@ -123,23 +123,15 @@ export const featureOf = (resourceId: string): FeatureId | null =>
 export const locationText = (id: FeatureId): string => `تجده الآن في: ${FEATURES[id].where}`
 
 export type FeatureStatus = 'running' | 'enabled' | 'off' | 'missing'
+/** Local tools (Tesseract / LanguageTool). Catalog resources use `resourceState` (online/helpers). */
 export const STATUS_LABEL: Record<FeatureStatus, string> = {
-  running: 'يعمل',
-  enabled: 'مفعّل',
-  off: 'مثبّت وغير مفعّل',
+  running: 'مثبّت ومفعّل ✓',
+  enabled: 'مثبّت ومفعّل ✓',
+  off: 'مثبّت — غير مفعّل',
   missing: 'غير مثبّت'
 }
 
-/** Catalog resource: downloading -> يعمل, installed -> مفعّل, otherwise غير مثبّت. */
-export function resourceStatus(r: {
-  installed: unknown
-  job: { status: string } | null
-}): FeatureStatus {
-  if (r.job && (r.job.status === 'queued' || r.job.status === 'running')) return 'running'
-  return r.installed ? 'enabled' : 'missing'
-}
-
-/** Local tool: not detected -> غير مثبّت; detected and switched on -> يعمل; detected but off. */
+/** Local tool: not detected -> غير مثبّت; detected and switched on -> مفعّل; detected but off. */
 export function toolStatus(detected: boolean | undefined, on: boolean): FeatureStatus {
   if (!detected) return 'missing'
   return on ? 'running' : 'off'
