@@ -13,6 +13,8 @@
  *   - insertText 'Replace': new text takes the formatting of the first replaced character;
  *   - insertText 'End' / 'Start': new text takes the formatting of the last / first character of
  *     the range and the range grows to include it; OTHER ranges ending at that point do not grow;
+ *   - spec.skipWhitespaceInWildcard: '?' does not return whitespace characters at all;
+ *   - getRange('Before'|'After'|'Start'|'End') gives a collapsed point, expandTo joins two of them;
  *   - search('?', {matchWildcards:true}) returns one range per character of the range, or, with
  *     spec.clusterMarks (what real Word does), one per letter together with its diacritics.
  *
@@ -116,11 +118,38 @@ function createFakeWord(spec) {
       return this._paras
     }
     getRange(loc) {
-      if (loc === 'Start' || loc === 'End') {
+      if (loc === 'Start' || loc === 'End' || loc === 'Before' || loc === 'After') {
+        // a collapsed point anchored to the first / last cell of this range
         const r = new Range(this.ctx, this.sp, null, this.sp, null)
+        if (this.sid != null) {
+          const first = loc === 'Start' || loc === 'Before'
+          r.pt = { pi: first ? this.sp : this.ep, id: first ? this.sid : this.eid, before: first }
+        }
         return r
       }
       return this
+    }
+    _bounds() {
+      // [start, end) cell offsets inside one paragraph
+      if (this.pt) {
+        const i = idx(this.pt.pi, this.pt.id)
+        if (i < 0) fail('range boundary vanished')
+        const p = this.pt.before ? i : i + 1
+        return { pi: this.pt.pi, s: p, e: p }
+      }
+      if (this.sid == null) fail('fake: expandTo on an empty range')
+      if (this.sp !== this.ep) fail('fake: multi-paragraph expandTo')
+      return { pi: this.sp, s: idx(this.sp, this.sid), e: idx(this.sp, this.eid) + 1 }
+    }
+    expandTo(o) {
+      const x = this._bounds()
+      const y = o._bounds()
+      if (x.pi !== y.pi) fail('fake: expandTo across paragraphs')
+      const s = Math.min(x.s, y.s)
+      const e = Math.max(x.e, y.e)
+      const cs = paras[x.pi].cells
+      if (e <= s) return new Range(this.ctx, x.pi, null, x.pi, null)
+      return new Range(this.ctx, x.pi, cs[s].id, x.pi, cs[e - 1].id)
     }
     intersectWith(o) {
       // absolute positions (paragraph, cell index)
@@ -146,6 +175,9 @@ function createFakeWord(spec) {
           const a = pi === this.sp ? idx(pi, this.sid) : 0
           const b = pi === this.ep ? idx(pi, this.eid) : cs.length - 1
           for (let i = a; i <= b; i++) {
+            // real Word may not return spaces / tabs / NBSP for '?'
+            if (spec.dropChars && spec.dropChars.includes(cs[i].ch)) continue
+            if (spec.skipWhitespaceInWildcard && /\s/.test(cs[i].ch)) continue
             // real Word returns an Arabic letter TOGETHER with its diacritics as one match
             let j = i
             if (spec.clusterMarks)

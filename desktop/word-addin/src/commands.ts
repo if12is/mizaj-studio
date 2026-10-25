@@ -1,6 +1,7 @@
 import type { OpId } from './api'
 import { createBoot, loadOffice, readPairing, registerServiceWorker } from './boot'
-import { messageOf } from './run'
+import { diagForUrl, type Diagnostics } from './diag'
+import { diagnosticsOfError, messageOf } from './run'
 
 /**
  * Function file of the ribbon: the four buttons run one operation on the selection straight away
@@ -30,7 +31,7 @@ interface DialogApi {
   ): void
 }
 
-function notify(text: string, error: boolean): void {
+function notify(text: string, error: boolean, d: Diagnostics | null = null): void {
   const el = document.getElementById('status')
   if (el) el.textContent = text
   try {
@@ -38,7 +39,7 @@ function notify(text: string, error: boolean): void {
       context?: { ui?: DialogApi }
       EventType?: { DialogMessageReceived: unknown }
     }
-    const url = `${location.origin}/message.html?e=${error ? 1 : 0}&m=${encodeURIComponent(text)}`
+    const url = `${location.origin}/message.html?e=${error ? 1 : 0}&m=${encodeURIComponent(text)}${d ? `&d=${encodeURIComponent(diagForUrl(d))}` : ''}`
     ui.context?.ui?.displayDialogAsync(
       url,
       { height: 22, width: 28, displayInIframe: true },
@@ -59,9 +60,13 @@ void loadOffice()
       office.actions?.associate(fn, async (event: Event) => {
         try {
           const { outcome } = await boot.runner.runDirect(op)
-          notify(outcome.messages.join(' '), outcome.report.verifyFailed)
+          notify(
+            outcome.messages.join(' '),
+            outcome.report.verifyFailed || outcome.report.unmapped > 0,
+            outcome.diagnostics
+          )
         } catch (e) {
-          notify(messageOf(e), true)
+          notify(messageOf(e), true, diagnosticsOfError(op, e))
         }
         event.completed()
       })

@@ -1,7 +1,8 @@
 import type { OpId } from './api'
 import { AddinApiError, APP_DOWN_AR } from './api'
 import { createBoot, loadOffice, readPairing, registerServiceWorker, type Boot } from './boot'
-import { OP_LABEL_AR, messageOf, type Preview } from './run'
+import { copyText, diagJson, type Diagnostics } from './diag'
+import { OP_LABEL_AR, diagnosticsOfError, messageOf, type Preview } from './run'
 import './style.css'
 
 /**
@@ -16,6 +17,12 @@ registerServiceWorker()
 let boot: Boot | null = null
 let current: Preview | null = null
 let busy = false
+let diag: Diagnostics | null = null
+
+function setDiag(d: Diagnostics | null): void {
+  diag = d
+  $<HTMLButtonElement>('copy-diag').hidden = !d
+}
 
 function setStatus(text: string, error = false): void {
   const s = $('status')
@@ -93,11 +100,13 @@ async function startOp(op: OpId): Promise<void> {
   current = null
   setStatus('جارٍ المعالجة…')
   try {
+    setDiag(null)
     current = await boot.runner.preview(op)
     renderPreview(current)
     setStatus(current.changed ? 'راجع التغييرات ثم اضغط «استبدال».' : '')
   } catch (e) {
     $('result').hidden = true
+    setDiag(diagnosticsOfError(op, e))
     setStatus(messageOf(e), true)
     if (e instanceof AddinApiError && e.code === 'app_down') setConn('down')
   } finally {
@@ -112,10 +121,12 @@ async function doApply(): Promise<void> {
   setStatus('جارٍ الاستبدال…')
   try {
     const out = await boot.runner.apply(current)
-    setStatus(out.messages.join(' '), out.report.verifyFailed)
+    setDiag(out.diagnostics)
+    setStatus(out.messages.join(' '), out.report.verifyFailed || out.report.unmapped > 0)
     current = null
     $('result').hidden = true
   } catch (e) {
+    setDiag(diagnosticsOfError(current?.op ?? 'all', e))
     setStatus(messageOf(e), true)
   } finally {
     setBusy(false)
@@ -133,6 +144,12 @@ for (const b of document.querySelectorAll<HTMLButtonElement>('.mz-ops button'))
   b.addEventListener('click', () => void startOp(b.dataset.op as OpId))
 $('apply').addEventListener('click', () => void doApply())
 $('cancel').addEventListener('click', cancel)
+$('copy-diag').addEventListener('click', () => {
+  if (!diag) return
+  void copyText(diagJson(diag)).then((ok) =>
+    setStatus(ok ? 'نُسخت التفاصيل (أرقام فقط، دون نص مستندك).' : 'تعذّر النسخ.')
+  )
+})
 
 void loadOffice()
   .then((office) => {

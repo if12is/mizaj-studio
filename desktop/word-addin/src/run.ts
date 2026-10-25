@@ -5,6 +5,8 @@ import {
   type TextEdit
 } from '../../src/main/systemwide/textDiff'
 import { AddinApiError, type Api, type OpId, type ProcessResponse } from './api'
+import { failCode } from './align'
+import { diagnosticsFromMessage, diagnosticsFromReport, type Diagnostics } from './diag'
 import { applyParagraphEdits, type ApplyReport } from './apply'
 import { SKIP_REASON_AR, type SkipReason } from './plan'
 import { readSelection } from './selection'
@@ -45,6 +47,7 @@ export interface ApplyOutcome {
   report: ApplyReport
   /** Arabic status lines for the user */
   messages: string[]
+  diagnostics: Diagnostics | null
 }
 
 export interface RunnerDeps {
@@ -133,8 +136,16 @@ export class Runner {
     this.requireSupport()
     if (!p.changed)
       return {
-        report: { edited: 0, unmapped: 0, tooLarge: 0, verifyFailed: false },
-        messages: ['لا توجد تغييرات: النص سليم كما هو.']
+        report: {
+          edited: 0,
+          unmapped: 0,
+          tooLarge: 0,
+          verifyFailed: false,
+          failures: [],
+          verifyCodes: []
+        },
+        messages: ['لا توجد تغييرات: النص سليم كما هو.'],
+        diagnostics: null
       }
     const report = await this.d.host.run(async (ctx) => {
       const read = await readSelection(ctx)
@@ -158,14 +169,16 @@ export class Runner {
       )
     messages.push(...skippedNotes(p.skipped))
     if (report.unmapped)
-      messages.push(`تعذّر مطابقة حروف ${report.unmapped} فقرة مع Word، فتُركت دون تغيير.`)
+      messages.push(
+        `تعذّر مطابقة حروف ${report.unmapped} فقرة مع Word، فتُركت دون تغيير. رمز: ${report.failures[0] ? failCode(report.failures[0]) : 'map'}`
+      )
     if (report.tooLarge)
       messages.push(`التحديد كبير: تُركت ${report.tooLarge} فقرة. حدّد جزءاً أصغر وأعد المحاولة.`)
     if (report.verifyFailed)
       messages.push(
-        'تنبيه: لم يطابق النص بعد التعديل ما كان متوقعاً. اضغط Ctrl+Z في Word للتراجع وأبلغ عن المشكلة.'
+        `تنبيه: لم يطابق النص بعد التعديل ما كان متوقعاً. اضغط Ctrl+Z في Word للتراجع وأبلغ عن المشكلة. رمز: ${report.verifyCodes[0] ?? 'verify'}`
       )
-    return { report, messages }
+    return { report, messages, diagnostics: diagnosticsFromReport(p.op, report) }
   }
 
   /** The ribbon buttons: preview and replace in one go. */
@@ -180,4 +193,11 @@ export class Runner {
 export function messageOf(e: unknown): string {
   if (e instanceof RunError || e instanceof AddinApiError) return e.messageAr
   return 'تعذّر تنفيذ العملية في Word. لم يُغيَّر النص.'
+}
+
+/** Copyable diagnostics for an error (only the technical code the server / runner put in the message). */
+export function diagnosticsOfError(op: string, e: unknown): Diagnostics | null {
+  if (e instanceof RunError || e instanceof AddinApiError)
+    return diagnosticsFromMessage(op, e.messageAr)
+  return null
 }

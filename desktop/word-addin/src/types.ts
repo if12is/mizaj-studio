@@ -14,7 +14,8 @@ export interface WCollection<T> {
 export interface WRange {
   text: string
   load(props?: string): WRange
-  getRange(location?: 'Whole' | 'Start' | 'End' | 'After' | 'Content'): WRange
+  getRange(location?: 'Whole' | 'Start' | 'End' | 'Before' | 'After' | 'Content'): WRange
+  expandTo(range: WRange): WRange
   intersectWith(range: WRange): WRange
   search(
     text: string,

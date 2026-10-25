@@ -1,10 +1,12 @@
 import {
   MAX_SELECTION_CHARS,
+  PipelineError,
   OP_IDS,
   WARNING_AR,
   runOp,
   type OpId,
-  type PipelineDeps
+  type PipelineDeps,
+  type PipelineResult
 } from '../systemwide/pipeline'
 import {
   applyEdits,
@@ -97,6 +99,23 @@ export function splitEditsByParagraph(
   return out
 }
 
+const cp = (c: string | undefined): string =>
+  c === undefined ? '-' : 'U+' + (c.codePointAt(0) ?? 0).toString(16).toUpperCase().padStart(4, '0')
+
+/**
+ * Per-paragraph edits when the processed text still has one line per paragraph: each paragraph is
+ * diffed against its own line, so no edit can ever touch a separator. Null when the line count
+ * changed (the engine merged or split lines).
+ */
+export function editsByLines(
+  paragraphs: readonly string[],
+  processed: string
+): TextEdit[][] | null {
+  const lines = processed.split('\n')
+  if (lines.length !== paragraphs.length) return null
+  return paragraphs.map((p, i) => diffText(p, lines[i]))
+}
+
 export async function processParagraphs(
   req: ProcessRequest,
   deps: PipelineDeps
@@ -104,22 +123,80 @@ export async function processParagraphs(
   const joined = req.paragraphs.join('\n')
   const r = await runOp(req.op, joined, deps)
   const edits = diffText(joined, r.text)
-  const per = splitEditsByParagraph(req.paragraphs, edits)
-  if (!per)
+  let per = splitEditsByParagraph(req.paragraphs, edits)
+  let segments = edits.length ? previewSegments(joined, r.text) : []
+  let changed = edits.length > 0
+  if (!per) {
+    // an edit crossed a paragraph separator (e.g. the diff paired whitespace around a line break):
+    // diff line by line instead; that is exact whenever the engine kept the line count
+    per = editsByLines(req.paragraphs, r.text)
+    if (per) {
+      changed = per.some((l) => l.length > 0)
+      segments = changed ? previewSegments(joined, r.text) : []
+    }
+  }
+  if (!per) {
+    // the engine changed the line count: process every paragraph on its own (only code points are
+    // ever reported, never text)
+    const parts: PipelineResult[] = []
+    for (const p of req.paragraphs) {
+      if (/\S/.test(p)) {
+        try {
+          parts.push(await runOp(req.op, p, deps))
+          continue
+        } catch (e) {
+          if (!(e instanceof PipelineError) || e.code !== 'no_arabic') throw e
+        }
+      }
+      parts.push({
+        text: p,
+        warnings: [],
+        applied: { proofread: 0, punctuation: 0 },
+        tashkeelRan: false
+      })
+    }
+    per = req.paragraphs.map((p, i) => diffText(p, parts[i].text))
+    changed = per.some((l) => l.length > 0)
+    const out = parts.map((x) => x.text)
+    segments = changed ? previewSegments(req.paragraphs.join('\n'), out.join('\n')) : []
+    const sum = (f: (x: PipelineResult) => number): number => parts.reduce((n, x) => n + f(x), 0)
+    return {
+      ok: true,
+      changed,
+      edits: per,
+      segments,
+      warnings: [...new Set(parts.flatMap((x) => x.warnings))].map((w) => WARNING_AR[w]),
+      applied: {
+        proofread: sum((x) => x.applied.proofread),
+        punctuation: sum((x) => x.applied.punctuation)
+      },
+      tashkeelRan: parts.some((x) => x.tashkeelRan)
+    }
+  }
+  // defence in depth: the edits must reproduce exactly the processed text
+  const rebuilt = per.map((l, i) => applyEdits(req.paragraphs[i], l))
+  const expected = rebuilt.join('\n')
+  if (expected !== r.text) {
+    const at = firstDiff(expected, r.text)
     throw new ProcessError(
       'unmappable',
-      'تعذّر تطبيق النتيجة داخل فقرات Word دون المساس بتنسيقها. لم يُغيَّر النص.'
+      `تعذّر التحقق من نتيجة المعالجة. لم يُغيَّر النص. رمز: verify paras=${req.paragraphs.length} len=${joined.length} firstDiff=@${at} ${cp(expected[at])}/${cp(r.text[at])}`
     )
-  // defence in depth: the edits must reproduce exactly the processed text
-  if (applyEdits(joined, edits) !== r.text)
-    throw new ProcessError('unmappable', 'تعذّر التحقق من نتيجة المعالجة. لم يُغيَّر النص.')
+  }
   return {
     ok: true,
-    changed: edits.length > 0,
+    changed,
     edits: per,
-    segments: edits.length ? previewSegments(joined, r.text) : [],
+    segments,
     warnings: r.warnings.map((w) => WARNING_AR[w]),
     applied: r.applied,
     tashkeelRan: r.tashkeelRan
   }
+}
+
+function firstDiff(a: string, b: string): number {
+  const n = Math.min(a.length, b.length)
+  let i = 0
+  while (i < n && a[i] === b[i]) i++
+  return i
 }
