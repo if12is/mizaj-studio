@@ -64,7 +64,7 @@ def ocr_image_file(binary: str, image: Path, lang: str, timeout: int = 180) -> d
         proc = subprocess.run(
             tesseract_cmd(binary, image, lang),
             capture_output=True, timeout=timeout, check=False, shell=False,
-            stdin=subprocess.DEVNULL, env=_child_env(),
+            stdin=subprocess.DEVNULL, env=discovery.tesseract_env(binary),
             creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
         )  # fmt: skip
     except (OSError, subprocess.SubprocessError) as exc:

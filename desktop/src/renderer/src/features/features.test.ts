@@ -7,7 +7,6 @@ import {
   STATUS_LABEL,
   featureOf,
   locationText,
-  resourceStatus,
   toolStatus
 } from './registry'
 import {
@@ -66,20 +65,14 @@ describe('feature registry', () => {
 })
 
 describe('status labels', () => {
-  it('resources: downloading, installed, missing', () => {
-    expect(STATUS_LABEL[resourceStatus({ installed: null, job: null })]).toBe('غير مثبّت')
-    expect(STATUS_LABEL[resourceStatus({ installed: {}, job: null })]).toBe('مفعّل')
-    expect(STATUS_LABEL[resourceStatus({ installed: null, job: { status: 'running' } })]).toBe(
-      'يعمل'
-    )
-    expect(resourceStatus({ installed: {}, job: { status: 'done' } })).toBe('enabled')
-    expect(resourceStatus({ installed: null, job: { status: 'failed' } })).toBe('missing')
-  })
   it('tools', () => {
     expect(toolStatus(false, true)).toBe('missing')
     expect(toolStatus(undefined, true)).toBe('missing')
     expect(toolStatus(true, true)).toBe('running')
     expect(toolStatus(true, false)).toBe('off')
+    expect(STATUS_LABEL.off).toBe('مثبّت — غير مفعّل')
+    expect(STATUS_LABEL.running).toBe('مثبّت ومفعّل ✓')
+    expect(STATUS_LABEL.missing).toBe('غير مثبّت')
   })
 })
 

@@ -87,6 +87,9 @@ test('resources list shows a clear status for every item', async () => {
   await expect(states.first()).toBeVisible()
   const texts = await states.allTextContents()
   expect(texts.length).toBeGreaterThan(0)
-  for (const s of texts) expect(['مفعّل', 'غير مثبّت', 'يعمل']).toContain(s.trim())
-  await expect(t('tool-tesseract-state')).toHaveText(/غير مثبّت|يعمل/)
+  for (const s of texts)
+    expect(s.trim()).toMatch(
+      /^(غير مثبّت|جارٍ التنزيل…|جارٍ التثبيت…|مثبّت ومفعّل ✓|مثبّت — غير مفعّل|خطأ: )/
+    )
+  await expect(t('tool-tesseract-state')).toHaveText(/غير مثبّت|مثبّت/)
 })

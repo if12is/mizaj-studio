@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Request, Response
 from pydantic import BaseModel
 
 from app.core import security
@@ -15,6 +15,10 @@ router = APIRouter(tags=["resources"])
 
 class DownloadIn(BaseModel):
     accept_license: bool = False
+
+
+class EnabledIn(BaseModel):
+    enabled: bool
 
 
 class ImportIn(BaseModel):
@@ -30,11 +34,28 @@ async def list_resources(request: Request) -> dict[str, Any]:
 
 
 @router.post("/api/resources/{rid}/download", status_code=202)
-async def download(rid: str, body: DownloadIn, request: Request) -> dict[str, Any]:
+async def download(
+    rid: str, body: DownloadIn, request: Request, response: Response
+) -> dict[str, Any]:
+    r = manager.find(rid)
+    if manager.is_current(request.app.state.data_dir, r):
+        response.status_code = 200  # nothing to download: same pinned version is on disk
+        return {"already_installed": True, "message_ar": "مثبّت بالفعل", "job_id": None}
     job = manager.start_download(
         request.app.state.data_dir, request.app.state.db_path, rid, body.accept_license
     )
-    return {"job_id": job.id}
+    return {"already_installed": False, "job_id": job.id}
+
+
+@router.delete("/api/resources/{rid}")
+async def uninstall(rid: str, request: Request) -> dict[str, Any]:
+    return await run_blocking(manager.uninstall, request.app.state.data_dir, rid)
+
+
+@router.post("/api/resources/{rid}/enabled")
+async def set_enabled(rid: str, body: EnabledIn, request: Request) -> dict[str, Any]:
+    meta = await run_blocking(manager.set_enabled, request.app.state.data_dir, rid, body.enabled)
+    return {"id": rid, "enabled": meta["enabled"]}
 
 
 @router.get("/api/resources/jobs/{job_id}")

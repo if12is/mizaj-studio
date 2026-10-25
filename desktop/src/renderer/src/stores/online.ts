@@ -3,6 +3,7 @@ import { ref } from 'vue'
 import { useApi } from '@renderer/api'
 import { notify } from '@renderer/api/toast'
 import {
+  formatBytes,
   jobActive,
   onlineErrorText,
   type OnlineKey,
@@ -44,7 +45,10 @@ export const useOnlineStore = defineStore('online', () => {
     const f = featureOf(rid)
     if (!f) return
     if (f === 'readAloud') {
-      const ready = PIPER_IDS.every((id) => resources.value.find((r) => r.id === id)?.installed)
+      const ready = PIPER_IDS.every((id) => {
+        const x = resources.value.find((r) => r.id === id)
+        return x?.installed && x.enabled !== false
+      })
       if (!ready) return
     }
     announceFeature(f)
@@ -92,7 +96,9 @@ export const useOnlineStore = defineStore('online', () => {
           )
         else {
           await Promise.all([loadResources(), loadStatus()])
-          if (j.status === 'done') announceResource(rid)
+          // the backend auto-enables local/private resources; online ones stay opt-in
+          if (j.status === 'done' && resources.value.find((r) => r.id === rid)?.enabled)
+            announceResource(rid)
         }
       } catch {
         /* job vanished: refresh the list */
@@ -112,12 +118,17 @@ export const useOnlineStore = defineStore('online', () => {
       return
     }
     try {
-      const r = await useApi().request<{ job_id: string }>(
+      const r = await useApi().request<{ job_id: string | null; already_installed?: boolean }>(
         'POST',
         `/api/resources/${rid}/download`,
         { accept_license: true },
         true
       )
+      if (r.already_installed || !r.job_id) {
+        message.value = { ok: true, text: 'مثبّت بالفعل.' }
+        await loadResources()
+        return
+      }
       patchJob(rid, { id: r.job_id, status: 'queued', bytes_done: 0, bytes_total: null })
       watchJob(rid, r.job_id)
       await loadStatus()
@@ -134,6 +145,35 @@ export const useOnlineStore = defineStore('online', () => {
       )
     } catch {
       notify('تعذر إلغاء التنزيل.')
+    }
+  }
+
+  /** «تفعيل» / «إيقاف» for an installed resource. */
+  async function setEnabled(rid: string, on: boolean): Promise<void> {
+    message.value = null
+    try {
+      await useApi().request('POST', `/api/resources/${rid}/enabled`, { enabled: on }, true)
+      await loadResources()
+      if (on) announceResource(rid)
+    } catch (e) {
+      message.value = { ok: false, text: onlineErrorText(e) }
+    }
+  }
+
+  /** «إلغاء التثبيت»: deletes the files; the message says how much space was freed. */
+  async function uninstall(rid: string): Promise<void> {
+    message.value = null
+    try {
+      const r = await useApi().request<{ freed_bytes: number }>(
+        'DELETE',
+        `/api/resources/${rid}`,
+        undefined,
+        true
+      )
+      message.value = { ok: true, text: `تم إلغاء التثبيت وتحرير ${formatBytes(r.freed_bytes)}.` }
+      await loadResources()
+    } catch (e) {
+      message.value = { ok: false, text: onlineErrorText(e) }
     }
   }
 
@@ -177,6 +217,8 @@ export const useOnlineStore = defineStore('online', () => {
     refreshTools,
     download,
     cancel,
+    setEnabled,
+    uninstall,
     importFile,
     dispose
   }

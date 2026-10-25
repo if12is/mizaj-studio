@@ -12,6 +12,7 @@
 
 from __future__ import annotations
 
+import json
 import logging
 import os
 import shutil
@@ -54,6 +55,13 @@ def locate(data_dir: Path) -> dict[str, Path] | None:
     fake = fake_hook()
     if fake:
         return {"exe": Path(fake), "model": Path(fake), "config": Path(fake)}
+    for rid in (ENGINE_ID, VOICE_ID):  # «إيقاف» in the resources list switches Piper off
+        meta = _res(data_dir, rid) / "installed.json"
+        try:
+            if json.loads(meta.read_text(encoding="utf-8")).get("enabled", True) is False:
+                return None
+        except (OSError, ValueError, AttributeError):
+            pass
     exe = _res(data_dir, ENGINE_ID) / "piper" / "piper.exe"
     model = _res(data_dir, VOICE_ID) / VOICE_FILE
     config = model.with_name(VOICE_FILE + ".json")

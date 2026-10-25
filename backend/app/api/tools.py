@@ -23,8 +23,8 @@ async def online_status(request: Request) -> dict[str, Any]:
 
 
 @router.get("/api/tools")
-async def tools() -> dict[str, Any]:
-    return await run_blocking(discovery.detect_all)
+async def tools(request: Request) -> dict[str, Any]:
+    return await run_blocking(discovery.detect_all, request.app.state.data_dir)
 
 
 @router.post("/api/tools/languagetool/check")
