@@ -9,7 +9,7 @@ import { stripMarks } from '@renderer/editor/arabic'
 import { notify } from '@renderer/api/toast'
 import { recordEvent } from '@renderer/stores/history'
 import { EVENT_LABELS } from '@renderer/history/logic'
-import { renderMarkdown } from '@renderer/lib/safeMarkdown'
+import { hideSuggestionFence, renderMarkdown } from '@renderer/lib/safeMarkdown'
 
 type Req = Parameters<ReturnType<typeof useGeminiStore>['ask']>[0]
 
@@ -32,6 +32,14 @@ interface Turn {
   applied: boolean
   /** the document text changed since the previous question: context was re-sent */
   refreshed: boolean
+  /** request in flight (waiting for the first token or receiving text) */
+  streaming: boolean
+  streamId: string | null
+  /** seconds since the request started (shown while «يفكّر…») */
+  elapsed: number
+  /** the user pressed «إيقاف» */
+  stopped: boolean
+  usage: GeminiUsageDto | null
 }
 
 const editor = useEditorStore()
@@ -76,7 +84,12 @@ async function send(): Promise<void> {
     suggestion: null,
     sel: null,
     applied: false,
-    refreshed: false
+    refreshed: false,
+    streaming: false,
+    streamId: null,
+    elapsed: 0,
+    stopped: false,
+    usage: null
   }
   let req: Parameters<typeof gemini.ask>[0]
   if (scope.value === 'selection') {
@@ -124,15 +137,47 @@ function sentenceAround(
 
 const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms))
 
+/** shown answer: while streaming the machine-readable suggestion block is hidden */
+const shown = (t: Turn): string =>
+  t.streaming && t.answer !== null ? hideSuggestionFence(t.answer) : t.answer ?? ''
+
+function stop(t: Turn): void {
+  if (!t.streamId || !t.streaming) return
+  t.stopped = true
+  gemini.cancel(t.streamId)
+}
+
+function scrollIfNearBottom(): void {
+  const el = list.value
+  if (!el || el.scrollHeight - el.scrollTop - el.clientHeight > 120) return
+  void nextTick(() => el.scrollTo({ top: el.scrollHeight }))
+}
+
 async function run(id: number, req: Req, cont: boolean, retried = false): Promise<void> {
   busy.value = true
   const t = allTurns.value.find((x) => x.id === id)!
+  const prior = cont ? t.answer ?? '' : ''
+  const sep = /\s$/.test(prior) || !prior ? '' : ' '
+  let acc = ''
+  const started = Date.now()
+  t.streaming = true
+  t.stopped = false
+  t.elapsed = 0
+  t.error = null
+  const timer = setInterval(() => (t.elapsed = Math.floor((Date.now() - started) / 1000)), 1000)
   try {
-    const prior = cont ? t.answer ?? '' : ''
-    const r = await gemini.ask(cont ? ({ ...req, continueFrom: prior } as Req) : req)
+    const r = await gemini.ask(cont ? ({ ...req, continueFrom: prior } as Req) : req, {
+      onStart: (sid) => (t.streamId = sid),
+      onDelta: (d) => {
+        acc += d
+        if (acc.trim()) t.answer = cont ? `${prior}${sep}${acc}` : acc
+        scrollIfNearBottom()
+      }
+    })
+    t.streaming = false
     if (r.ok) {
       t.error = null
-      t.answer = cont ? `${prior}${/\s$/.test(prior) ? '' : ' '}${r.text}` : r.text || '(لا نص)'
+      t.answer = cont ? `${prior}${sep}${r.text}` : r.text || '(لا نص)'
       t.truncated = r.truncated
       if (r.contextRefreshed) t.refreshed = true
       if (docId.value) {
@@ -140,7 +185,12 @@ async function run(id: number, req: Req, cont: boolean, retried = false): Promis
         staleOnLoad.value = false
       }
       t.cutoff = r.cutoff
+      t.usage = r.usage
       if (!cont) t.suggestion = r.suggestion
+    } else if (r.code === 'aborted') {
+      // stopped by the user: keep what already arrived
+      t.stopped = true
+      if (t.answer !== null) t.answer = hideSuggestionFence(t.answer)
     } else if (r.retryAfterSec !== null && r.retryAfterSec <= 30 && !retried) {
       // quota with a short wait: count down, then retry once automatically
       for (let left = Math.ceil(r.retryAfterSec) + 1; left > 0; left--) {
@@ -148,10 +198,16 @@ async function run(id: number, req: Req, cont: boolean, retried = false): Promis
         await sleep(1000)
       }
       t.countdown = null
+      clearInterval(timer)
       await run(id, req, cont, true)
       return
-    } else t.error = r.message
+    } else {
+      t.error = r.message
+      if (t.answer !== null && !cont) t.answer = hideSuggestionFence(t.answer)
+    }
   } finally {
+    clearInterval(timer)
+    t.streaming = false
     busy.value = false
     await nextTick()
     list.value?.scrollTo({ top: list.value.scrollHeight })
@@ -180,7 +236,12 @@ async function loadSession(): Promise<void> {
     suggestion: null,
     sel: null,
     applied: false,
-    refreshed: false
+    refreshed: false,
+    streaming: false,
+    streamId: null,
+    elapsed: 0,
+    stopped: false,
+    usage: null
   }))
   // turns asked in this session (not yet in the store's copy) stay; the saved history replaces the rest
   if (!allTurns.value.some((t) => t.docId === id)) allTurns.value = [...allTurns.value, ...restored]
@@ -288,13 +349,42 @@ function apply(t: Turn): void {
           >
             تجاوزتَ حدّ الاستخدام؛ ستُعاد المحاولة تلقائياً بعد {{ t.countdown }} ثانية…
           </p>
-          <p v-else-if="t.answer === null && !t.error" class="text-slate-500">جاري الاستشارة...</p>
+          <div
+            v-else-if="t.streaming"
+            class="flex items-center gap-2"
+            data-testid="gemini-streaming"
+          >
+            <span
+              v-if="t.answer === null"
+              class="text-slate-500"
+              role="status"
+              data-testid="gemini-thinking"
+            >
+              يفكّر… {{ t.elapsed }} ث
+            </span>
+            <span v-else class="text-xs text-slate-500">يكتب… {{ t.elapsed }} ث</span>
+            <button
+              type="button"
+              class="rounded border px-3 py-1 hover:bg-slate-100 dark:border-slate-600 dark:hover:bg-slate-700"
+              data-testid="gemini-stop"
+              @click="stop(t)"
+            >
+              إيقاف
+            </button>
+          </div>
           <p
             v-if="t.refreshed"
             class="text-xs text-mizaj-amber"
             data-testid="gemini-context-refreshed"
           >
             تغيّر نص المستند، فجرى تحديث سياق المحادثة قبل هذه الإجابة.
+          </p>
+          <p
+            v-if="t.stopped && !t.streaming && t.answer === null"
+            class="text-xs text-slate-500"
+            data-testid="gemini-stopped"
+          >
+            أُوقف الطلب قبل وصول أي نص.
           </p>
           <p
             v-if="t.error"
@@ -312,8 +402,28 @@ function apply(t: Turn): void {
               class="gemini-md rounded border p-2 dark:border-slate-600"
               dir="rtl"
               data-testid="gemini-answer"
-              v-html="renderMarkdown(t.answer)"
+              v-html="renderMarkdown(shown(t))"
             ></div>
+            <p
+              v-if="t.stopped && !t.streaming"
+              class="text-xs text-slate-500"
+              data-testid="gemini-stopped"
+            >
+              أُوقف الطلب؛ هذا ما وصل قبل الإيقاف.
+            </p>
+            <p
+              v-if="t.usage && t.usage.totalTokens"
+              class="text-xs text-slate-500"
+              dir="rtl"
+              data-testid="gemini-usage"
+            >
+              الرموز: الإدخال {{ t.usage.promptTokens }} · الإخراج {{ t.usage.outputTokens
+              }}<template v-if="t.usage.thoughtsTokens">
+                · التفكير {{ t.usage.thoughtsTokens }}</template
+              ><template v-if="t.usage.cachedTokens">
+                · من الذاكرة المخبّأة {{ t.usage.cachedTokens }}</template
+              >
+            </p>
             <div v-if="t.cutoff" class="flex items-center gap-2" data-testid="gemini-cutoff">
               <span class="text-xs text-mizaj-amber">انقطعت الإجابة لطولها.</span>
               <button

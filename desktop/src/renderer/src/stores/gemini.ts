@@ -15,6 +15,16 @@ export interface GeminiAnswer {
   /** quota: seconds Google asked us to wait */
   retryAfterSec: number | null
   message: string | null
+  /** error code from the main process (e.g. 'aborted' after «إيقاف») */
+  code: string | null
+  usage: GeminiUsageDto | null
+}
+
+export interface AskHooks {
+  /** the stream id, available before the request finishes (needed for «إيقاف») */
+  onStart?: (id: string) => void
+  /** each visible text delta as it arrives */
+  onDelta?: (delta: string) => void
 }
 
 /**
@@ -64,15 +74,34 @@ export const useGeminiStore = defineStore('gemini', () => {
 
   async function saveKey(key: string): Promise<boolean> {
     message.value = null
-    const r = await api()?.saveKey(key)
-    if (!r) return false
-    if (!r.ok) {
-      message.value = { ok: false, text: r.message }
-      return false
+    busy.value = true
+    try {
+      const r = await api()?.saveKey(key)
+      if (!r) return false
+      if (!r.ok) {
+        message.value = { ok: false, text: r.message }
+        return false
+      }
+      state.value = r.state
+      if (r.check.ok && r.check.models) {
+        models.value = r.check.models
+        modelsSource.value = 'live'
+        message.value = {
+          ok: true,
+          text: `المفتاح صالح ✓ (${r.check.models.length} نموذجاً متاحاً)`
+        }
+        const cur = state.value.config.model
+        if (r.check.defaultModel && (!cur || !r.check.models.some((m) => m.id === cur)))
+          await setConfig({ model: r.check.defaultModel })
+      } else
+        message.value = {
+          ok: false,
+          text: `حُفظ المفتاح لكن تعذّر التحقق منه الآن: ${r.check.message ?? ''}`
+        }
+      return true
+    } finally {
+      busy.value = false
     }
-    state.value = r.state
-    await loadModels()
-    return true
   }
 
   async function clearKey(): Promise<void> {
@@ -92,7 +121,7 @@ export const useGeminiStore = defineStore('gemini', () => {
       if (r.ok) {
         models.value = r.models
         modelsSource.value = 'live'
-        message.value = { ok: true, text: `المفتاح صالح (${r.models.length} نموذجاً متاحاً).` }
+        message.value = { ok: true, text: `المفتاح صالح ✓ (${r.models.length} نموذجاً متاحاً)` }
         if (state.value?.hasKey) {
           const cur = state.value.config.model
           if (!cur || !r.models.some((m) => m.id === cur))
@@ -137,7 +166,12 @@ export const useGeminiStore = defineStore('gemini', () => {
     consentResolve = null
   }
 
-  async function ask(req: Req): Promise<GeminiAnswer> {
+  /** «إيقاف»: aborts the running request in the main process (cleanly). */
+  function cancel(id: string): void {
+    void api()?.cancel(id)
+  }
+
+  async function ask(req: Req, hooks: AskHooks = {}): Promise<GeminiAnswer> {
     const none: GeminiAnswer = {
       ok: false,
       text: '',
@@ -146,22 +180,36 @@ export const useGeminiStore = defineStore('gemini', () => {
       cutoff: false,
       contextRefreshed: false,
       retryAfterSec: null,
-      message: null
+      message: null,
+      code: null,
+      usage: null
     }
     if (!api()) return { ...none, message: 'هذه الميزة متاحة في تطبيق سطح المكتب فقط.' }
     if (!(await ensureConsent()))
       return { ...none, message: 'لم يُرسل شيء: لم تُوافق على الإشعار.' }
-    const r = await api()!.ask(req)
-    if (!r.ok) return { ...none, message: r.message, retryAfterSec: r.retryAfterSec ?? null }
-    return {
-      ok: true,
-      text: r.result.text,
-      suggestion: r.result.suggestion,
-      truncated: r.result.truncated,
-      cutoff: r.result.cutoff,
-      contextRefreshed: r.result.contextRefreshed,
-      retryAfterSec: null,
-      message: null
+    const id = `s${Date.now().toString(36)}${Math.random().toString(36).slice(2, 10)}`
+    const off = api()!.onChunk((m) => {
+      if (m.id === id) hooks.onDelta?.(m.delta)
+    })
+    hooks.onStart?.(id)
+    try {
+      const r = await api()!.ask(req, id)
+      if (!r.ok)
+        return { ...none, message: r.message, code: r.code, retryAfterSec: r.retryAfterSec ?? null }
+      return {
+        ok: true,
+        text: r.result.text,
+        suggestion: r.result.suggestion,
+        truncated: r.result.truncated,
+        cutoff: r.result.cutoff,
+        contextRefreshed: r.result.contextRefreshed,
+        retryAfterSec: null,
+        message: null,
+        code: null,
+        usage: r.result.usage ?? null
+      }
+    } finally {
+      off()
     }
   }
 
@@ -185,6 +233,7 @@ export const useGeminiStore = defineStore('gemini', () => {
     sessionReset,
     ensureConsent,
     answerConsent,
-    ask
+    ask,
+    cancel
   }
 })

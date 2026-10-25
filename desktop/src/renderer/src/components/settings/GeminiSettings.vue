@@ -74,7 +74,7 @@ async function test(): Promise<void> {
             dir="ltr"
             autocomplete="off"
             spellcheck="false"
-            placeholder="AIza…"
+            placeholder="الصق مفتاح API هنا"
             aria-label="مفتاح API"
             data-testid="gemini-key-input"
           />
@@ -89,7 +89,7 @@ async function test(): Promise<void> {
           <button
             :class="btn"
             data-testid="gemini-key-save"
-            :disabled="!keyInput.trim()"
+            :disabled="!keyInput.trim() || gemini.busy"
             @click="save"
           >
             حفظ المفتاح
@@ -107,7 +107,8 @@ async function test(): Promise<void> {
           </button>
         </div>
         <p class="text-xs text-slate-500">
-          يُحفظ المفتاح مشفّراً بمخزن النظام ولا يظهر في الواجهة ولا في السجلات.
+          يُحفظ المفتاح مشفّراً بمخزن النظام ولا يظهر في الواجهة ولا في السجلات. تختلف صيغ المفاتيح
+          (مثل AIza… أو AQ…) ولا نفرض صيغة معيّنة؛ بعد الحفظ يُختبر المفتاح مباشرة مع Google.
           <button class="underline" @click="openExternal('https://aistudio.google.com/apikey')">
             احصل على مفتاح
           </button>
@@ -134,6 +135,29 @@ async function test(): Promise<void> {
           >
             تحديث القائمة
           </button>
+        </label>
+        <label class="flex flex-wrap items-center gap-2">
+          مهلة الخمول (ثوانٍ):
+          <input
+            type="number"
+            min="15"
+            max="600"
+            step="5"
+            class="w-24 rounded border px-2 py-0.5 dark:border-slate-600 dark:bg-slate-800"
+            dir="ltr"
+            data-testid="gemini-idle-timeout"
+            aria-label="مهلة الخمول بالثواني"
+            :value="gemini.config?.idleTimeoutSec ?? 90"
+            @change="
+              gemini.setConfig({
+                idleTimeoutSec: Number(($event.target as HTMLInputElement).value) || 90
+              })
+            "
+          />
+          <span class="text-xs text-slate-500">
+            يُوقَف الطلب فقط إذا لم يصل أي شيء من Google خلال هذه المدة (الافتراضي 90)؛ لا حدّ
+            لإجمالي الوقت ما دام الرد يتدفق.
+          </span>
         </label>
         <p v-if="gemini.modelsSource === 'fallback'" class="text-xs text-mizaj-amber">
           تعذر الاتصال بـ Google؛ تُعرض قائمة احتياطية.

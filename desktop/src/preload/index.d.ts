@@ -37,6 +37,8 @@ declare global {
     enabled: boolean
     model: string
     consentAt: string | null
+    /** abort when no data arrives for this many seconds (no total cap) */
+    idleTimeoutSec: number
   }
   interface GeminiStateDto {
     config: GeminiConfigDto
@@ -51,7 +53,22 @@ declare global {
   type GeminiOutcome<T> =
     | ({ ok: true } & T)
     | { ok: false; code: string; message: string; retryAfterSec?: number }
+  interface GeminiUsageDto {
+    promptTokens: number
+    outputTokens: number
+    thoughtsTokens: number
+    cachedTokens: number
+    totalTokens: number
+  }
+  interface GeminiKeyCheckDto {
+    ok: boolean
+    message?: string
+    code?: string
+    models?: GeminiModelDto[]
+    defaultModel?: string
+  }
   interface GeminiAskResultDto {
+    usage: GeminiUsageDto
     text: string
     suggestion: string | null
     truncated: boolean
@@ -67,7 +84,9 @@ declare global {
     getState(): Promise<GeminiStateDto>
     setConfig(patch: Partial<Omit<GeminiConfigDto, 'consentAt'>>): Promise<GeminiStateDto>
     acceptConsent(): Promise<GeminiStateDto>
-    saveKey(key: string): Promise<GeminiOutcome<{ state: GeminiStateDto }>>
+    saveKey(
+      key: string
+    ): Promise<GeminiOutcome<{ state: GeminiStateDto; check: GeminiKeyCheckDto }>>
     clearKey(): Promise<GeminiStateDto>
     testKey(
       key?: string
@@ -77,6 +96,8 @@ declare global {
     >
     sessionGet(docId: number, text: string): Promise<GeminiOutcome<{ session: GeminiSessionDto }>>
     sessionReset(docId: number): Promise<GeminiOutcome<object>>
+    cancel(streamId: string): Promise<void>
+    onChunk(cb: (m: { id: string; delta: string }) => void): () => void
     ask(
       req:
         | {
@@ -95,7 +116,8 @@ declare global {
             docId?: number
             docText?: string
             continueFrom?: string
-          }
+          },
+      streamId?: string
     ): Promise<GeminiOutcome<{ result: GeminiAskResultDto }>>
   }
 

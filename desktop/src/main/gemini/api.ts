@@ -3,7 +3,15 @@ import { GeminiError, quotaMessage } from './errors'
 export const DEFAULT_BASE = 'https://generativelanguage.googleapis.com'
 export const ALLOWED_HOST = 'generativelanguage.googleapis.com'
 export const LIST_TIMEOUT_MS = 20_000
+/** Non-streaming helper calls (cache creation): a total cap is fine, they return small bodies. */
 export const ASK_TIMEOUT_MS = 60_000
+/**
+ * Generation streams: abort only when NO bytes arrive for this long. There is deliberately no cap
+ * on the total time while data keeps flowing (a thinking model may take minutes).
+ */
+export const DEFAULT_IDLE_SEC = 90
+export const MIN_IDLE_SEC = 15
+export const MAX_IDLE_SEC = 600
 const MAX_BODY_BYTES = 4 * 1024 * 1024
 /** Offline fallback only (documented moving aliases); the live list replaces it. */
 export const FALLBACK_MODELS = ['gemini-flash-latest', 'gemini-pro-latest']
@@ -64,7 +72,9 @@ function version(id: string): number {
   return /latest/.test(id) ? 999 : 0 // moving aliases track the newest
 }
 
-const NOT_TEXT = /(embedding|aqa|imagen|veo|-tts|image|live|native-audio|robotics|computer-use)/i
+/** Whole hyphen-separated tokens only, so e.g. "gemini-3-flash-preview" can never be filtered by accident. */
+const NOT_TEXT =
+  /(?:^|[-_/])(?:embedding|embeddings|aqa|imagen|veo|tts|image|live|native-audio|robotics|computer-use)(?:$|[-_/\d])/i
 
 /** Newest first: higher version, then stable before preview, then name. */
 export function sortModels(list: ModelInfo[]): ModelInfo[] {
@@ -100,7 +110,7 @@ export function parseModels(json: unknown): ModelInfo[] {
     }
     if (typeof r.name !== 'string') continue
     const methods = Array.isArray(r.supportedGenerationMethods) ? r.supportedGenerationMethods : []
-    if (!methods.includes('generateContent')) continue
+    if (!methods.includes('generateContent') && !methods.includes('streamGenerateContent')) continue
     const id = r.name.replace(/^models\//, '')
     if (!isValidModelId(id) || NOT_TEXT.test(id)) continue
     const lim = (v: unknown): number | undefined =>
@@ -259,6 +269,12 @@ export interface GenerateOptions {
   /** the partial answer so far: ask the model to continue it */
   continueFrom?: string
   sleep?: Sleep
+  /** user "stop": aborts the request cleanly (GeminiError 'aborted') */
+  signal?: AbortSignal
+  /** abort when no bytes arrive for this long (default 90 s); no cap on the total time */
+  idleMs?: number
+  /** called with each visible (non-thought) text delta as it arrives */
+  onText?: (delta: string) => void
 }
 
 export interface GenerateResult {
@@ -296,9 +312,20 @@ export interface GenerateInput {
   cachedContent?: string
 }
 
+/** Token counts from usageMetadata (0 when Google did not report them). */
+export interface Usage {
+  promptTokens: number
+  outputTokens: number
+  /** hidden "thinking" tokens (billed, never shown) */
+  thoughtsTokens: number
+  cachedTokens: number
+  totalTokens: number
+}
+
 export interface ChatResult extends GenerateResult {
   /** tokens served from a cache (implicit or explicit), when Google reports them */
   cachedTokens: number
+  usage: Usage
 }
 
 export function userContent(text: string): Content {
@@ -306,6 +333,208 @@ export function userContent(text: string): Content {
 }
 export function modelContent(text: string): Content {
   return { role: 'model', parts: [{ text }] }
+}
+
+/**
+ * Incremental Server-Sent-Events parser. Feed decoded text pieces split anywhere (even in the
+ * middle of a line or of a CRLF); get back the `data:` payload of every COMPLETE event.
+ */
+export class SseParser {
+  private buf = ''
+  push(chunk: string): string[] {
+    this.buf += chunk
+    // normalise line ends, but keep a trailing CR: its LF may arrive in the next chunk
+    const held = this.buf.endsWith('\r') ? '\r' : ''
+    const body = held ? this.buf.slice(0, -1) : this.buf
+    this.buf = body.replace(/\r\n?/g, '\n') + held
+    const out: string[] = []
+    for (;;) {
+      const i = this.buf.indexOf('\n\n')
+      if (i < 0) break
+      const d = SseParser.dataOf(this.buf.slice(0, i))
+      this.buf = this.buf.slice(i + 2)
+      if (d !== null) out.push(d)
+    }
+    return out
+  }
+  /** end of stream: a final event without its blank line still counts */
+  flush(): string[] {
+    const rest = this.buf.replace(/\r/g, '\n').trim()
+    this.buf = ''
+    const d = rest ? SseParser.dataOf(rest) : null
+    return d === null ? [] : [d]
+  }
+  get pending(): number {
+    return this.buf.length
+  }
+  private static dataOf(block: string): string | null {
+    const lines: string[] = []
+    for (const l of block.split('\n')) {
+      if (l.startsWith('data:')) lines.push(l.slice(5).replace(/^ /, ''))
+    }
+    return lines.length ? lines.join('\n') : null
+  }
+}
+
+interface StreamJson {
+  error?: { code?: number; status?: string; message?: string; details?: unknown[] }
+  promptFeedback?: { blockReason?: string }
+  usageMetadata?: Record<string, unknown>
+  candidates?: {
+    finishReason?: string
+    content?: { parts?: { text?: unknown; thought?: unknown }[] }
+  }[]
+}
+
+const MAX_STREAM_BUFFER = 16 * 1024 * 1024
+
+const num = (v: unknown): number => (typeof v === 'number' && Number.isFinite(v) && v > 0 ? v : 0)
+
+export function parseUsage(u: Record<string, unknown> | undefined): Usage {
+  return {
+    promptTokens: num(u?.promptTokenCount),
+    outputTokens: num(u?.candidatesTokenCount),
+    thoughtsTokens: num(u?.thoughtsTokenCount),
+    cachedTokens: num(u?.cachedContentTokenCount),
+    totalTokens: num(u?.totalTokenCount)
+  }
+}
+
+/** Accumulates stream events into the final answer (thought parts are never included). */
+class StreamState {
+  text = ''
+  finish: string | undefined
+  blocked: string | undefined
+  usage: Record<string, unknown> | undefined
+  constructor(private readonly onText?: (d: string) => void) {}
+  event(j: StreamJson): void {
+    if (j.error) throw httpError(typeof j.error.code === 'number' ? j.error.code : 0, j)
+    if (j.promptFeedback?.blockReason) this.blocked = j.promptFeedback.blockReason
+    if (j.usageMetadata) this.usage = j.usageMetadata
+    const c = j.candidates?.[0]
+    if (!c) return
+    if (c.finishReason) this.finish = c.finishReason
+    for (const p of c.content?.parts ?? []) {
+      if (typeof p.text !== 'string' || p.thought === true || !p.text) continue
+      this.text += p.text
+      this.onText?.(p.text)
+    }
+  }
+}
+
+/**
+ * One streaming generation request (`:streamGenerateContent?alt=sse`, key in the header).
+ * The abort controller fires on (a) the caller's signal -> 'aborted' and (b) NO data for `idleMs`
+ * -> 'timeout'. The idle timer restarts on every received chunk, so a long answer that keeps
+ * flowing is never cut off. If a server/proxy ignores alt=sse and returns plain JSON (object or
+ * array), that is parsed too.
+ */
+async function streamOnce(
+  f: FetchLike,
+  base: string,
+  path: string,
+  key: string,
+  body: unknown,
+  opts: GenerateOptions
+): Promise<StreamState> {
+  const url = `${base}${path}`
+  assertAllowedUrl(url, base)
+  if (opts.signal?.aborted) throw new GeminiError('aborted')
+  const idleMs = opts.idleMs && opts.idleMs > 0 ? opts.idleMs : DEFAULT_IDLE_SEC * 1000
+  const ac = new AbortController()
+  let reason: 'idle' | 'user' | null = null
+  let timer: ReturnType<typeof setTimeout> | undefined
+  const arm = (): void => {
+    clearTimeout(timer)
+    timer = setTimeout(() => {
+      reason ??= 'idle'
+      ac.abort()
+    }, idleMs)
+  }
+  const onUser = (): void => {
+    reason ??= 'user'
+    ac.abort()
+  }
+  opts.signal?.addEventListener('abort', onUser, { once: true })
+  arm()
+  const st = new StreamState(opts.onText)
+  try {
+    const res = await f(url, {
+      method: 'POST',
+      headers: { 'x-goog-api-key': key, 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+      redirect: 'error',
+      signal: ac.signal
+    })
+    arm()
+    if (!res.ok) {
+      let json: unknown = null
+      try {
+        json = JSON.parse((await res.text()).slice(0, MAX_BODY_BYTES))
+      } catch {
+        json = null
+      }
+      if (res.status === 500 || res.status === 503)
+        throw new GeminiError('bad_response', 'transient')
+      throw httpError(res.status, json)
+    }
+    const dec = new TextDecoder()
+    const sse = new SseParser()
+    let mode: 'sse' | 'json' | null = null
+    let raw = ''
+    const eventData = (d: string): void => {
+      if (d === '[DONE]') return
+      let j: unknown
+      try {
+        j = JSON.parse(d)
+      } catch {
+        return // keep-alive or a partial line: ignore
+      }
+      if (j && typeof j === 'object') st.event(j as StreamJson)
+    }
+    const feed = (piece: string): void => {
+      if (mode === null) {
+        const first = piece.trimStart()[0]
+        if (!first) return
+        mode = first === '{' || first === '[' ? 'json' : 'sse'
+      }
+      if (mode === 'json') {
+        raw += piece
+        if (raw.length > MAX_STREAM_BUFFER) throw new GeminiError('bad_response')
+        return
+      }
+      for (const d of sse.push(piece)) eventData(d)
+      if (sse.pending > MAX_STREAM_BUFFER) throw new GeminiError('bad_response')
+    }
+    if (res.body) {
+      const rd = res.body.getReader()
+      for (;;) {
+        const { done, value } = await rd.read()
+        if (done) break
+        arm() // bytes arrived: the model is alive
+        feed(dec.decode(value, { stream: true }))
+      }
+      feed(dec.decode())
+    } else feed(await res.text())
+    if (mode === 'json') {
+      let j: unknown
+      try {
+        j = JSON.parse(raw)
+      } catch {
+        throw new GeminiError('bad_response')
+      }
+      for (const x of Array.isArray(j) ? j : [j]) if (x && typeof x === 'object') st.event(x)
+    } else for (const d of sse.flush()) eventData(d)
+    return st
+  } catch (e) {
+    if (reason === 'idle') throw new GeminiError('timeout')
+    if (reason === 'user') throw new GeminiError('aborted')
+    if (e instanceof GeminiError) throw e
+    throw new GeminiError('offline')
+  } finally {
+    clearTimeout(timer)
+    opts.signal?.removeEventListener('abort', onUser)
+  }
 }
 
 export async function generateChat(
@@ -317,42 +546,33 @@ export async function generateChat(
   opts: GenerateOptions = {}
 ): Promise<ChatResult> {
   if (!isValidModelId(model)) throw new GeminiError('bad_request')
-  const json = (await request(
-    f,
-    base,
-    `/v1beta/models/${encodeURIComponent(model)}:generateContent`,
-    key,
-    {
-      method: 'POST',
-      body: {
-        ...(input.cachedContent
-          ? { cachedContent: input.cachedContent }
-          : input.system
-            ? { systemInstruction: { parts: [{ text: input.system }] } }
-            : {}),
-        contents: input.contents,
-        generationConfig: generationConfig(model, opts.outputTokenLimit)
-      }
-    },
-    ASK_TIMEOUT_MS,
-    opts.sleep ?? defaultSleep
-  )) as {
-    promptFeedback?: { blockReason?: string }
-    usageMetadata?: { cachedContentTokenCount?: unknown }
-    candidates?: {
-      finishReason?: string
-      content?: { parts?: { text?: unknown; thought?: unknown }[] }
-    }[]
+  const body = {
+    ...(input.cachedContent
+      ? { cachedContent: input.cachedContent }
+      : input.system
+        ? { systemInstruction: { parts: [{ text: input.system }] } }
+        : {}),
+    contents: input.contents,
+    generationConfig: generationConfig(model, opts.outputTokenLimit)
   }
-  if (json.promptFeedback?.blockReason) {
-    throw new GeminiError(json.promptFeedback.blockReason === 'OTHER' ? 'blocked_other' : 'safety')
+  const path = `/v1beta/models/${encodeURIComponent(model)}:streamGenerateContent?alt=sse`
+  const sleep = opts.sleep ?? defaultSleep
+  let st: StreamState
+  for (let attempt = 0; ; attempt++) {
+    try {
+      st = await streamOnce(f, base, path, key, body, opts)
+      break
+    } catch (e) {
+      const transient = e instanceof GeminiError && e.message === 'transient'
+      if (!transient) throw e
+      if (attempt >= BACKOFF_MS.length) throw new GeminiError('bad_response')
+      await sleep(BACKOFF_MS[attempt])
+      if (opts.signal?.aborted) throw new GeminiError('aborted')
+    }
   }
-  const c = json.candidates?.[0]
-  const text = (c?.content?.parts ?? [])
-    .map((p) => (typeof p.text === 'string' && p.thought !== true ? p.text : ''))
-    .join('')
-    .trim()
-  const fr = c?.finishReason
+  if (st.blocked) throw new GeminiError(st.blocked === 'OTHER' ? 'blocked_other' : 'safety')
+  const text = st.text.trim()
+  const fr = st.finish
   if (!text) {
     if (fr === 'SAFETY' || fr === 'PROHIBITED_CONTENT' || fr === 'BLOCKLIST' || fr === 'SPII')
       throw new GeminiError('safety')
@@ -362,8 +582,8 @@ export async function generateChat(
     throw new GeminiError('bad_response')
   }
   if (fr === 'SAFETY') throw new GeminiError('safety')
-  const ct = json.usageMetadata?.cachedContentTokenCount
-  return { text, cutoff: fr === 'MAX_TOKENS', cachedTokens: typeof ct === 'number' ? ct : 0 }
+  const usage = parseUsage(st.usage)
+  return { text, cutoff: fr === 'MAX_TOKENS', cachedTokens: usage.cachedTokens, usage }
 }
 
 /** Stateless single-turn call (word questions; continuation of a stateless answer). */
@@ -375,13 +595,13 @@ export async function generate(
   system: string,
   prompt: string,
   opts: GenerateOptions = {}
-): Promise<GenerateResult> {
+): Promise<ChatResult> {
   const contents: Content[] = [userContent(prompt)]
   if (opts.continueFrom) {
     contents.push(modelContent(opts.continueFrom), userContent(CONTINUE_PROMPT))
   }
   const r = await generateChat(f, base, key, model, { system, contents }, opts)
-  return { text: r.text, cutoff: r.cutoff }
+  return r
 }
 
 export const CACHE_TTL_SEC = 3600

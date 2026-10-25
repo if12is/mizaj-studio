@@ -48,8 +48,13 @@ describe('config sanitising', () => {
     expect(sanitizeConfig({ model: '../x y', provider: 'evil' })).toEqual({
       enabled: false,
       model: '',
-      consentAt: null
+      consentAt: null,
+      idleTimeoutSec: 90
     })
+    expect(sanitizeConfig({ idleTimeoutSec: 5 }).idleTimeoutSec).toBe(15)
+    expect(sanitizeConfig({ idleTimeoutSec: 99999 }).idleTimeoutSec).toBe(600)
+    expect(sanitizeConfig({ idleTimeoutSec: 120.4 }).idleTimeoutSec).toBe(120)
+    expect(sanitizeConfig({ idleTimeoutSec: 'x' }).idleTimeoutSec).toBe(90)
   })
   it('migrates a former Gemini CLI config to API mode and rewrites the file', () => {
     const f = join(dir, 'old.json')
@@ -71,7 +76,7 @@ describe('GeminiService', () => {
     const s = svc()
     expect(await s.ask(docReq)).toMatchObject({ ok: false, code: 'disabled' })
     s.setConfig({ enabled: true })
-    s.saveKey(KEY)
+    new GeminiKeyStore(join(dir, 'k.bin'), storage).save(KEY)
     expect(await s.ask(docReq)).toMatchObject({ ok: false, code: 'consent' })
     expect(calls).toHaveLength(0) // nothing was sent
     s.acceptConsent()
@@ -85,12 +90,12 @@ describe('GeminiService', () => {
   })
   it('API provider: key only in the header, state never contains the key', async () => {
     const s = svc()
-    s.saveKey(KEY)
+    new GeminiKeyStore(join(dir, 'k.bin'), storage).save(KEY)
     s.setConfig({ enabled: true, model: 'gemini-2.5-flash' })
     s.acceptConsent()
     await s.ask(docReq)
     expect(calls[0].headers['x-goog-api-key']).toBe(KEY)
-    expect(calls[0].url).toContain('/models/gemini-2.5-flash:generateContent')
+    expect(calls[0].url).toContain('/models/gemini-2.5-flash:streamGenerateContent')
     expect(calls[0].url + calls[0].body).not.toContain(KEY)
     const st = JSON.stringify(await s.getState())
     expect(st).not.toContain(KEY)
@@ -104,7 +109,7 @@ describe('GeminiService', () => {
   })
   it('flags truncated documents and parses the suggestion block', async () => {
     const s = svc()
-    s.saveKey(KEY)
+    new GeminiKeyStore(join(dir, 'k.bin'), storage).save(KEY)
     s.setConfig({ enabled: true })
     s.acceptConsent()
     reply = {
@@ -118,7 +123,7 @@ describe('GeminiService', () => {
   })
   it('sends a 100k-char document whole, with no truncation', async () => {
     const s = svc()
-    s.saveKey(KEY)
+    new GeminiKeyStore(join(dir, 'k.bin'), storage).save(KEY)
     s.setConfig({ enabled: true })
     s.acceptConsent()
     const r = await s.ask({ kind: 'document', question: 'س', text: 'ب'.repeat(100_000) })
@@ -127,7 +132,7 @@ describe('GeminiService', () => {
   })
   it('rejects oversized / empty questions', async () => {
     const s = svc()
-    s.saveKey(KEY)
+    new GeminiKeyStore(join(dir, 'k.bin'), storage).save(KEY)
     s.setConfig({ enabled: true })
     s.acceptConsent()
     expect(await s.ask({ ...docReq, question: ' ' })).toMatchObject({
@@ -136,8 +141,7 @@ describe('GeminiService', () => {
     })
   })
   it('model list falls back offline only', async () => {
-    const s = svc()
-    s.saveKey(KEY)
+    new GeminiKeyStore(join(dir, 'k.bin'), storage).save(KEY)
     const off = new GeminiService({
       keys: new GeminiKeyStore(join(dir, 'k.bin'), storage),
       config: new GeminiConfigStore(join(dir, 'c.json')),

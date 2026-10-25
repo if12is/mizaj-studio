@@ -23,8 +23,12 @@ let wordReply =
 let failStatus: number | null = null
 type Fake = { status?: number; json: unknown }
 let override: ((body: string) => Fake | null) | null = null
+/** «hold» mode: the next stream sends its first chunk after firstDelayMs, then waits for release or disconnect. */
+let hold: { firstDelayMs: number; first: string; released: boolean } | null = null
+let holdClosed = false
+const sleepMs = (ms: number) => new Promise((r) => setTimeout(r, ms))
 const requests: { method: string; url: string; key: string | undefined; body: string }[] = []
-const gen = () => requests.filter((r) => r.url.includes(':generateContent'))
+const gen = () => requests.filter((r) => r.url.includes(':streamGenerateContent'))
 
 const t = (id: string) => page.getByTestId(id)
 type CM = {
@@ -98,29 +102,92 @@ test.beforeAll(async () => {
               m('gemini-2.0-flash'),
               m('embedding-001', ['embedContent']),
               m('gemini-2.5-pro'),
-              m('gemini-2.5-flash')
+              m('gemini-2.5-flash'),
+              m('gemini-3-flash-preview'),
+              m('gemini-3.1-flash-lite-preview'),
+              m('gemini-3-pro-image-preview'),
+              m('gemini-flash-latest')
             ]
           })
         )
         return
       }
-      const ov = req.url?.includes(':generateContent') ? override?.(body) : null
-      if (ov) {
-        res.statusCode = ov.status ?? 200
+      const isGen = !!req.url?.includes(':streamGenerateContent')
+      const ov = isGen ? override?.(body) : null
+      if (ov && (ov.status ?? 200) >= 400) {
+        res.statusCode = ov.status!
         res.end(JSON.stringify(ov.json))
         return
       }
-      if (req.url?.includes(':generateContent') && failStatus) {
+      if (isGen && failStatus) {
         res.statusCode = failStatus
         res.end(JSON.stringify({ error: { status: 'RESOURCE_EXHAUSTED', message: 'quota' } }))
         return
       }
-      if (req.url?.includes(':generateContent')) {
+      if (isGen && hold) {
+        const h = hold
+        hold = null
+        holdClosed = false
+        res.on('close', () => (holdClosed = true))
+        res.setHeader('Content-Type', 'text/event-stream')
+        void (async () => {
+          await sleepMs(h.firstDelayMs)
+          if (holdClosed) return
+          res.write(
+            `data: ${JSON.stringify({ candidates: [{ content: { parts: [{ text: h.first }] } }] })}\r\n\r\n`
+          )
+          for (let i = 0; i < 200 && !h.released && !holdClosed; i++) await sleepMs(100)
+          if (!holdClosed) res.end()
+        })()
+        return
+      }
+      if (isGen) {
         const isWord = body.includes('الكلمة المقصودة')
-        const text = isWord ? wordReply : 'هذا جواب عن المستند.'
-        res.end(
-          JSON.stringify({ candidates: [{ content: { parts: [{ text }] }, finishReason: 'STOP' }] })
-        )
+        const json =
+          ov?.json ??
+          ({
+            candidates: [
+              {
+                content: { parts: [{ text: isWord ? wordReply : 'هذا جواب عن المستند.' }] },
+                finishReason: 'STOP'
+              }
+            ]
+          } as unknown)
+        // stream it as SSE: every text part is cut in two events (and a thinking part is passed through)
+        const cand = (
+          json as {
+            candidates?: {
+              content?: { parts?: Record<string, unknown>[] }
+              finishReason?: string
+            }[]
+            promptFeedback?: unknown
+          }
+        ).candidates?.[0]
+        res.setHeader('Content-Type', 'text/event-stream')
+        const ev = (o: unknown) => res.write(`data: ${JSON.stringify(o)}\r\n\r\n`)
+        if (!cand) {
+          ev(json)
+          res.end()
+          return
+        }
+        for (const part of cand.content?.parts ?? []) {
+          const text = typeof part.text === 'string' ? part.text : ''
+          const cut = Math.floor(text.length / 2)
+          for (const piece of text.length > 3 && !part.thought
+            ? [text.slice(0, cut), text.slice(cut)]
+            : [text])
+            ev({ candidates: [{ content: { parts: [{ ...part, text: piece }] } }] })
+        }
+        ev({
+          candidates: [{ finishReason: cand.finishReason }],
+          usageMetadata: {
+            promptTokenCount: 11,
+            candidatesTokenCount: 7,
+            thoughtsTokenCount: 5,
+            totalTokenCount: 23
+          }
+        })
+        res.end()
         return
       }
       res.statusCode = 404
@@ -188,10 +255,21 @@ test('enable, key rejected then accepted, live model list, key stored encrypted'
   await t('gemini-key-test').click()
   await expect(t('gemini-message')).toContainText('غير صالح')
 
+  // no format validation: a key of another shape is sent to Google, which rejects it
+  await t('gemini-key-input').fill('AQ.Ab8RN6SomeOtherShapeOfKey')
+  await t('gemini-key-save').click()
+  await expect(t('gemini-message')).toContainText('غير صالح')
+  await expect(t('gemini-key-hint')).toHaveCount(0) // a rejected key is not kept
+  // spaces inside are refused locally
+  await t('gemini-key-input').fill('AIza with spaces')
+  await t('gemini-key-save').click()
+  await expect(t('gemini-message')).toContainText('مسافات')
+
   await t('gemini-key-input').fill(GOOD_KEY)
   await t('gemini-key-test').click()
-  await expect(t('gemini-message')).toContainText('المفتاح صالح')
+  await expect(t('gemini-message')).toContainText('المفتاح صالح ✓')
   await t('gemini-key-save').click()
+  await expect(t('gemini-message')).toContainText('المفتاح صالح ✓')
   await expect(t('gemini-key-hint')).toContainText('xyz')
   await expect(t('gemini-key-hint')).not.toContainText('E2EFAKE')
   await expect(t('gemini-key-input')).toHaveValue('') // never echoed back
@@ -199,13 +277,27 @@ test('enable, key rejected then accepted, live model list, key stored encrypted'
   // models come from the API: embedding-only excluded, newest first, newest flash preselected
   const sel = t('gemini-model-select')
   await expect(sel.locator('option')).toHaveText([
+    'gemini-flash-latest',
+    'gemini-3.1-flash-lite-preview',
+    'gemini-3-flash-preview',
     'gemini-2.5-flash',
     'gemini-2.5-pro',
     'gemini-2.0-flash',
     'gemini-1.5-pro'
   ])
-  await expect(sel).toHaveValue('gemini-2.5-flash')
+  // the latest Flash ids are listed (not filtered); image/embedding models are not
+  await expect(sel).toHaveValue('gemini-flash-latest')
   await sel.selectOption('gemini-2.0-flash')
+
+  // advanced: the idle timeout (default 90 s) is configurable and persisted
+  await expect(t('gemini-idle-timeout')).toHaveValue('90')
+  await t('gemini-idle-timeout').fill('120')
+  await t('gemini-idle-timeout').blur()
+  await expect
+    .poll(
+      () => JSON.parse(readFileSync(join(userData, 'gemini-config.json'), 'utf8')).idleTimeoutSec
+    )
+    .toBe(120)
 
   // the key header was used; the key never appears in URLs
   expect(requests.some((r) => r.key === GOOD_KEY && r.url.startsWith('/v1beta/models?'))).toBe(true)
@@ -244,8 +336,9 @@ test('ask about the document: consent first (decline sends nothing), shown only 
   await expect(t('gemini-consent')).toBeVisible() // declined before, so asked again
   await t('gemini-consent-accept').click()
   await expect(t('gemini-answer').first()).toContainText('هذا جواب عن المستند')
+  await expect(t('gemini-usage').first()).toContainText('التفكير 5') // usageMetadata, thoughts counted not shown
   expect(gen()).toHaveLength(1)
-  expect(gen()[0].url).toContain('models/gemini-2.0-flash:generateContent')
+  expect(gen()[0].url).toContain('models/gemini-2.0-flash:streamGenerateContent')
   expect(gen()[0].key).toBe(GOOD_KEY)
   expect(gen()[0].body).toContain('هذا نص تجريبي للمستند')
   expect(gen()[0].body).not.toContain(GOOD_KEY)
@@ -352,6 +445,44 @@ test('answer cut at the output limit offers «متابعة» which continues it'
   override = null
 })
 
+test('streaming: «يفكّر…» with seconds, text appears live, «إيقاف» aborts cleanly and keeps the partial', async () => {
+  await t('gemini-question').fill('لخّص هذا المستند الطويل')
+  hold = { firstDelayMs: 2500, first: 'بداية الملخص', released: false }
+  await t('gemini-send').click()
+  await expect(t('gemini-thinking')).toContainText('يفكّر')
+  await expect(t('gemini-thinking')).toContainText(/\d+ ث/)
+  await expect(t('gemini-stop')).toBeVisible()
+  await expect(t('gemini-send')).toBeDisabled()
+  // the first token arrives while the request is still open: it is shown at once
+  await expect(t('gemini-answer').last()).toContainText('بداية الملخص')
+  await expect(t('gemini-thinking')).toHaveCount(0)
+  await expect(t('gemini-stop')).toBeVisible()
+  await t('gemini-stop').click()
+  await expect(t('gemini-stop')).toHaveCount(0)
+  await expect(t('gemini-stopped')).toBeVisible()
+  await expect(t('gemini-answer').last()).toContainText('بداية الملخص') // partial kept
+  await expect.poll(() => holdClosed).toBe(true) // the HTTP request really was dropped
+  await expect(t('gemini-error')).toHaveCount(0)
+  // the panel is usable again
+  await t('gemini-question').fill('سؤال بعد الإيقاف')
+  await t('gemini-send').click()
+  await expect(t('gemini-answer').last()).toContainText('هذا جواب عن المستند')
+})
+
+test('streaming: stop before the first token shows a clear note and nothing breaks', async () => {
+  await t('gemini-question').fill('سؤال بطيء')
+  hold = { firstDelayMs: 5000, first: 'متأخر', released: true }
+  await t('gemini-send').click()
+  await expect(t('gemini-thinking')).toBeVisible()
+  await t('gemini-stop').click()
+  await expect(t('gemini-stopped').last()).toContainText('قبل وصول أي نص')
+  await expect.poll(() => holdClosed).toBe(true)
+  await expect(t('gemini-send')).toBeDisabled() // empty question box, but not busy:
+  await t('gemini-question').fill('x')
+  await expect(t('gemini-send')).toBeEnabled()
+  await t('gemini-question').fill('')
+})
+
 test('safety / recitation finish reasons give clear Arabic messages', async () => {
   override = () => ({ json: { candidates: [{ finishReason: 'RECITATION' }] } })
   await t('gemini-question').fill('سؤال')
@@ -382,8 +513,10 @@ test('quota with a short RetryInfo delay counts down and retries once; a long on
   await t('gemini-question').fill('سؤال حصة')
   await t('gemini-send').click()
   await expect(t('gemini-countdown')).toContainText('ثانية')
-  await expect(t('gemini-answer').last()).toContainText('هذا جواب عن المستند', { timeout: 15000 })
-  expect(n).toBe(2)
+  await expect(t('gemini-countdown')).toHaveCount(0, { timeout: 15000 })
+  await expect.poll(() => n, { timeout: 15000 }).toBe(2)
+  await expect(t('gemini-streaming')).toHaveCount(0, { timeout: 15000 })
+  await expect(t('gemini-answer').last()).toContainText('هذا جواب عن المستند')
   override = () => quota('120s')
   await t('gemini-question').fill('سؤال حصة 2')
   await t('gemini-send').click()

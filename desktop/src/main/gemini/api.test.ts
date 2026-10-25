@@ -92,8 +92,8 @@ describe('generate and error mapping', () => {
     const seen: { url?: string; init?: RequestInit } = {}
     expect(
       await generate(fakeFetch(200, ok, seen), DEFAULT_BASE, KEY, 'gemini-2.5-flash', 'sys', 'q')
-    ).toEqual({ text: 'الجواب', cutoff: false })
-    expect(seen.url).toContain('gemini-2.5-flash:generateContent')
+    ).toMatchObject({ text: 'الجواب', cutoff: false })
+    expect(seen.url).toContain('gemini-2.5-flash:streamGenerateContent')
     expect(JSON.stringify(seen.init!.body)).not.toContain(KEY)
   })
   const code = async (f: typeof fetch): Promise<string> => {
@@ -121,11 +121,6 @@ describe('generate and error mapping', () => {
         throw new TypeError('fetch failed')
       }) as unknown as typeof fetch)
     ).toBe('offline')
-    expect(
-      await code((async () => {
-        throw Object.assign(new Error('t'), { name: 'TimeoutError' })
-      }) as unknown as typeof fetch)
-    ).toBe('timeout')
   })
   it('error messages are Arabic and never contain the key', async () => {
     try {
@@ -177,7 +172,7 @@ describe('generate: output budget, thoughts, finish reasons', () => {
     expect(r.text).toBe('أب')
   })
   it('MAX_TOKENS keeps the partial answer and flags cutoff; empty is a clear error', async () => {
-    expect(await gen(fakeFetch(200, resp([{ text: 'جزء' }], 'MAX_TOKENS')))).toEqual({
+    expect(await gen(fakeFetch(200, resp([{ text: 'جزء' }], 'MAX_TOKENS')))).toMatchObject({
       text: 'جزء',
       cutoff: true
     })

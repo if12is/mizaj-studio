@@ -1,4 +1,5 @@
 import { existsSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
+import { DEFAULT_IDLE_SEC, MAX_IDLE_SEC, MIN_IDLE_SEC } from './api'
 
 /** Non-secret Gemini assistant settings; kept by the main process so it can enforce them. */
 export interface GeminiConfig {
@@ -6,12 +7,15 @@ export interface GeminiConfig {
   model: string
   /** ISO time the user accepted the "text is sent to Google" notice; null = not yet */
   consentAt: string | null
+  /** abort a generation when no data arrives for this many seconds (never a total cap) */
+  idleTimeoutSec: number
 }
 
 export const DEFAULT_CONFIG: GeminiConfig = {
   enabled: false,
   model: '',
-  consentAt: null
+  consentAt: null,
+  idleTimeoutSec: DEFAULT_IDLE_SEC
 }
 
 export function sanitizeConfig(raw: unknown): GeminiConfig {
@@ -19,7 +23,11 @@ export function sanitizeConfig(raw: unknown): GeminiConfig {
   return {
     enabled: o.enabled === true,
     model: typeof o.model === 'string' && /^[A-Za-z0-9._\-/]{0,120}$/.test(o.model) ? o.model : '',
-    consentAt: typeof o.consentAt === 'string' && o.consentAt.length < 40 ? o.consentAt : null
+    consentAt: typeof o.consentAt === 'string' && o.consentAt.length < 40 ? o.consentAt : null,
+    idleTimeoutSec:
+      typeof o.idleTimeoutSec === 'number' && Number.isFinite(o.idleTimeoutSec)
+        ? Math.min(MAX_IDLE_SEC, Math.max(MIN_IDLE_SEC, Math.round(o.idleTimeoutSec)))
+        : DEFAULT_IDLE_SEC
   }
 }
 

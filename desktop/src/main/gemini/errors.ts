@@ -6,6 +6,7 @@ export type GeminiErrorCode =
   | 'quota'
   | 'offline'
   | 'timeout'
+  | 'aborted'
   | 'safety'
   | 'recitation'
   | 'blocked_other'
@@ -21,7 +22,9 @@ const MESSAGES: Record<GeminiErrorCode, string> = {
   invalid_key: 'مفتاح API غير صالح أو لا يملك الصلاحية. تحقق منه في Google AI Studio.',
   quota: 'تجاوزتَ حدّ الاستخدام (الحصة) لدى Google. انتظر قليلاً ثم أعد المحاولة.',
   offline: 'تعذر الاتصال بـ Google. تحقق من اتصالك بالإنترنت.',
-  timeout: 'انتهت مهلة الانتظار قبل وصول الرد. أعد المحاولة.',
+  timeout:
+    'توقّف وصول البيانات من Google مدة أطول من مهلة الخمول. أعد المحاولة، أو ارفع المهلة من الإعدادات المتقدمة.',
+  aborted: 'أُوقف الطلب.',
   safety: 'حجب Gemini هذا الطلب لأسباب تتعلق بالسلامة، فلا يوجد رد.',
   recitation: 'أوقف Gemini الرد لأنه يطابق نصاً محمياً (استشهاد حرفي). أعد صياغة السؤال.',
   blocked_other: 'أوقف Gemini الرد لسبب غير محدد. أعد المحاولة أو جرّب نموذجاً آخر.',
