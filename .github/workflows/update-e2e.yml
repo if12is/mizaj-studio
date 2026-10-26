@@ -112,13 +112,18 @@ jobs:
             Write-Host "::error title=Install old version::installer not found: $inst (dir has: $near)"
             exit 1
           }
-          $p = Start-Process -FilePath $inst -ArgumentList '/S' -Wait -PassThru
-          if ($p.ExitCode -eq -1073741819) {
-            # Intermittent access violation inside the stock NSIS installer on hosted runners
-            # (seen with Defender real-time scanning). Retry once and record it.
-            Write-Host "::warning title=Installer::installer crashed (0xC0000005); retrying once"
-            Start-Sleep -Seconds 10
+          # Intermittent access violation (0xC0000005) inside the stock NSIS installer on hosted
+          # runners, tied to Defender real-time scanning of the freshly extracted files. Real-time
+          # scanning is paused on this throwaway runner only (defender-scan.yml still scans the
+          # installer), and a crash is retried up to 3 times with a growing pause.
+          try { Set-MpPreference -DisableRealtimeMonitoring $true -ErrorAction Stop }
+          catch { Write-Host "::notice title=Installer::could not pause Defender real-time scanning: $($_.Exception.Message)" }
+          for ($try = 1; $try -le 4; $try++) {
             $p = Start-Process -FilePath $inst -ArgumentList '/S' -Wait -PassThru
+            if ($p.ExitCode -ne -1073741819 -or $try -eq 4) { break }
+            Write-Host "::warning title=Installer::installer crashed (0xC0000005) on attempt $try; retrying"
+            Get-Process | Where-Object { $_.Path -like '*Mizaj*' } | Stop-Process -Force -ErrorAction SilentlyContinue
+            Start-Sleep -Seconds (15 * $try)
           }
           if ($p.ExitCode -ne 0) {
             Write-Host "::error title=Install old version::installer $inst exited with code $($p.ExitCode)"
