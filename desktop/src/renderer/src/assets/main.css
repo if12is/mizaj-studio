@@ -507,3 +507,40 @@ html.dark .dark\:text-red-400 {
 .bg-mizaj-emerald.text-white {
   background-color: #047857;
 }
+
+/* Scrollbars in the brand colours, everywhere in the app (light and dark) */
+:root {
+  --sb-track: #f1f5f9;
+  --sb-thumb: #10b98180;
+  --sb-thumb-hover: #10b981;
+  color-scheme: light;
+}
+.dark {
+  --sb-track: #0f172a;
+  --sb-thumb: #34d39966;
+  --sb-thumb-hover: #34d399b3;
+  color-scheme: dark;
+}
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track,
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--sb-thumb);
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background-clip: padding-box;
+  min-height: 32px;
+}
+::-webkit-scrollbar-thumb:hover,
+::-webkit-scrollbar-thumb:active {
+  background: var(--sb-thumb-hover);
+  background-clip: padding-box;
+}
+::-webkit-scrollbar-button {
+  display: none;
+}

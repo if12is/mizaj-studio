@@ -237,6 +237,13 @@ tr:last-child td { border-bottom: 0; }
 }
 @media (min-width: 901px) { .brand-row { display: contents; } }
 @media print { .index, .top { display: none; } .frame { display: block; } }
+/* scrollbars in the app's colours */
+::-webkit-scrollbar{width:10px;height:10px}
+::-webkit-scrollbar-track,::-webkit-scrollbar-corner{background:transparent}
+::-webkit-scrollbar-thumb{background:#10b98159;border:2px solid transparent;border-radius:999px;background-clip:padding-box;min-height:32px}
+::-webkit-scrollbar-thumb:hover{background:#10b981;background-clip:padding-box}
+::-webkit-scrollbar-button{display:none}
+@media (prefers-color-scheme: dark){::-webkit-scrollbar-thumb{background:#34d39940;background-clip:padding-box}::-webkit-scrollbar-thumb:hover{background:#34d399b3;background-clip:padding-box}}
 </style>
 
 <header class="band">
