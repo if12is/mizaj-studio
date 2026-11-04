@@ -264,6 +264,10 @@ async def start(
     data_dir: Path | None = None,
 ) -> Job:
     i, o = validate_request(input_dir, output_dir, formats, data_dir)
+    # everything goes into ONE new folder named after the input folder (+ " مشكل"), not loose
+    # files in the chosen output folder
+    folder = re.sub(r'[\\/:*?"<>|\0]', "_", i.name).strip(" .") or "ملفات"
+    o = o / f"{folder} مشكل"
     files = discover(i, o, formats, recursive)
     o.mkdir(parents=True, exist_ok=True)
     pipeline = await build_pipeline(mode, level, True)
