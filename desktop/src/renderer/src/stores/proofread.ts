@@ -263,6 +263,12 @@ export const useProofreadStore = defineStore('proofread', () => {
   function decideGroup(category: ProofCategory, d: Decision): void {
     decisions.value = setGroup(decisions.value, items.value, category, d)
   }
+  /** One click for every category at once («قبول الكل» / «رفض الكل» for the whole list). */
+  function decideAll(d: Decision): void {
+    const next = { ...decisions.value }
+    for (const i of items.value) next[i.id] = d
+    decisions.value = next
+  }
   async function setYaStyle(v: YaStyle): Promise<void> {
     const pid = projects.currentDocument?.project_id
     // a project with its own style keeps it: the choice made in the dialog goes to the project
@@ -293,6 +299,7 @@ export const useProofreadStore = defineStore('proofread', () => {
     decide,
     choose,
     decideGroup,
+    decideAll,
     setYaStyle
   }
 })

@@ -72,6 +72,18 @@ const stateCls = (id: string, which: 'accept' | 'reject'): string =>
         <span data-testid="proofread-summary" class="text-slate-700 dark:text-slate-200">
           {{ total ? `المقبول ${store.acceptedCount} من ${total}` : 'لا توجد اقتراحات' }}
         </span>
+        <span v-if="total" class="flex items-center gap-1">
+          <button
+            :class="[chip, 'border-mizaj-emerald font-semibold']"
+            data-testid="proofread-accept-all"
+            @click="store.decideAll('accept')"
+          >
+            قبول الكل (كل الأقسام)
+          </button>
+          <button :class="chip" data-testid="proofread-reject-all" @click="store.decideAll('reject')">
+            رفض الكل
+          </button>
+        </span>
         <span v-if="store.loading" class="text-xs text-slate-500" role="status">
           جارٍ التدقيق…
         </span>
