@@ -43,7 +43,7 @@ hiddenimports += [
 ]
 hiddenimports += collect_submodules("uvicorn") + ["uvicorn.logging", "uvicorn.loops.auto",
                                                    "uvicorn.protocols.http.auto"]
-hiddenimports += collect_submodules("app")
+hiddenimports += collect_submodules("app") + ["olefile"]
 
 # our own resources
 datas += [

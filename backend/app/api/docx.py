@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import logging
 import os
 import shutil
 import sqlite3
@@ -22,6 +23,7 @@ from app.core.errors import MizajError, not_found, validation_error
 from app.engine.executor import run_blocking
 from app.engine.factory import build_pipeline
 
+log = logging.getLogger("mizaj.docx")
 router = APIRouter(prefix="/api/docx", tags=["docx"])
 
 
@@ -116,19 +118,32 @@ def _convert_legacy(src: Path, data_dir: Path) -> Path:
     flags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
     if sys.platform == "win32":
         ps = (
-            "$ErrorActionPreference='Stop';$w=New-Object -ComObject Word.Application;"
-            "$w.Visible=$false;$w.DisplayAlerts=0;"
-            "try{$d=$w.Documents.Open($env:MZ_IN,$false,$true);"
-            "$d.SaveAs2($env:MZ_OUT,16);$d.Close($false)}finally{$w.Quit()}"
+            "$ErrorActionPreference='Stop';"
+            "foreach($id in 'Word.Application','KWPS.Application','wps.Application'){"
+            "try{$w=New-Object -ComObject $id;"
+            "try{$w.Visible=$false}catch{};try{$w.DisplayAlerts=0}catch{};"
+            "try{$d=$w.Documents.Open($env:MZ_IN,$false,$true);$o=$env:MZ_OUT;"
+            "try{$d.SaveAs2($o,16)}catch{$d.SaveAs([ref]$o,[ref]16)};$d.Close($false)}"
+            "finally{try{$w.Quit()}catch{}};"
+            "if(Test-Path -LiteralPath $env:MZ_OUT){exit 0}"
+            "}catch{[Console]::Error.WriteLine($id+': '+$_.Exception.Message)}};exit 1"
+        )
+        import base64
+
+        exe = Path(os.environ.get("SystemRoot", r"C:\Windows")) / (
+            r"System32\WindowsPowerShell\v1.0\powershell.exe"
         )
         try:
-            subprocess.run(
-                ["powershell", "-NoProfile", "-NonInteractive", "-Command", ps],
+            r = subprocess.run(
+                [str(exe) if exe.is_file() else "powershell", "-NoProfile", "-NonInteractive",
+                 "-EncodedCommand", base64.b64encode(ps.encode("utf-16-le")).decode()],
                 env={**os.environ, "MZ_IN": str(src), "MZ_OUT": str(out)},
-                capture_output=True, timeout=120, creationflags=flags, check=True,
+                capture_output=True, timeout=120, creationflags=flags,
             )
-        except Exception:
-            pass
+            if r.returncode != 0:
+                log.warning("word com convert failed: %s", r.stderr[-500:].decode("utf-8", "replace"))
+        except Exception as exc:  # noqa: BLE001
+            log.warning("word com convert error: %r", exc)
         if out.is_file() and out.stat().st_size > 0:
             return out
     soffice = shutil.which("soffice") or shutil.which("libreoffice")
@@ -142,8 +157,18 @@ def _convert_legacy(src: Path, data_dir: Path) -> Path:
             if made.is_file():
                 made.replace(out)
                 return out
-        except Exception:
+        except Exception:  # noqa: BLE001
             pass
+    if src.suffix.lower() == ".doc":  # last resort: text-only conversion, needs no Office
+        try:
+            from app.docx.legacy import doc_to_docx
+
+            doc_to_docx(src, out)
+            if out.is_file() and out.stat().st_size > 0:
+                return out
+        except Exception as exc:  # noqa: BLE001
+            log.warning("builtin .doc conversion failed: %r", exc)
+            out.unlink(missing_ok=True)
     raise validation_error(
         "could not convert the legacy Word file; save it as .docx in Word and import again",
         {"field": "path"},
