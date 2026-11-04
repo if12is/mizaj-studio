@@ -204,12 +204,7 @@ export const useFileStore = defineStore('fileio', () => {
     const path = pathArg ?? (await pickOpenPath(IMPORT_EXTENSIONS, 'Documents'))
     if (!path) return
     const kind = importKind(path)
-    if (kind === 'unsupported')
-      return void notify(
-        /\.(doc|docm|dot|dotx|rtf|odt)$/i.test(path)
-          ? 'هذا ملف Word قديم أو بصيغة أخرى؛ افتحه في Word واحفظه بصيغة docx ثم استورده.'
-          : 'صيغة الملف غير مدعومة للاستيراد.'
-      )
+    if (kind === 'unsupported') return void notify('صيغة الملف غير مدعومة للاستيراد.')
     busy.value = true
     try {
       const api = useApi()
