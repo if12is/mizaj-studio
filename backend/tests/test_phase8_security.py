@@ -423,7 +423,8 @@ def test_batch_output_escape_via_symlink_is_skipped(client, tmp_path):
         d.mkdir(parents=True, exist_ok=True)
     (i / "sub" / "a.txt").write_text("كتاب", encoding="utf-8")
     try:
-        os.symlink(outside, o / "sub", target_is_directory=True)
+        (o / "in مشكل").mkdir(parents=True, exist_ok=True)
+        os.symlink(outside, o / "in مشكل" / "sub", target_is_directory=True)
     except OSError:
         pytest.skip("cannot create symlink")
     jid = client.post("/api/batch", json={"input_dir": str(i), "output_dir": str(o), "formats": ["txt"]}).json()["job_id"]

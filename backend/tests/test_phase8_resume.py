@@ -306,7 +306,7 @@ def test_batch_resume_after_crash_skips_finished_outputs(data_dir, tmp_path, mon
             "/api/batch", json={"input_dir": str(i), "output_dir": str(o), "formats": ["txt"]}
         ).json()["job_id"]
         assert _wait(c1, jid)["status"] == "done"
-    outs = sorted(o.glob("*.txt"))
+    outs = sorted((o / "in مشكل").glob("*.txt"))
     assert len(outs) == 6 and all(batch.output_valid(p) for p in outs)
     good = {p: p.read_bytes() for p in outs}
     # simulate a crash: f2 was being written (no marker, truncated), f4 never started; state=running
@@ -353,23 +353,24 @@ def test_batch_cancel_then_resume_in_same_run(ioc, tmp_path):
         assert ioc.post(f"/api/batch/{jid}/resume").status_code == 202
         st = _wait(ioc, jid, ("done", "failed"))
     assert st["status"] == "done" and st["succeeded"] == 30
-    assert all(batch.output_valid(p) for p in o.glob("*.txt")) and len(list(o.glob("*.txt"))) == 30
+    assert all(batch.output_valid(p) for p in (o / "in مشكل").glob("*.txt")) and len(list((o / "in مشكل").glob("*.txt"))) == 30
 
 
 def test_fresh_batch_ignores_stale_done_markers(ioc, tmp_path):
     i, o = tmp_path / "in", tmp_path / "out"
     i.mkdir()
-    o.mkdir()
+    r = o / "in مشكل"
+    r.mkdir(parents=True)
     (i / "a.txt").write_text("كتاب", encoding="utf-8")
-    (o / "a.txt").write_text("OLD", encoding="utf-8")
-    batch.mark_done(o / "a.txt", i / "a.txt")
+    (r / "a.txt").write_text("OLD", encoding="utf-8")
+    batch.mark_done(r / "a.txt", i / "a.txt")
     jid = ioc.post(
         "/api/batch",
         json={"input_dir": str(i), "output_dir": str(o), "formats": ["txt"],
               "on_exist": "overwrite"},
     ).json()["job_id"]
     assert _wait(ioc, jid)["status"] == "done"
-    assert (o / "a.txt").read_text(encoding="utf-8") != "OLD"
+    assert (r / "a.txt").read_text(encoding="utf-8") != "OLD"
 
 
 # ---------------------------------------------------------------- 8.4.3 SSE resume
