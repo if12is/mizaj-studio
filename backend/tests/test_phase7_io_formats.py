@@ -64,6 +64,7 @@ def test_convert_txt_cp1256_to_utf8_and_batch_never_overwrites(ioc, tmp_path):
     (src / "bad.docx").write_bytes(b"not a docx")
     (src / "skip.xyz").write_text("x")
     out = tmp_path / "out"
+    res = out / f"{src.name} مشكل"
     before = {p: p.read_bytes() for p in src.rglob("*") if p.is_file()}
     r = ioc.post(
         "/api/batch",
@@ -82,9 +83,9 @@ def test_convert_txt_cp1256_to_utf8_and_batch_never_overwrites(ioc, tmp_path):
         time.sleep(0.1)
     assert st["status"] == "done" and st["total"] == 4 and st["succeeded"] == 3
     assert len(st["errors"]) == 1 and st["errors"][0]["error_code"] == "ERR_DOCX_CORRUPT"
-    a = (out / "a.txt").read_bytes().decode("utf-8")
+    a = (res / "a.txt").read_bytes().decode("utf-8")
     assert "\r\n" in a and strip_marks(a) == "ذهب الولد\r\nإلى المدرسة"
-    assert (out / "sub" / "b.md").read_text(encoding="utf-8").startswith("# ")
+    assert (res / "sub" / "b.md").read_text(encoding="utf-8").startswith("# ")
     assert {p: p.read_bytes() for p in src.rglob("*") if p.is_file()} == before
     # same output dir again: existing outputs renamed, never clobbered
     r = ioc.post(
@@ -95,7 +96,7 @@ def test_convert_txt_cp1256_to_utf8_and_batch_never_overwrites(ioc, tmp_path):
         if ioc.get(f"/api/batch/{jid}").json()["status"] == "done":
             break
         time.sleep(0.1)
-    assert (out / "a_1.txt").exists()
+    assert (res / "a_1.txt").exists()
     # output == input is refused
     bad = ioc.post(
         "/api/batch", json={"input_dir": str(src), "output_dir": str(src), "formats": ["txt"]}

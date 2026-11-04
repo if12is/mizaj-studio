@@ -86,8 +86,13 @@ export function registerFileIpc(): void {
     const exts = cleanExtensions(o.extensions)
     const opts = {
       properties: ['openFile' as const],
+      // Always offer "All files" so a file whose extension is not in the list (e.g. legacy .doc,
+      // .DOCX variants, .docm) is still visible instead of silently hidden by the single filter.
       filters: exts.length
-        ? [{ name: isBoundedString(o.filterName, 64) ? o.filterName : exts[0], extensions: exts }]
+        ? [
+            { name: isBoundedString(o.filterName, 64) ? o.filterName : exts[0], extensions: exts },
+            { name: 'All files', extensions: ['*'] }
+          ]
         : []
     }
     const w = winOf(e)

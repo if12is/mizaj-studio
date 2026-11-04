@@ -46,6 +46,10 @@ export const IMPORT_EXTENSIONS = [
   'epub',
   'pdf',
   'docx',
+  'doc',
+  'rtf',
+  'odt',
+  'docm',
   'png',
   'jpg',
   'jpeg',
@@ -74,7 +78,7 @@ export function stem(path: string): string {
 
 export function importKind(path: string): ImportKind {
   const e = extOf(path)
-  if (e === 'docx') return 'docx'
+  if (e === 'docx' || e === 'doc' || e === 'rtf' || e === 'odt' || e === 'docm') return 'docx'
   if (e === 'pdf') return 'pdf'
   if (IMAGE_EXT.has(e)) return 'image'
   if (TEXT_EXT.has(e)) return 'text'

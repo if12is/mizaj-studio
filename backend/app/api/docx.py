@@ -1,6 +1,11 @@
 from __future__ import annotations
 
+import hashlib
+import os
+import shutil
 import sqlite3
+import subprocess
+import sys
 from pathlib import Path
 from typing import Any, Literal
 
@@ -97,12 +102,65 @@ def _do_import(db_path: Path, path: Path, project_id: int, title: str | None) ->
         conn.close()
 
 
+LEGACY_EXTS = (".doc", ".rtf", ".odt", ".docm")
+
+
+def _convert_legacy(src: Path, data_dir: Path) -> Path:
+    """Convert a legacy Word file to .docx (MS Word via PowerShell COM, else LibreOffice)."""
+    out_dir = Path(data_dir) / "converted"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    key = hashlib.sha1(f"{src}|{src.stat().st_mtime_ns}".encode()).hexdigest()[:10]
+    out = out_dir / f"{src.stem[:80]}-{key}.docx"
+    if out.is_file() and out.stat().st_size > 0:
+        return out
+    flags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+    if sys.platform == "win32":
+        ps = (
+            "$ErrorActionPreference='Stop';$w=New-Object -ComObject Word.Application;"
+            "$w.Visible=$false;$w.DisplayAlerts=0;"
+            "try{$d=$w.Documents.Open($env:MZ_IN,$false,$true);"
+            "$d.SaveAs2($env:MZ_OUT,16);$d.Close($false)}finally{$w.Quit()}"
+        )
+        try:
+            subprocess.run(
+                ["powershell", "-NoProfile", "-NonInteractive", "-Command", ps],
+                env={**os.environ, "MZ_IN": str(src), "MZ_OUT": str(out)},
+                capture_output=True, timeout=120, creationflags=flags, check=True,
+            )
+        except Exception:
+            pass
+        if out.is_file() and out.stat().st_size > 0:
+            return out
+    soffice = shutil.which("soffice") or shutil.which("libreoffice")
+    if soffice:
+        try:
+            subprocess.run(
+                [soffice, "--headless", "--convert-to", "docx", "--outdir", str(out_dir), str(src)],
+                capture_output=True, timeout=180, creationflags=flags, check=True,
+            )
+            made = out_dir / f"{src.stem}.docx"
+            if made.is_file():
+                made.replace(out)
+                return out
+        except Exception:
+            pass
+    raise validation_error(
+        "could not convert the legacy Word file; save it as .docx in Word and import again",
+        {"field": "path"},
+        "تعذّر تحويل ملف Word القديم. افتحه في Word واحفظه بصيغة docx ثم استورده.",
+    )
+
+
 @router.post("/import", status_code=201)
 async def import_docx(body: ImportRequest, request: Request) -> dict[str, Any]:
-    path = _check_in(body.path, "path")
-    return await run_blocking(
-        _do_import, request.app.state.db_path, path, body.project_id, body.title
-    )
+    title = body.title
+    if Path(body.path).suffix.lower() in LEGACY_EXTS:
+        src = security.safe_path(body.path, "path", exts=LEGACY_EXTS, max_bytes=MAX_DOCX_BYTES)
+        title = title or src.stem
+        path = await run_blocking(_convert_legacy, src, request.app.state.data_dir)
+    else:
+        path = _check_in(body.path, "path")
+    return await run_blocking(_do_import, request.app.state.db_path, path, body.project_id, title)
 
 
 def _resolve_source(db_path: Path, body: ExportRequest) -> dict[str, Any]:
