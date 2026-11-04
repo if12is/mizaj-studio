@@ -502,7 +502,8 @@ async function exportDocx(): Promise<void> {
         document_id: doc.id,
         target_path: target,
         mode: settings.values.engine_mode,
-        level: settings.values.tashkeel_level
+        level: settings.values.tashkeel_level,
+        as_is: true // as the document is now; tashkeel only if the user ran it
       },
       true
     )
