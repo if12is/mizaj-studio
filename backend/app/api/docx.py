@@ -64,6 +64,8 @@ class ExportRequest(BaseModel):
     mode: Literal["fast", "accurate"] = "fast"
     level: Literal["full", "irab_only", "essential", "minimal", "legal"] = "full"
     include_comments: bool = False
+    # export the document exactly as the editor holds it (no engine run on top of it)
+    as_is: bool = False
 
 
 def _do_import(db_path: Path, path: Path, project_id: int, title: str | None) -> dict[str, Any]:
@@ -219,7 +221,7 @@ def _resolve_source(db_path: Path, body: ExportRequest) -> dict[str, Any]:
                 return {
                     "src": src,
                     "stored": stored if stored.strip() else None,
-                    "stored_diacritized": bool(diac.strip()),
+                    "stored_diacritized": bool(diac.strip()) or body.as_is,
                 }
         st = dict(conn.execute("SELECT key, value FROM settings").fetchall())
     finally:
@@ -232,7 +234,7 @@ def _resolve_source(db_path: Path, body: ExportRequest) -> dict[str, Any]:
     return {
         "title": row["title"],
         "text": diac if diac.strip() else row["raw_content"],
-        "diacritized": bool(diac.strip()),
+        "diacritized": bool(diac.strip()) or body.as_is,
         "font": st.get("editor_font") or DEFAULTS["editor_font"],
         "size_px": size,
     }
