@@ -4,6 +4,7 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useApi } from '@renderer/api'
 import { ApiError } from '@renderer/api/client'
 import { notify } from '@renderer/api/toast'
+import { TEXT_ONLY_TOAST, TEXT_ONLY_WARNING } from '@renderer/files/formats'
 import { useProjectsStore } from '@renderer/stores/projects'
 import SuccessCheck from './ui/SuccessCheck.vue'
 
@@ -74,8 +75,10 @@ async function onDrop(e: DragEvent): Promise<void> {
       title: string
       word_count: number
       stats: Record<string, unknown>
+      conversion?: string
     }>('/api/docx/import', { path, project_id: projectId })
     await projects.loadDocuments(projectId)
+    if (r.conversion === 'text_only') notify(TEXT_ONLY_WARNING, TEXT_ONLY_TOAST)
     card.value = {
       ...card.value,
       state: 'ready',

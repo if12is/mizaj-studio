@@ -17,6 +17,7 @@ export const EXPORT_FORMATS: ExportFormat[] = [
     ext: 'docx',
     filterName: 'Word'
   },
+  // same content as the entries above; uses the default options without asking
   { id: 'docx-track', label: 'تصدير بتتبع التغييرات', ext: 'docx', filterName: 'Word' },
   { id: 'txt', label: 'نص عادي (‎.txt‎)', ext: 'txt', filterName: 'Text' },
   { id: 'md', label: 'Markdown (‎.md‎)', ext: 'md', filterName: 'Markdown' },
@@ -146,12 +147,22 @@ export function ocrErrorMessage(e: unknown): {
   return { text: 'تعذر التعرف الضوئي على الملف.', hint: null, missing: false }
 }
 
+/** Shown after importing a legacy file (.doc/.rtf/.odt/.docm) that could only be read as text. */
+export const TEXT_ONLY_WARNING =
+  'تم استيراد النص فقط لأن Microsoft Word غير متاح لتحويل الملف القديم؛ التنسيق الأصلي لن يُحفظ. لحفظ التنسيق: افتح الملف في Word واحفظه بصيغة docx ثم استورده.'
+export const TEXT_ONLY_TOAST = { kind: 'warning', ms: 15000 } as const
+
 /** Arabic text for the common error envelopes raised while writing an export. */
 export function exportErrorMessage(e: unknown): string {
   if (e instanceof ApiError) {
     if (e.errorCode === 'ERR_DOCX_WRITE_LOCKED')
       return 'الملف مفتوح في برنامج آخر (مثل Word)؛ أغلقه أو اختر مساراً آخر.'
-    return e.messageAr
+    if (e.errorCode === 'ERR_DISK_FULL')
+      return 'لا توجد مساحة كافية على القرص. حرّر مساحة ثم أعد المحاولة.'
+    if (e.errorCode === 'ERR_DOCX_CORRUPT') return 'ملف Word تالف أو غير صالح.'
+    // ERR_DOCX_SOURCE_MISSING (409) and the rest: the backend's Arabic sentence is already good
+    if (e.messageAr) return e.messageAr
+    return 'تعذر التصدير.'
   }
   return 'تعذر التصدير.'
 }

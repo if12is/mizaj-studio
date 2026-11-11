@@ -1,6 +1,6 @@
 import { ref } from 'vue'
 
-export type ToastKind = 'error' | 'success' | 'info'
+export type ToastKind = 'error' | 'success' | 'info' | 'warning'
 
 export interface Toast {
   id: number
@@ -21,5 +21,6 @@ export function notify(text: string, opts: { kind?: ToastKind; ms?: number } = {
 export const toastClass: Record<ToastKind, string> = {
   error: 'bg-red-600',
   success: 'bg-mizaj-emerald',
-  info: 'bg-slate-600'
+  info: 'bg-slate-600',
+  warning: 'bg-amber-600'
 }

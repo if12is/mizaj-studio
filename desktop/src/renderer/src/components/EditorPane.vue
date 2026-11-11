@@ -16,6 +16,7 @@ import type { Suggestion } from '@renderer/editor/inspector'
 import { readOnlyCompartment, useTashkeelRun } from '@renderer/composables/useTashkeelRun'
 import { useDictionaryStore } from '@renderer/stores/dictionary'
 import { useEditorStore } from '@renderer/stores/editor'
+import { useFileStore } from '@renderer/stores/fileio'
 import { useProjectsStore } from '@renderer/stores/projects'
 import { useSettingsStore } from '@renderer/stores/settings'
 import { useSidecarStore } from '@renderer/stores/sidecar'
@@ -485,38 +486,9 @@ async function openAndMaybeDiacritize(id: number, diacritize: boolean): Promise<
   if (diacritize) await run.start()
 }
 
+/** Toolbar «تصدير DOCX»: exactly the File-menu Word export (same request, flush and errors). */
 async function exportDocx(): Promise<void> {
-  const doc = projects.currentDocument
-  const api = window.mizajAPI
-  if (!doc) return
-  let target: string | null = null
-  if (api?.showSaveDialog) target = await api.showSaveDialog(`${doc.title}.docx`)
-  else target = window.prompt('مسار ملف DOCX الناتج (مطلق)', '') || null
-  if (!target) return
-  try {
-    await props.flushSave()
-    const r = await useApi().request<{ target_path: string }>(
-      'POST',
-      '/api/docx/export',
-      {
-        document_id: doc.id,
-        target_path: target,
-        mode: settings.values.engine_mode,
-        level: settings.values.tashkeel_level,
-        as_is: true // as the document is now; tashkeel only if the user ran it
-      },
-      true
-    )
-    notify(`تم تصدير الملف: ${r.target_path}`, { kind: 'success' })
-  } catch (e) {
-    if (!(e instanceof ApiError)) return notify('تعذر تصدير الملف.')
-    if (e.errorCode === 'ERR_DOCX_WRITE_LOCKED')
-      notify('الملف مفتوح في برنامج آخر. أغلق Word أو اختر اسماً/مساراً آخر ثم أعد التصدير.')
-    else if (e.errorCode === 'ERR_DISK_FULL')
-      notify('لا توجد مساحة كافية على القرص. حرّر مساحة ثم أعد المحاولة.')
-    else if (e.errorCode === 'ERR_DOCX_CORRUPT') notify('ملف Word تالف أو غير صالح.')
-    else notify(e.messageAr)
-  }
+  await useFileStore().exportAs('docx')
 }
 
 // re-check / clear when the spelling settings change, and once a tashkeel run is over
