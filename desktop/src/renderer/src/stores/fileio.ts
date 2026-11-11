@@ -4,6 +4,7 @@ import { useApi } from '@renderer/api'
 import { notify } from '@renderer/api/toast'
 import { ApiError } from '@renderer/api/client'
 import {
+  DEFAULT_TRACKED,
   EXPORT_FORMATS,
   IMPORT_EXTENSIONS,
   baseName,
@@ -11,6 +12,8 @@ import {
   exportFileName,
   importKind,
   ocrErrorMessage,
+  TEXT_ONLY_TOAST,
+  TEXT_ONLY_WARNING,
   stem,
   type ExportId,
   type TrackedOptions,
@@ -88,28 +91,30 @@ export const useFileStore = defineStore('fileio', () => {
     const settings = useSettingsStore()
     const doc = projects.currentDocument
     if (!fmt || !doc) return void notify('افتح مستنداً أولاً.', { kind: 'info' })
+    const diffBase = useEditorStore().diffBase
+    const hasOrigin = !!doc.source_docx_path || diffBase !== null
     let tracked: TrackedOptions | null = null
     if (id === 'docx-track-edits') {
-      const base = useEditorStore().diffBase
-      if (!doc.source_docx_path && base === null)
+      if (!hasOrigin)
         return void notify('لا يوجد أصل للمقارنة: افتح ملف Word أو شغّل التشكيل أولاً.', {
           kind: 'info'
         })
       tracked = await askTracked()
       if (!tracked) return
+    } else if (id === 'docx-track' && hasOrigin) {
+      // same content as every other Word export: the user's own edits, tracked against the
+      // original (default options, no dialog)
+      tracked = DEFAULT_TRACKED
     }
     busy.value = true
     try {
       let doneMsg = ''
-      let source: string | null = null
-      if (id === 'docx-track') {
-        // tracked changes need the original Word file to compare against
-        source = doc.source_docx_path
-        if (!source) {
-          notify('اختر ملف Word الأصلي ليُقارَن به التشكيل وتُسجَّل التغييرات.', { kind: 'info' })
-          source = await pickOpenPath(['docx'], 'Word')
-          if (!source) return
-        }
+      let legacySource: string | null = null
+      if (id === 'docx-track' && !tracked) {
+        // no source file and no diff base: compare against an original file the user picks
+        notify('اختر ملف Word الأصلي ليُقارَن به التشكيل وتُسجَّل التغييرات.', { kind: 'info' })
+        legacySource = await pickOpenPath(['docx'], 'Word')
+        if (!legacySource) return
       }
       const target = await pickSavePath(
         exportFileName(doc.title, fmt.ext),
@@ -117,9 +122,23 @@ export const useFileStore = defineStore('fileio', () => {
         fmt.filterName
       )
       if (!target) return
-      await hooks?.flush()
+      await hooks?.flush() // unsaved editor text is stored before any export reads it
       const api = useApi()
-      if (id === 'docx') {
+      if (tracked) {
+        const r = await api.request<{ stats: { revisions: number } }>(
+          'POST',
+          '/api/docx/export-tracked',
+          {
+            document_id: doc.id,
+            target_path: target,
+            scope: tracked.scope,
+            granularity: tracked.granularity,
+            ...(doc.source_docx_path ? {} : { original_text: diffBase })
+          },
+          true
+        )
+        doneMsg = `تم التصدير: ${target} — ${r.stats.revisions} تغييراً يمكن قبوله أو رفضه في Word`
+      } else if (id === 'docx') {
         await api.request(
           'POST',
           '/api/docx/export',
@@ -132,26 +151,12 @@ export const useFileStore = defineStore('fileio', () => {
           },
           true
         )
-      } else if (id === 'docx-track-edits' && tracked) {
-        const r = await api.request<{ stats: { revisions: number } }>(
-          'POST',
-          '/api/docx/export-tracked',
-          {
-            document_id: doc.id,
-            target_path: target,
-            scope: tracked.scope,
-            granularity: tracked.granularity,
-            ...(doc.source_docx_path ? {} : { original_text: useEditorStore().diffBase })
-          },
-          true
-        )
-        doneMsg = `تم التصدير: ${target} — ${r.stats.revisions} تغييراً يمكن قبوله أو رفضه في Word`
       } else if (id === 'docx-track') {
         await api.request(
           'POST',
           '/api/io/docx/track-changes',
           {
-            source_path: source,
+            source_path: legacySource,
             target_path: target,
             mode: settings.values.engine_mode,
             level: settings.values.tashkeel_level
@@ -211,7 +216,7 @@ export const useFileStore = defineStore('fileio', () => {
       const api = useApi()
       if (kind === 'docx') {
         const pid = await ensureProjectId()
-        const r = await api.request<{ document_id: number }>(
+        const r = await api.request<{ document_id: number; conversion?: string }>(
           'POST',
           '/api/docx/import',
           { path, project_id: pid },
@@ -219,7 +224,8 @@ export const useFileStore = defineStore('fileio', () => {
         )
         await useProjectsStore().loadDocuments(pid)
         await hooks?.openDocument(r.document_id)
-        notify('تم استيراد ملف Word.', { kind: 'success' })
+        if (r.conversion === 'text_only') notify(TEXT_ONLY_WARNING, TEXT_ONLY_TOAST)
+        else notify('تم استيراد ملف Word.', { kind: 'success' })
       } else if (kind === 'image') {
         await runOcr(path)
       } else if (kind === 'pdf') {

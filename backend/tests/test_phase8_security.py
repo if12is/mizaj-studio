@@ -412,7 +412,8 @@ def test_stored_source_path_is_revalidated(client, tmp_path):
     con.close()
     out = tmp_path / "o.docx"
     r = client.post("/api/docx/export", json={"document_id": did, "target_path": str(out)})
-    assert r.status_code == 200 and out.exists()  # generated from text, never opened the UNC path
+    # never opened the UNC path, and no silent plain file either: the source is reported missing
+    assert r.status_code == 409 and code_of(r) == "ERR_DOCX_SOURCE_MISSING" and not out.exists()
 
 
 def test_batch_output_escape_via_symlink_is_skipped(client, tmp_path):

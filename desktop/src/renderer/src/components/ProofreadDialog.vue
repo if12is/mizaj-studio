@@ -80,7 +80,11 @@ const stateCls = (id: string, which: 'accept' | 'reject'): string =>
           >
             قبول الكل (كل الأقسام)
           </button>
-          <button :class="chip" data-testid="proofread-reject-all" @click="store.decideAll('reject')">
+          <button
+            :class="chip"
+            data-testid="proofread-reject-all"
+            @click="store.decideAll('reject')"
+          >
             رفض الكل
           </button>
         </span>
