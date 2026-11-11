@@ -1,12 +1,10 @@
 from __future__ import annotations
 
-import hashlib
 import logging
 import os
 import shutil
 import sqlite3
-import subprocess
-import sys
+import tempfile
 from pathlib import Path
 from typing import Any, Literal
 
@@ -68,7 +66,63 @@ class ExportRequest(BaseModel):
     as_is: bool = False
 
 
-def _do_import(db_path: Path, path: Path, project_id: int, title: str | None) -> dict[str, Any]:
+def _snapshot_path(data_dir: Path, document_id: int) -> Path:
+    return Path(data_dir) / "sources" / f"doc-{document_id}.docx"
+
+
+def _save_snapshot(data_dir: Path, document_id: int, src: Path) -> None:
+    """Private copy of the imported source .docx (atomic): export keeps the original formatting
+    even when the original file is later moved, renamed or on an unmounted drive."""
+    dst = _snapshot_path(data_dir, document_id)
+    dst.parent.mkdir(parents=True, exist_ok=True)
+    fd, tmp = tempfile.mkstemp(dir=dst.parent, prefix=".~snap.", suffix=".tmp")
+    try:
+        with os.fdopen(fd, "wb") as out, open(src, "rb") as inp:
+            shutil.copyfileobj(inp, out)
+            out.flush()
+            os.fsync(out.fileno())
+        os.replace(tmp, dst)
+    except OSError as exc:  # a missing snapshot only removes the fallback; the import stands
+        log.warning("could not snapshot source docx: %r", exc)
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+
+
+def resolve_source_docx(
+    data_dir: Path, document_id: int, recorded: str | None
+) -> Path | None:
+    """The source .docx of a document: the recorded original when it validates, else the private
+    snapshot taken at import. A document that HAS a recorded source but neither is available
+    raises ERR_DOCX_SOURCE_MISSING (never silently a plain regenerated file). Documents without a
+    recorded source return None."""
+    if not recorded:
+        return None
+    try:
+        return _check_in(recorded, "source_docx_path")
+    except MizajError:
+        pass
+    snap = _snapshot_path(data_dir, document_id)
+    if snap.is_file():
+        try:
+            return _check_in(str(snap), "source_docx_path")
+        except MizajError:
+            pass
+    raise MizajError(
+        "ERR_DOCX_SOURCE_MISSING",
+        409,
+        "ملف Word الأصلي غير موجود في مكانه، لذلك لا يمكن التصدير بنفس التنسيق. "
+        "أعِد الملف إلى مكانه أو استورده من جديد.",
+        "The original Word file is missing, so the export cannot keep its formatting. "
+        "Put the file back or import it again.",
+        {"path": recorded},
+    )
+
+
+def _do_import(
+    db_path: Path, path: Path, project_id: int, title: str | None, data_dir: Path | None = None
+) -> dict[str, Any]:
     if not path.is_file():
         raise not_found("File", str(path))
     from app.docx.service import extract_plain_text  # lazy: python-docx/lxml (startup time)
@@ -96,6 +150,8 @@ def _do_import(db_path: Path, path: Path, project_id: int, title: str | None) ->
                 "last_opened_at=excluded.last_opened_at",
                 (str(path), doc_id, ts),
             )
+        if data_dir is not None:
+            _save_snapshot(data_dir, doc_id, path)
         return {
             "document_id": doc_id,
             "title": name,
@@ -109,88 +165,32 @@ def _do_import(db_path: Path, path: Path, project_id: int, title: str | None) ->
 LEGACY_EXTS = (".doc", ".rtf", ".odt", ".docm")
 
 
-def _convert_legacy(src: Path, data_dir: Path) -> Path:
-    """Convert a legacy Word file to .docx (MS Word via PowerShell COM, else LibreOffice)."""
-    out_dir = Path(data_dir) / "converted"
-    out_dir.mkdir(parents=True, exist_ok=True)
-    key = hashlib.sha1(f"{src}|{src.stat().st_mtime_ns}".encode()).hexdigest()[:10]
-    out = out_dir / f"{src.stem[:80]}-{key}.docx"
-    if out.is_file() and out.stat().st_size > 0:
-        return out
-    flags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
-    if sys.platform == "win32":
-        ps = (
-            "$ErrorActionPreference='Stop';"
-            "foreach($id in 'Word.Application','KWPS.Application','wps.Application'){"
-            "try{$w=New-Object -ComObject $id;"
-            "try{$w.Visible=$false}catch{};try{$w.DisplayAlerts=0}catch{};"
-            "try{$d=$w.Documents.Open($env:MZ_IN,$false,$true);$o=$env:MZ_OUT;"
-            "try{$d.SaveAs2($o,16)}catch{$d.SaveAs([ref]$o,[ref]16)};$d.Close($false)}"
-            "finally{try{$w.Quit()}catch{}};"
-            "if(Test-Path -LiteralPath $env:MZ_OUT){exit 0}"
-            "}catch{[Console]::Error.WriteLine($id+': '+$_.Exception.Message)}};exit 1"
-        )
-        import base64
-
-        exe = Path(os.environ.get("SystemRoot", r"C:\Windows")) / (
-            r"System32\WindowsPowerShell\v1.0\powershell.exe"
-        )
-        try:
-            r = subprocess.run(
-                [str(exe) if exe.is_file() else "powershell", "-NoProfile", "-NonInteractive",
-                 "-EncodedCommand", base64.b64encode(ps.encode("utf-16-le")).decode()],
-                env={**os.environ, "MZ_IN": str(src), "MZ_OUT": str(out)},
-                capture_output=True, timeout=120, creationflags=flags,
-            )
-            if r.returncode != 0:
-                log.warning("word com convert failed: %s", r.stderr[-500:].decode("utf-8", "replace"))
-        except Exception as exc:  # noqa: BLE001
-            log.warning("word com convert error: %r", exc)
-        if out.is_file() and out.stat().st_size > 0:
-            return out
-    soffice = shutil.which("soffice") or shutil.which("libreoffice")
-    if soffice:
-        try:
-            subprocess.run(
-                [soffice, "--headless", "--convert-to", "docx", "--outdir", str(out_dir), str(src)],
-                capture_output=True, timeout=180, creationflags=flags, check=True,
-            )
-            made = out_dir / f"{src.stem}.docx"
-            if made.is_file():
-                made.replace(out)
-                return out
-        except Exception:  # noqa: BLE001
-            pass
-    if src.suffix.lower() == ".doc":  # last resort: text-only conversion, needs no Office
-        try:
-            from app.docx.legacy import doc_to_docx
-
-            doc_to_docx(src, out)
-            if out.is_file() and out.stat().st_size > 0:
-                return out
-        except Exception as exc:  # noqa: BLE001
-            log.warning("builtin .doc conversion failed: %r", exc)
-            out.unlink(missing_ok=True)
-    raise validation_error(
-        "could not convert the legacy Word file; save it as .docx in Word and import again",
-        {"field": "path"},
-        "تعذّر تحويل ملف Word القديم. افتحه في Word واحفظه بصيغة docx ثم استورده.",
-    )
-
-
 @router.post("/import", status_code=201)
 async def import_docx(body: ImportRequest, request: Request) -> dict[str, Any]:
     title = body.title
+    conversion: str | None = None
     if Path(body.path).suffix.lower() in LEGACY_EXTS:
         src = security.safe_path(body.path, "path", exts=LEGACY_EXTS, max_bytes=MAX_DOCX_BYTES)
         title = title or src.stem
-        path = await run_blocking(_convert_legacy, src, request.app.state.data_dir)
+        from app.docx.convert import convert_legacy
+
+        path, conversion = await run_blocking(convert_legacy, src, request.app.state.data_dir)
     else:
         path = _check_in(body.path, "path")
-    return await run_blocking(_do_import, request.app.state.db_path, path, body.project_id, title)
+    result = await run_blocking(
+        _do_import,
+        request.app.state.db_path,
+        path,
+        body.project_id,
+        title,
+        request.app.state.data_dir,
+    )
+    if conversion is not None:
+        result["conversion"] = conversion
+    return result
 
 
-def _resolve_source(db_path: Path, body: ExportRequest) -> dict[str, Any]:
+def _resolve_source(db_path: Path, body: ExportRequest, data_dir: Path) -> dict[str, Any]:
     """Either {"src": Path} for an imported/Word file, or {"text": ..., "title": ...,
     "diacritized": bool, font settings} for a document with no source .docx (generate new)."""
     if (body.document_id is None) == (body.source_path is None):
@@ -207,11 +207,9 @@ def _resolve_source(db_path: Path, body: ExportRequest) -> dict[str, Any]:
         if row is None:
             raise not_found("Document", body.document_id)
         if row["source_docx_path"]:
-            # the stored path may come from a restored backup: re-validate it (no UNC/devices)
-            try:
-                src = _check_in(row["source_docx_path"], "source_docx_path")
-            except MizajError:
-                src = None
+            # the stored path may come from a restored backup: re-validate it (no UNC/devices);
+            # the import snapshot replaces a missing original, never a plain regenerated file
+            src = resolve_source_docx(data_dir, body.document_id, row["source_docx_path"])
             if src is not None:
                 # what the editor holds (edits, manual marks, accepted proofreading) wins
                 # over re-running the engine on the original file
@@ -244,7 +242,7 @@ def _resolve_source(db_path: Path, body: ExportRequest) -> dict[str, Any]:
 async def export_docx(body: ExportRequest, request: Request) -> dict[str, Any]:
     _check_path(body.target_path, "target_path")
     db_path = request.app.state.db_path
-    src = await run_blocking(_resolve_source, db_path, body)
+    src = await run_blocking(_resolve_source, db_path, body, request.app.state.data_dir)
     target = _check_out(body.target_path, "target_path", request.app.state.data_dir, src.get("src"))
     from app.docx.service import diacritize_docx, process_text_docx  # lazy (startup time)
 
@@ -258,6 +256,7 @@ async def export_docx(body: ExportRequest, request: Request) -> dict[str, Any]:
             db_path,
             stored=src.get("stored"),
             stored_diacritized=src.get("stored_diacritized", False),
+            as_is=body.as_is,
         )
     else:
         pipeline = None
@@ -346,12 +345,7 @@ async def export_tracked(body: TrackedExportRequest, request: Request) -> dict[s
     db_path = request.app.state.db_path
     data_dir = request.app.state.data_dir
     src_raw = await run_blocking(_source_of, db_path, body.document_id)
-    src = None
-    if src_raw:
-        try:
-            src = _check_in(src_raw, "source_docx_path")
-        except MizajError:
-            src = None
+    src = resolve_source_docx(data_dir, body.document_id, src_raw)
     target = _check_out(body.target_path, "target_path", data_dir, src)
     stats = await run_blocking(_tracked_sync, db_path, body, target, data_dir, src)
     return {"target_path": str(target), "stats": stats}
@@ -362,7 +356,7 @@ class RenderRequest(BaseModel):
     diacritized: bool = False
 
 
-def _render_sync(db_path: Path, body: RenderRequest) -> dict[str, Any]:
+def _render_sync(db_path: Path, body: RenderRequest, data_dir: Path) -> dict[str, Any]:
     from app.docx import render  # lazy: python-docx/lxml (startup time)
 
     conn = connect(db_path)
@@ -381,10 +375,7 @@ def _render_sync(db_path: Path, body: RenderRequest) -> dict[str, Any]:
     # what the export would write: diacritized text when asked for and present, else raw
     stored = diac if diac.strip() else (row["raw_content"] or "")
     if row["source_docx_path"]:
-        try:
-            src = _check_in(row["source_docx_path"], "source_docx_path")
-        except MizajError:
-            src = None
+        src = resolve_source_docx(data_dir, body.document_id, row["source_docx_path"])
         if src is not None and src.is_file():
             return render.render_docx(src, stored if stored.strip() else None)
     try:
@@ -398,4 +389,6 @@ def _render_sync(db_path: Path, body: RenderRequest) -> dict[str, Any]:
 @router.post("/render")
 async def render_docx(body: RenderRequest, request: Request) -> dict[str, Any]:
     """Sanitized HTML of the document's page view (formatting from the source .docx)."""
-    return await run_blocking(_render_sync, request.app.state.db_path, body)
+    return await run_blocking(
+        _render_sync, request.app.state.db_path, body, request.app.state.data_dir
+    )

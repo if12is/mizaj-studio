@@ -141,13 +141,17 @@ def _marked_words(text: str) -> int:
 def process_docx(
     src: Path,
     dst: Path,
-    pipeline: TashkeelPipeline,
+    pipeline: TashkeelPipeline | None,
     db_path: Path,
     include_comments: bool = False,
     stored: str | None = None,
     stored_diacritized: bool = False,
+    as_is: bool = False,
 ) -> dict[str, Any]:
     """Blocking implementation (run it in the engine executor).
+
+    `as_is`: the engine never runs anywhere; only the editor text (`stored`) is written into the
+    body, every other part stays byte-identical to the source (`pipeline` may be None).
 
     `stored`: the editor's text of the document (flow text of the body). Paragraphs it covers
     are written from it, run by run, instead of being diacritized again: when
@@ -193,6 +197,8 @@ def process_docx(
                             touched = True
                     if touched:
                         stats.setdefault("engine_fallback", 0)
+                if as_is and not from_editor:
+                    continue  # untouched part: kept byte-identical, no engine
                 for unit in iter_units(root, kind):
                     stats["skipped_code_runs"] += unit.skipped_code_runs
                     if not unit.t_nodes:
@@ -202,6 +208,8 @@ def process_docx(
                     if from_editor and stored_diacritized and unit.category in ("body", "sdt"):
                         stats["words_diacritized"] += _marked_words(unit.text)
                         continue  # final editor text: the engine never touches it
+                    if as_is:
+                        continue  # text boxes etc. inside the body part: left as they are
                     if not has_arabic_letters(unit.text):
                         continue
                     out = pipeline.run_text(conn, unit.text)
@@ -229,12 +237,17 @@ async def diacritize_docx(
     keep_existing: bool = True,
     stored: str | None = None,
     stored_diacritized: bool = False,
+    as_is: bool = False,
 ) -> dict[str, Any]:
-    """Async entry point: builds the Phase 2 pipeline, then runs off the event loop."""
-    pipeline = await build_pipeline(mode, level, keep_existing)
-    return await run_blocking(
-        process_docx, src, dst, pipeline, db_path, include_comments, stored, stored_diacritized
+    """Async entry point: builds the Phase 2 pipeline (not for `as_is`), then runs off the event
+    loop."""
+    pipeline = None if as_is else await build_pipeline(
+        mode, level, keep_existing
     )
+    return await run_blocking(
+        process_docx,
+        src, dst, pipeline, db_path, include_comments, stored, stored_diacritized, as_is,
+    )  # fmt: skip
 
 
 def extract_plain_text(src: Path) -> tuple[str, dict[str, Any]]:

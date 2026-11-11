@@ -207,12 +207,14 @@ test('batch dialog processes a folder of two TXT files and opens the output', as
   for (const f of ['docx', 'md', 'srt', 'epub']) await t(`batch-format-${f}`).uncheck()
   await t('batch-start').click()
   await expect(t('batch-status')).toHaveAttribute('data-status', 'done', { timeout: 60_000 })
+  // results go into ONE new folder named after the input folder: «<name> مشكل»
+  const resDir = join(outDir, 'in مشكل')
   expect(
-    readdirSync(outDir)
+    readdirSync(resDir)
       .filter((f) => !f.endsWith('.done'))
       .sort()
   ).toEqual(['a.txt', 'b.txt'])
-  expect((readFileSync(join(outDir, 'a.txt'), 'utf8').match(MARKS) ?? []).length).toBeGreaterThan(2)
+  expect((readFileSync(join(resDir, 'a.txt'), 'utf8').match(MARKS) ?? []).length).toBeGreaterThan(2)
   expect(readFileSync(join(inDir, 'a.txt'), 'utf8')).toBe('ذهب الولد إلى المدرسة') // untouched
   await t('batch-open-output').click()
   const log = await app.evaluate(

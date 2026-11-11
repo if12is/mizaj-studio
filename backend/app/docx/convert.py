@@ -44,7 +44,7 @@ def _com_convert_worker(src: Path, dst: Path, result: dict) -> None:
         for prog_id in WORD_PROGIDS:
             app = None
             try:
-                # dynamic=True: late-bound IDispatch, no comtypes.gen wrappers (read-only in the frozen app)
+                # dynamic=True: late-bound IDispatch, no comtypes.gen (read-only when frozen)
                 app = comtypes.client.CreateObject(prog_id, dynamic=True)
                 try:
                     app.Visible = False
