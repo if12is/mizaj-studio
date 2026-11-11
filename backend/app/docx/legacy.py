@@ -69,18 +69,31 @@ def extract_text(path: Path) -> str:
     return _CTRL.sub("", text).replace("\xa0", " ").strip("\n")
 
 
+_ARABIC = re.compile(r"[\u0600-\u06ff\u0750-\u077f\ufb50-\ufdff\ufe70-\ufeff]")
+_AR_FONT = "Simplified Arabic"
+
+
 def doc_to_docx(src: Path, dst: Path) -> None:
     from docx import Document
+    from docx.enum.text import WD_ALIGN_PARAGRAPH
     from docx.oxml import OxmlElement
+    from docx.oxml.ns import qn
 
     d = Document()
     for line in extract_text(src).split("\n"):
         p = d.add_paragraph(line.rstrip("\t"))
-        p.alignment = 0
-        ppr = p._p.get_or_add_pPr()
-        if re.search(r"[؀-ۿ]", line):
+        if _ARABIC.search(line):
+            ppr = p._p.get_or_add_pPr()
             ppr.append(OxmlElement("w:bidi"))
+            # with w:bidi, "left" means the leading (right) edge in Word
+            p.alignment = WD_ALIGN_PARAGRAPH.LEFT
             for r in p.runs:
                 rpr = r._r.get_or_add_rPr()
+                fonts = OxmlElement("w:rFonts")
+                for a in ("w:ascii", "w:hAnsi", "w:cs"):
+                    fonts.set(qn(a), _AR_FONT)
+                rpr.append(fonts)
                 rpr.append(OxmlElement("w:rtl"))
+        else:
+            p.alignment = WD_ALIGN_PARAGRAPH.LEFT
     d.save(str(dst))

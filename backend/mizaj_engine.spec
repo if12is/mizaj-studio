@@ -44,6 +44,8 @@ hiddenimports += [
 hiddenimports += collect_submodules("uvicorn") + ["uvicorn.logging", "uvicorn.loops.auto",
                                                    "uvicorn.protocols.http.auto"]
 hiddenimports += collect_submodules("app") + ["olefile"]
+if sys.platform == "win32":  # legacy .doc import drives Word/WPS through COM (convert.py)
+    hiddenimports += collect_submodules("comtypes")
 
 # our own resources
 datas += [
