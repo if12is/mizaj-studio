@@ -1,0 +1,33 @@
+name: Bug report / بلاغ عن مشكلة
+description: Something does not work as expected
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened? / ماذا حدث؟
+      description: Include the input text (or a small sample .docx without private data) and the output you got.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect? / ما المتوقع؟
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Mizaj version and Windows version
+      placeholder: e.g. 2.3.0 on Windows 11
+  - type: dropdown
+    id: engine
+    attributes:
+      label: Tashkeel engine
+      options: [Fast (mishkal), Accurate (CATT), Not related to tashkeel]
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs (optional)
+      description: "<userData>/logs/mizaj-backend.log and mizaj-main.log. Remove any private text first."
+      render: text
