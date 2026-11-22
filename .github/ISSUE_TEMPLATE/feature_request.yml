@@ -1,0 +1,21 @@
+name: Feature request / اقتراح ميزة
+description: Suggest an improvement or new tool
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem does this solve? / ما المشكلة؟
+      description: Who needs it and in what kind of document (legal, academic, poetry, Quran, ...).
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution / الحل المقترح
+  - type: checkboxes
+    id: offline
+    attributes:
+      label: Offline-first
+      options:
+        - label: The feature works without internet, or is opt-in and says what leaves the device (see AGENTS.md §5).

@@ -12,6 +12,20 @@
 - **Complete SQLite WAL Database + Migrations:** Includes `projects`, `documents`, `tashkeel_cache` (with `UNIQUE` index on `word_or_phrase`), `settings`, and `recent_files`, managed by a `PRAGMA user_version` migration runner.
 - **Deep Non-Destructive DOCX Engine:** Preserves 7-tuple run style signatures, tables, headers/footers, footnotes/endnotes, textboxes (`w:txbxContent`), and mixed Arabic/English/Code spans.
 
+## Contributing
+
+Mizaj is open source and welcomes contributors — developers, Arabic linguists and legal writers alike.
+Start with [`CONTRIBUTING.md`](./CONTRIBUTING.md), then pick an issue labelled
+[`good first issue`](https://github.com/if12is/mizaj-studio/labels/good%20first%20issue) or
+[`help wanted`](https://github.com/if12is/mizaj-studio/labels/help%20wanted).
+Every test runs in a deterministic mock mode, so you can contribute without downloading the model weights.
+
+المشروع مفتوح المصدر ويرحّب بالمساهمات في الكود وفي البيانات اللغوية (العملات، المسرد القانوني، القوالب، أنماط الأخطاء الإملائية).
+
+## License
+
+Copyright (C) 2026 Mizaj Studio Contributors. Released under the [GNU GPL v3.0 or later](./LICENSE).
+
 ## Repository Documentation Map
 - **AI Agent Rules:** [`AGENTS.md`](./AGENTS.md) (Single Source of Truth), [`CLAUDE.md`](./CLAUDE.md), [`CONTRIBUTING.md`](./CONTRIBUTING.md)
 - **Architecture Deep-Dives:**
